@@ -76,10 +76,12 @@ async function initDB() {
       transportista TEXT,
       mat_camion TEXT,
       mat_remolque TEXT,
+      carga_grupo_id TEXT,
       notas TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS transportista TEXT;
+    ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS carga_grupo_id TEXT;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_camion TEXT;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_remolque TEXT;
     CREATE TABLE IF NOT EXISTS partes_produccion (
@@ -331,7 +333,7 @@ app.get('/api/entregas', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 app.post('/api/entregas', async (req, res) => {
-  const {linea_pedido_id,fecha_carga,cantidad,notas,transportista,mat_camion,mat_remolque} = req.body;
+  const {linea_pedido_id,fecha_carga,cantidad,notas,transportista,mat_camion,mat_remolque,carga_grupo_id} = req.body;
   try {
     const r = await pool.query(
       `INSERT INTO entregas_parciales (linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,notas) VALUES ($1,$2,$3,'pendiente',$4,$5,$6,$7) RETURNING *`,
@@ -341,7 +343,7 @@ app.post('/api/entregas', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 app.put('/api/entregas/:id', async (req, res) => {
-  const {fecha_carga,cantidad,notas,estado,transportista,mat_camion,mat_remolque} = req.body;
+  const {fecha_carga,cantidad,notas,estado,transportista,mat_camion,mat_remolque,carga_grupo_id} = req.body;
   try {
     const r = await pool.query(
       `UPDATE entregas_parciales SET fecha_carga=$1,cantidad=$2,notas=$3,estado=$4,transportista=$5,mat_camion=$6,mat_remolque=$7 WHERE id=$8 RETURNING *`,
