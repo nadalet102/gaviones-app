@@ -358,6 +358,16 @@ app.patch('/api/entregas/:id/confirmar', async (req, res) => {
   } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
   finally { client.release(); }
 });
+app.patch('/api/entregas/:id/fecha', async (req, res) => {
+  try {
+    const r = await pool.query(
+      'UPDATE entregas_parciales SET fecha_carga=$1 WHERE id=$2 RETURNING *',
+      [req.body.fecha_carga, req.params.id]
+    );
+    res.json(r.rows[0]);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
 app.delete('/api/entregas/:id', async (req, res) => {
   try { await pool.query('DELETE FROM entregas_parciales WHERE id=$1',[req.params.id]); res.json({ok:true}); }
   catch(e) { res.status(500).json({error:e.message}); }
@@ -431,21 +441,42 @@ app.get('/api/necesidades', async (req, res) => {
         pr.id as producto_id, pr.referencia, pr.descripcion, pr.tipo,
         pr.largo, pr.ancho, pr.alto, pr.unidad,
         COALESCE(s.cantidad,0) as stock_actual,
-        COALESCE(SUM(CASE WHEN pe.estado NOT IN ('entregado','cancelado') THEN l.cantidad ELSE 0 END),0) as pedido_total,
-        COALESCE(SUM(CASE WHEN e.estado='confirmada' THEN e.cantidad ELSE 0 END),0) as entregado_total,
-        COALESCE(SUM(CASE WHEN e.estado='pendiente' THEN e.cantidad ELSE 0 END),0) as programado_pendiente
+        -- Total pedido: suma de lineas de pedidos activos (sin duplicar por entregas)
+        COALESCE((
+          SELECT SUM(l.cantidad)
+          FROM lineas_pedido l
+          JOIN pedidos pe ON pe.id=l.pedido_id
+          WHERE l.producto_id=pr.id
+          AND pe.estado NOT IN ('entregado','cancelado')
+        ),0) as pedido_total,
+        -- Ya entregado: entregas confirmadas
+        COALESCE((
+          SELECT SUM(e.cantidad)
+          FROM entregas_parciales e
+          JOIN lineas_pedido l ON l.id=e.linea_pedido_id
+          JOIN pedidos pe ON pe.id=l.pedido_id
+          WHERE l.producto_id=pr.id
+          AND e.estado='confirmada'
+          AND pe.estado NOT IN ('cancelado')
+        ),0) as entregado_total,
+        -- Programado pendiente: entregas pendientes de confirmar
+        COALESCE((
+          SELECT SUM(e.cantidad)
+          FROM entregas_parciales e
+          JOIN lineas_pedido l ON l.id=e.linea_pedido_id
+          JOIN pedidos pe ON pe.id=l.pedido_id
+          WHERE l.producto_id=pr.id
+          AND e.estado='pendiente'
+          AND pe.estado NOT IN ('cancelado')
+        ),0) as programado_pendiente
       FROM productos pr
       LEFT JOIN stock s ON s.producto_id=pr.id
-      LEFT JOIN lineas_pedido l ON l.producto_id=pr.id
-      LEFT JOIN pedidos pe ON pe.id=l.pedido_id
-      LEFT JOIN entregas_parciales e ON e.linea_pedido_id=l.id
       WHERE pr.activo=true
-      GROUP BY pr.id,pr.referencia,pr.descripcion,pr.tipo,pr.largo,pr.ancho,pr.alto,pr.unidad,s.cantidad
       ORDER BY pr.tipo,pr.largo DESC`);
     res.json(r.rows.map(row=>({
       ...row,
-      pendiente_entregar: Math.max(0, row.pedido_total - row.entregado_total),
-      necesidad_neta: Math.max(0, row.pedido_total - row.entregado_total - row.stock_actual)
+      pendiente_entregar: Math.max(0, +row.pedido_total - +row.entregado_total),
+      necesidad_neta: Math.max(0, +row.pedido_total - +row.entregado_total - +row.stock_actual)
     })));
   } catch(e) { res.status(500).json({error:e.message}); }
 });
