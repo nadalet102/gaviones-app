@@ -1998,11 +1998,13 @@ async function procesarImportPDF(input){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({base64:base64, media_type:'application/pdf'})
     });
+    var rawText=await response.text();
     if(!response.ok){
-      var err=await response.json();
-      throw new Error(err.error||'Error del servidor');
+      throw new Error('HTTP '+response.status+': '+rawText.substring(0,200));
     }
-    var pedido=await response.json();
+    var pedido;
+    try{ pedido=JSON.parse(rawText); }
+    catch(pe){ throw new Error('Respuesta no es JSON: '+rawText.substring(0,200)); }
     mostrarModalImport('preview', pedido);
   }catch(e){
     mostrarModalImport('error', null, e.message);
