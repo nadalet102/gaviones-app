@@ -73,9 +73,15 @@ async function initDB() {
       fecha_carga DATE NOT NULL,
       cantidad NUMERIC NOT NULL,
       estado TEXT DEFAULT 'pendiente',
+      transportista TEXT,
+      mat_camion TEXT,
+      mat_remolque TEXT,
       notas TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+    ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS transportista TEXT;
+    ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_camion TEXT;
+    ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_remolque TEXT;
     CREATE TABLE IF NOT EXISTS partes_produccion (
       id SERIAL PRIMARY KEY,
       fecha DATE NOT NULL,
@@ -325,21 +331,21 @@ app.get('/api/entregas', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 app.post('/api/entregas', async (req, res) => {
-  const {linea_pedido_id,fecha_carga,cantidad,notas} = req.body;
+  const {linea_pedido_id,fecha_carga,cantidad,notas,transportista,mat_camion,mat_remolque} = req.body;
   try {
     const r = await pool.query(
-      `INSERT INTO entregas_parciales (linea_pedido_id,fecha_carga,cantidad,estado,notas) VALUES ($1,$2,$3,'pendiente',$4) RETURNING *`,
-      [linea_pedido_id,fecha_carga,cantidad,notas||null]
+      `INSERT INTO entregas_parciales (linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,notas) VALUES ($1,$2,$3,'pendiente',$4,$5,$6,$7) RETURNING *`,
+      [linea_pedido_id,fecha_carga,cantidad,notas||null,transportista||null,mat_camion||null,mat_remolque||null]
     );
     res.json(r.rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 app.put('/api/entregas/:id', async (req, res) => {
-  const {fecha_carga,cantidad,notas,estado} = req.body;
+  const {fecha_carga,cantidad,notas,estado,transportista,mat_camion,mat_remolque} = req.body;
   try {
     const r = await pool.query(
-      `UPDATE entregas_parciales SET fecha_carga=$1,cantidad=$2,notas=$3,estado=$4 WHERE id=$5 RETURNING *`,
-      [fecha_carga,cantidad,notas||null,estado||'pendiente',req.params.id]
+      `UPDATE entregas_parciales SET fecha_carga=$1,cantidad=$2,notas=$3,estado=$4,transportista=$5,mat_camion=$6,mat_remolque=$7 WHERE id=$8 RETURNING *`,
+      [fecha_carga,cantidad,notas||null,estado||'pendiente',transportista||null,mat_camion||null,mat_remolque||null,req.params.id]
     );
     res.json(r.rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
@@ -484,3 +490,4 @@ app.get('/api/necesidades', async (req, res) => {
 app.get('*', (req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 const PORT = process.env.PORT||3000;
 initDB().then(()=>app.listen(PORT,()=>console.log(`Server on port ${PORT}`)));
+
