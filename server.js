@@ -595,6 +595,94 @@ app.get('/api/historial', async (req, res) => {
 
 // ── IMPORTAR PDF BC ───────────────────────────────────────────────────────────
 app.post('/api/importar-pdf', async (req, res) => {
+  const { base64 } = req.body;
+  if(!base64) return res.status(400).json({error:'No se recibio el PDF'});
+
+  const PDFParser = require('pdf2json');
+  const buf = Buffer.from(base64, 'base64');
+
+  try {
+    const text = await new Promise((resolve, reject) => {
+      const parser = new PDFParser(null, 1);
+      parser.on('pdfParser_dataError', e => reject(new Error(e.parserError)));
+      parser.on('pdfParser_dataReady', data => {
+        const t = data.Pages.map(page =>
+          page.Texts.map(t => {
+            try { return decodeURIComponent(t.R.map(r => r.T).join('')); }
+            catch(e) { return t.R.map(r => r.T).join(''); }
+          }).join(' ')
+        ).join('\n');
+        resolve(t);
+      });
+      parser.parseBuffer(buf);
+    });
+
+    // Extract fields with regex
+    const numMatch = text.match(/N[oº°]\s*Pedido[^\n]*?\n[^\n]*(PV\d{2}\/\d{5})/i)
+                  || text.match(/(PV\d{2}\/\d{5})/);
+    const numero = numMatch ? numMatch[1] : null;
+
+    const fechaMatch = text.match(/(\d{2}\/\d{2}\/\d{2,4})/);
+    let fecha_pedido = null;
+    if(fechaMatch) {
+      const parts = fechaMatch[1].split('/');
+      if(parts[2].length===2) parts[2]='20'+parts[2];
+      fecha_pedido = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
+    }
+
+    // Cliente: just the company name (up to street address or CIF)
+    const clienteMatch = text.match(/Cliente:\s*((?:(?!CIF:|Direcci|Calle|Avda|Plaza|Pza|\d{5}).)+ )/i);
+    const cliente_nombre = clienteMatch
+      ? clienteMatch[1].trim().replace(/\s+/g,' ').split(/\s{2,}/)[0].trim()
+      : null;
+
+    // Obra: "Nº documento externo" value — take first word/phrase before next keyword
+    const obraMatch = text.match(/externo\s+([A-Z][^\n]{2,40}?)(?:\s{2,}|Direcci|Cliente)/i);
+    const obra = obraMatch ? obraMatch[1].trim() : null;
+
+    // Destino: company name + location from "Dirección de descarga:"
+    const destiMatch = text.match(/Direcci[oó]n de descarga:\s*([^\n]+)/i);
+    let destino = null;
+    if(destiMatch) {
+      // Take first meaningful segment (company name + city)
+      const raw = destiMatch[1].replace(/https?:\/\/\S+/g,'').trim();
+      destino = raw.split(/\s{3,}/)[0].trim().replace(/\s+/g,' ');
+    }
+
+    // Lines: GVIBRF references
+    // Pattern: GVIBRF... <description> <quantity>
+    const lineaRegex = /\b(GVIBRF\w+)\b\s+([^\n]+?)\s+(\d+)[,.]?(\d{2})\s+\d/g;
+    const lineas = [];
+    let m;
+    while((m = lineaRegex.exec(text)) !== null) {
+      const ref = m[1];
+      const desc = m[2].trim();
+      const cant = parseFloat(m[3] + '.' + (m[4]||'00'));
+      if(cant > 0 && !lineas.find(l => l.referencia === ref)) {
+        lineas.push({ referencia: ref, descripcion: desc, cantidad: Math.round(cant) });
+      }
+    }
+
+    // Fallback: simpler pattern
+    if(!lineas.length) {
+      const simple = /\b(GVIBRF\w+)\b[^\n]*?(\d{1,4})[,\.](\d{2})\s/g;
+      while((m = simple.exec(text)) !== null) {
+        const ref = m[1];
+        const cant = parseInt(m[2]);
+        if(cant > 0 && !lineas.find(l => l.referencia === ref)) {
+          lineas.push({ referencia: ref, descripcion: '', cantidad: cant });
+        }
+      }
+    }
+
+    res.json({ numero, cliente_nombre, obra, destino, fecha_pedido, lineas });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// OLD ANTHROPIC ENDPOINT (disabled - using pdf2json instead)
+app.post('/api/importar-pdf-DISABLED', async (req, res) => {
   const { base64, media_type } = req.body;
   if(!base64) return res.status(400).json({error:'No se recibio el PDF'});
   const apiKey = process.env.ANTHROPIC_API_KEY;
