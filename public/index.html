@@ -728,9 +728,12 @@ async function loadNecesidades(){
 // ── CATÁLOGO ──────────────────────────────────────────────────────────────────
 function renderProductos(){
   const el=document.getElementById('productos-list');
-  const tipoGrupos={gavion:'Gaviones',colchoneta:'Colchonetas Reno',accesorio:'Accesorios'};
+  const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla suelta',panel:'Paneles / Jaulas',accesorio:'Accesorios',otro:'Otros'};
+  // Get all types present in products (including custom ones)
+  const tiposPresentes=[...new Set(productos.map(p=>p.tipo))].sort();
   let html='';
-  Object.entries(tipoGrupos).forEach(([tipo,label])=>{
+  tiposPresentes.forEach(tipo=>{
+    const label=TIPO_LABELS[tipo]||(tipo.charAt(0).toUpperCase()+tipo.slice(1));
     const prods=productos.filter(p=>p.tipo===tipo);
     if(!prods.length) return;
     html+=`<div style="padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)">${label}</div>`;
@@ -745,6 +748,7 @@ function renderProductos(){
         <td><span class="badge ${stQ>0?'b-green':'b-gray'}">${fmtN(stQ)} ${p.unidad||'ud'}</span></td>
         <td class="r">
           <button class="btn-icon" onclick="openModal('producto','${p.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
+          <button class="btn-icon danger" onclick="deleteProducto('${p.id}','${p.referencia}')" title="Eliminar"><i class="ti ti-trash"></i></button>
         </td>
       </tr>`;
     });
@@ -890,11 +894,14 @@ function openModal(type, id){
     title.innerHTML=`<i class="ti ti-box"></i> ${id?'Editar producto':'Nuevo producto'}`;
     body.innerHTML=`
       <div class="frow">
-        <div class="field"><label>Tipo</label>
+        <div class="field"><label>Tipo / Categoría</label>
           <select id="f-ptipo" onchange="toggleDims()">
             <option value="gavion" ${!p||p.tipo==='gavion'?'selected':''}>Gavión</option>
             <option value="colchoneta" ${p&&p.tipo==='colchoneta'?'selected':''}>Colchoneta Reno</option>
+            <option value="malla" ${p&&p.tipo==='malla'?'selected':''}>Malla suelta</option>
+            <option value="panel" ${p&&p.tipo==='panel'?'selected':''}>Panel / Jaula</option>
             <option value="accesorio" ${p&&p.tipo==='accesorio'?'selected':''}>Accesorio</option>
+            <option value="otro" ${p&&!['gavion','colchoneta','malla','panel','accesorio'].includes(p.tipo)?'selected':''}>Otro</option>
           </select>
         </div>
         <div class="field"><label>Referencia</label><input type="text" id="f-pref" value="${p?p.referencia||'':''}" placeholder="GAV-2x1x1"></div>
@@ -914,7 +921,9 @@ function openModal(type, id){
           <option value="m" ${p&&p.unidad==='m'?'selected':''}>m (metro)</option>
         </select>
       </div>`;
-    foot.innerHTML=`<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    foot.innerHTML=`
+      ${id?`<button class="btn btn-danger btn-sm" onclick="closeModal();deleteProducto('${id}','')"><i class="ti ti-trash"></i> Eliminar</button>`:''}
+      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveProducto()"><i class="ti ti-device-floppy"></i> Guardar</button>`;
 
   } else if(type==='cliente'){
@@ -986,7 +995,7 @@ function openModalOF(data){
 function toggleDims(){
   const tipo=document.getElementById('f-ptipo')?.value;
   const dr=document.getElementById('dims-row');
-  if(dr) dr.style.display=tipo==='accesorio'?'none':'';
+  if(dr) dr.style.display=(tipo==='accesorio'||tipo==='otro')?'none':'';
 }
 
 function lineaHTML(i, l){
@@ -1103,6 +1112,19 @@ async function saveProducto(){
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
+async function deleteProducto(id, ref){
+  const nombre=ref||productos.find(p=>String(p.id)===String(id))?.referencia||'este producto';
+  if(!confirm('¿Eliminar '+nombre+'? Se eliminará también su stock asociado.')) return;
+  try{
+    await api('PUT','/productos/'+id,{...productos.find(p=>String(p.id)===String(id)),activo:false});
+    productos=productos.filter(p=>String(p.id)!==String(id));
+    stock=stock.filter(s=>String(s.producto_id)!==String(id));
+    renderProductos();renderStock();
+    await loadNecesidades();
+    log(nombre+' eliminado','ok');
+  }catch(e){log('Error al eliminar: '+e.message,'warn');}
+}
+
 async function saveCliente(){
   const nombre=document.getElementById('f-cnombre').value.trim();
   if(!nombre){log('Introduce el nombre','warn');return;}
@@ -1150,4 +1172,3 @@ loadAll();
 </script>
 </body>
 </html>
-
