@@ -185,6 +185,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   <div class="tab" id="tab-stock" onclick="switchTab('stock')"><i class="ti ti-package"></i> Stock</div>
   <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
   <div class="tab" id="tab-clientes" onclick="switchTab('clientes')"><i class="ti ti-users"></i> Clientes</div>
+  <div class="tab" id="tab-hist" onclick="switchTab('hist')"><i class="ti ti-history"></i> Historial</div>
 </div>
 
 <!-- PANEL -->
@@ -323,6 +324,34 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 </div>
 </div>
 
+<!-- HISTORIAL -->
+<div class="view" id="view-hist">
+<div class="container">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px" id="hist-kpis"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div>
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-title"><i class="ti ti-file-check"></i> Pedidos completados / cancelados</div>
+          <select id="hist-estado-filter" onchange="renderHistorial()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+            <option value="">Todos</option>
+            <option value="entregado">Entregados</option>
+            <option value="cancelado">Cancelados</option>
+          </select>
+        </div>
+        <div id="hist-pedidos"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-hdr"><div class="card-title"><i class="ti ti-truck"></i> Entregas confirmadas</div></div>
+        <div id="hist-entregas" style="max-height:500px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
 <div class="statusbar">
   <div class="sb-msg" id="sb-msg"><i class="ti ti-info-circle"></i> Listo</div>
 </div>
@@ -420,6 +449,7 @@ function switchTab(t){
   else if(t==='stock') renderStock();
   else if(t==='productos') renderProductos();
   else if(t==='clientes') renderClientes();
+  else if(t==='hist') loadHistorial();
 }
 
 // ── STATS ──────────────────────────────────────────────────────────────────────
@@ -472,6 +502,7 @@ function renderDash(){
       '<td style="display:flex;gap:5px;align-items:center">'+
         (e.estado==='pendiente'?'<input type="date" value="'+String(e.fecha_carga).substring(0,10)+'" title="Cambiar fecha" style="font-size:11px;padding:2px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)" onchange="cambiarFechaEntrega('+e.id+',this.value)">':'<span class="dim">'+fmtD(e.fecha_carga)+'</span>')+
         (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i> Confirmar</button>':'')+
+        (e.estado==='confirmada'?'<button class="btn btn-outline btn-sm" style="color:var(--amber);border-color:var(--amber);font-size:10px" onclick="anularEntrega('+e.id+')"><i class="ti ti-arrow-back-up"></i> Anular</button>':'')+
       '</td>'+
     '</tr>').join('')+'</tbody></table>';
   }
@@ -577,7 +608,7 @@ function renderParte(parte){
   // Historial partes anteriores
   html+='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de producción</div></div>';
   html+='<div style="padding:8px 16px;color:var(--text2);font-size:12px">Haz clic en un día para ver el detalle</div>';
-  html+='<table class="tbl"><thead><tr><th>Fecha</th><th class="r">Total fabricado</th><th>Estado</th><th>Detalle</th></tr></thead><tbody id="historial-partes"></tbody></table></div>';
+  html+='<table class="tbl"><thead><tr><th>Fecha</th><th class="r">Total fabricado</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody id="historial-partes"></tbody></table></div>';
 
   el.innerHTML=html;
   loadHistorialPartes();
@@ -597,6 +628,7 @@ async function loadHistorialPartes(){
         '<td class="r mono" style="font-weight:500;color:var(--green)">'+fmtN(total)+' ud</td>'+
         '<td><span class="badge '+(p.estado==='cerrado'?'b-green':'b-amber')+'">'+(p.estado==='cerrado'?'Cerrado':'Abierto')+'</span></td>'+
         '<td class="dim" style="font-size:11px">'+resumen+'</td>'+
+        '<td>'+(p.estado==='cerrado'?'<button class="btn btn-outline btn-sm" style="color:var(--amber);border-color:var(--amber)" onclick="reabrirParte('+p.id+')"><i class="ti ti-lock-open"></i> Reabrir</button>':'')+'</td>'+
       '</tr>';
     }).join('');
   }catch(e){}
@@ -709,6 +741,9 @@ function renderCal(){
         '<span class="badge '+(todasConfirmadas?'b-green':'b-amber')+'">'+( todasConfirmadas?'Confirmada':'Pendiente')+'</span>'+
         (algunaPendiente
           ?'<button class="btn btn-green btn-sm" onclick="confirmarGrupo(['+idsPendientes.join(',')+'])"><i class="ti ti-check"></i> Confirmar</button>'
+          :'')+
+        (todasConfirmadas
+          ?'<button class="btn btn-outline btn-sm" style="color:var(--amber);border-color:var(--amber)" onclick="anularGrupo(['+g.lineas.map(e=>e.id).join(',')+'])"><i class="ti ti-arrow-back-up"></i> Anular</button>'
           :'')+
         '<button class="btn-icon" data-fecha="'+g.fecha+'" data-ped="'+g.pedido_numero+'" onclick="verDetalleGrupo(this.dataset.fecha,this.dataset.ped)" title="Ver detalle"><i class="ti ti-eye"></i></button>'+
         '<button class="btn-icon" data-pf="'+g.fecha+'" data-pp="'+g.pedido_numero+'" onclick="imprimirCargaGrupo(this.dataset.pf,this.dataset.pp)" title="Imprimir esta carga"><i class="ti ti-printer"></i></button>'+
@@ -1625,6 +1660,112 @@ async function deleteCliente(id){
     renderClientes();
     log('Cliente eliminado');
   }catch(e){log('Error: '+e.message,'warn');}
+}
+
+// ── ANULAR / REABRIR ──────────────────────────────────────────────────────────
+async function anularEntrega(id){
+  if(!confirm('Anular esta entrega? El stock se devolvera.')) return;
+  try{
+    await api('PATCH','/entregas/'+id+'/anular',{});
+    await loadAll();
+    log('Entrega anulada - stock devuelto','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function anularGrupo(idsArr){
+  var ids=Array.isArray(idsArr)?idsArr:String(idsArr).split(',').map(x=>x.trim()).filter(Boolean);
+  if(!confirm('Anular todas las entregas de esta carga? El stock se devolvera.')) return;
+  try{
+    for(var i=0;i<ids.length;i++) await api('PATCH','/entregas/'+ids[i]+'/anular',{});
+    await loadAll();
+    log('Carga anulada - stock devuelto','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function reabrirParte(id){
+  if(!confirm('Reabrir este parte? El stock fabricado ese dia se descontara.')) return;
+  try{
+    await api('PATCH','/partes/'+id+'/reabrir',{});
+    await loadAll();
+    if(parteHoy) renderParte(parteHoy);
+    loadHistorialPartes();
+    log('Parte reabierto - stock ajustado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function reactivarPedido(id){
+  if(!confirm('Reactivar este pedido?')) return;
+  try{
+    await api('PATCH','/pedidos/'+id+'/estado',{estado:'pendiente'});
+    await loadAll();
+    loadHistorial();
+    log('Pedido reactivado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+// ── HISTORIAL ──────────────────────────────────────────────────────────────────
+var histData={pedidos:[],entregas:[]};
+
+async function loadHistorial(){
+  try{
+    histData=await api('GET','/historial');
+    renderHistorial();
+  }catch(e){log('Error cargando historial','warn');}
+}
+
+function renderHistorial(){
+  var estadoF=document.getElementById('hist-estado-filter')?.value||'';
+  var pedidosFilt=histData.pedidos.filter(function(p){return !estadoF||p.estado===estadoF;});
+
+  // KPIs
+  var totalEntregados=histData.pedidos.filter(function(p){return p.estado==='entregado';}).length;
+  var totalCancelados=histData.pedidos.filter(function(p){return p.estado==='cancelado';}).length;
+  var totalUdsEntregadas=histData.entregas.reduce(function(s,e){return s+(+e.cantidad||0);},0);
+  var kpis=document.getElementById('hist-kpis');
+  if(kpis){
+    kpis.innerHTML=
+      '<div class="kpi"><div class="kpi-label">Pedidos entregados</div><div class="kpi-value" style="color:var(--green)">'+totalEntregados+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Pedidos cancelados</div><div class="kpi-value" style="color:var(--red)">'+totalCancelados+'</div>'+
+      '<div style="margin-top:6px;font-size:11px;color:var(--text2)">'+fmtN(totalUdsEntregadas)+' uds entregadas en total</div></div>';
+  }
+
+  // Pedidos
+  var pedEl=document.getElementById('hist-pedidos');
+  if(!pedEl) return;
+  if(!pedidosFilt.length){
+    pedEl.innerHTML='<div class="empty"><i class="ti ti-file-check"></i><p>Sin pedidos completados aun</p></div>';
+  }else{
+    pedEl.innerHTML='<table class="tbl"><thead><tr><th>N</th><th>Cliente</th><th>Estado</th><th>F. entrega</th><th></th></tr></thead><tbody>'+
+    pedidosFilt.map(function(p){
+      var sc=p.estado==='entregado'?'b-green':'b-gray';
+      var totalUds=(p.lineas||[]).reduce(function(s,l){return s+(+l.cantidad||0);},0);
+      return '<tr>'+
+        '<td class="mono" style="font-weight:500;color:var(--blue)">'+p.numero+'</td>'+
+        '<td><div style="font-weight:500">'+(p.cliente_nombre||p.cliente_nombre_rel||'—')+'</div>'+(p.obra?'<div class="dim">'+p.obra+'</div>':'')+'</td>'+
+        '<td><span class="badge '+sc+'">'+( p.estado==='entregado'?'Entregado':'Cancelado')+'</span></td>'+
+        '<td class="dim">'+fmtD(p.fecha_entrega)+'<div>'+fmtN(totalUds)+' ud</div></td>'+
+        '<td><button class="btn btn-outline btn-sm" style="color:var(--amber);border-color:var(--amber)" onclick="reactivarPedido('+p.id+')"><i class="ti ti-arrow-back-up"></i> Reactivar</button></td>'+
+      '</tr>';
+    }).join('')+'</tbody></table>';
+  }
+
+  // Entregas confirmadas
+  var entEl=document.getElementById('hist-entregas');
+  if(!entEl) return;
+  if(!histData.entregas.length){
+    entEl.innerHTML='<div class="empty"><i class="ti ti-truck"></i><p>Sin entregas confirmadas aun</p></div>';
+  }else{
+    entEl.innerHTML='<table class="tbl"><thead><tr><th>Fecha</th><th>Pedido</th><th>Producto</th><th class="r">Uds.</th><th></th></tr></thead><tbody>'+
+    histData.entregas.map(function(e){
+      return '<tr>'+
+        '<td class="mono" style="font-size:11px">'+fmtD(e.fecha_carga)+'</td>'+
+        '<td><div style="font-weight:500;font-size:12px">'+e.pedido_numero+'</div><div class="dim">'+(e.cliente_nombre||'')+'</div></td>'+
+        '<td><div style="font-weight:500;font-size:12px">'+e.referencia+'</div><div class="dim">'+dimStr(e)+'</div></td>'+
+        '<td class="r mono" style="font-weight:500">'+fmtN(e.cantidad)+'</td>'+
+        '<td><button class="btn-icon" style="color:var(--amber)" onclick="anularEntrega('+e.id+')" title="Anular entrega"><i class="ti ti-arrow-back-up"></i></button></td>'+
+      '</tr>';
+    }).join('')+'</tbody></table>';
+  }
 }
 
 function log(msg,type=''){
