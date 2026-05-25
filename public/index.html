@@ -159,7 +159,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   <div class="tb-right">
     <div class="sync-dot syncing" id="sync-dot"></div>
     <button class="tb-btn highlight" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</button>
-    <button class="tb-btn" onclick="abrirImportPDF()" title="Importar pedido desde PDF de BC"><i class="ti ti-file-import"></i> Importar BC</button>
     <button class="tb-btn accent" onclick="openModal('pedido',null)"><i class="ti ti-plus"></i> Nuevo pedido</button>
     <button class="tb-btn" onclick="loadAll()"><i class="ti ti-refresh"></i></button>
   </div>
@@ -358,7 +357,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 </div>
 
 <!-- MODAL -->
-<input type="file" id="pdf-import-input" accept=".pdf" style="display:none" onchange="procesarImportPDF(this)">
 <div class="overlay" id="overlay">
   <div class="modal" id="modal-box">
     <div class="modal-hdr">
@@ -1524,8 +1522,9 @@ function openModal(type, id, extraId){
     box.classList.add('wide');
     const p=id?pedidos.find(x=>String(x.id)===String(id)):null;
     const lineas=p?p.lineas||[]:[];
-    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-text"></i> '+(id?'Editar pedido':'Nuevo pedido');
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-text"></i> '+(id?'Editar pedido':'Nuevo pedido')+(!id?' <button class="btn btn-outline btn-sm" onclick="triggerPDFImportEnModal()" style="margin-left:8px;font-size:11px"><i class="ti ti-file-import"></i> Importar PDF BC</button>':'');
     document.getElementById('modal-body').innerHTML=
+      (!id?'<input type="file" id="pdf-modal-input" accept=".pdf" style="display:none" onchange="procesarPDFEnModal(this)">':'')+
       '<div class="frow"><div class="field"><label>Nº Pedido</label><input type="text" id="f-num" value="'+(p?p.numero:autoNumPedido())+'" placeholder="P-2024-001"></div>'+
       '<div class="field"><label>Cliente</label><select id="f-cliente"><option value="">Sin cliente</option>'+clientes.map(c=>'<option value="'+c.id+'" '+(p&&String(p.cliente_id)===String(c.id)?'selected':'')+'>'+c.nombre+'</option>').join('')+'</select></div></div>'+
       '<div class="field"><label>Nombre cliente (si no está en lista)</label><input type="text" id="f-cliente-nombre" value="'+(p?p.cliente_nombre||'':'')+'" placeholder="Nombre del cliente"></div>'+
@@ -2132,6 +2131,72 @@ async function crearPedidoDesdeImport(){
     var noMatch=(pedido.lineas||[]).length-lineasFinal.length;
     log('Pedido '+pedido.numero+' importado ('+lineasFinal.length+' lineas)'+(noMatch?' — '+noMatch+' ref. sin catálogo omitidas':''),'ok');
   }catch(e){log('Error al crear pedido: '+e.message,'warn');}
+}
+
+function triggerPDFImportEnModal(){
+  var inp=document.getElementById('pdf-modal-input');
+  if(inp){inp.value='';inp.click();}
+}
+
+async function procesarPDFEnModal(input){
+  var file=input.files[0];
+  if(!file) return;
+  // Show loading state in title
+  var titleEl=document.getElementById('modal-title');
+  if(titleEl) titleEl.innerHTML='<i class="ti ti-loader"></i> Leyendo PDF...';
+
+  var base64=await new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(){res(r.result.split(',')[1]);};
+    r.onerror=function(){rej(new Error('Error leyendo archivo'));};
+    r.readAsDataURL(file);
+  });
+
+  try{
+    var response=await fetch('/api/importar-pdf',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({base64:base64,media_type:'application/pdf'})
+    });
+    var rawText=await response.text();
+    if(!response.ok) throw new Error('HTTP '+response.status+': '+rawText.substring(0,200));
+    var pedido;
+    try{pedido=JSON.parse(rawText);}
+    catch(pe){throw new Error('Respuesta no valida: '+rawText.substring(0,100));}
+
+    // Fill the form fields
+    if(pedido.numero) document.getElementById('f-num').value=pedido.numero;
+    if(pedido.cliente_nombre) document.getElementById('f-cliente-nombre').value=pedido.cliente_nombre;
+    if(pedido.obra) document.getElementById('f-obra').value=pedido.obra;
+    if(pedido.fecha_pedido) document.getElementById('f-fecha-ped').value=pedido.fecha_pedido;
+
+    // Fill lines
+    if(pedido.lineas&&pedido.lineas.length){
+      var container=document.getElementById('lineas-container');
+      if(container){
+        container.innerHTML='';
+        var sinCatalogo=0;
+        pedido.lineas.forEach(function(l,i){
+          var prod=productos.find(function(p){return p.referencia===l.referencia;});
+          if(prod){
+            var html=lineaHTML(Date.now()+i,{producto_id:prod.id,cantidad:l.cantidad});
+            container.insertAdjacentHTML('beforeend',html);
+          } else {
+            sinCatalogo++;
+          }
+        });
+        if(sinCatalogo>0) log(sinCatalogo+' referencia(s) del PDF no estan en el catalogo y no se han importado','warn');
+        else log('PDF importado: '+pedido.lineas.length+' lineas','ok');
+      }
+    }
+
+    // Restore title
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-text"></i> Nuevo pedido <button class="btn btn-outline btn-sm" onclick="triggerPDFImportEnModal()" style="margin-left:8px;font-size:11px"><i class="ti ti-file-import"></i> Importar PDF BC</button>';
+
+  }catch(e){
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-text"></i> Nuevo pedido <button class="btn btn-outline btn-sm" onclick="triggerPDFImportEnModal()" style="margin-left:8px;font-size:11px"><i class="ti ti-file-import"></i> Importar PDF BC</button>';
+    log('Error leyendo PDF: '+e.message,'warn');
+  }
 }
 
 function mostrarToast(msg, tipo){
