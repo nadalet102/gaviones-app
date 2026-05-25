@@ -1199,9 +1199,18 @@ function imprimirCalendario(){
 
 async function confirmarGrupo(ids){
   try{
-    for(const id of ids){ await api('PATCH','/entregas/'+id+'/confirmar',{}); }
+    var autoPedido=false;
+    for(var i=0;i<ids.length;i++){
+      var r=await api('PATCH','/entregas/'+ids[i]+'/confirmar',{});
+      if(r&&r.pedidoAutoEntregado) autoPedido=true;
+    }
     await loadAll();
-    log(ids.length+' entrega'+(ids.length>1?'s':'')+' confirmada'+(ids.length>1?'s':'')+' — stock actualizado','ok');
+    if(autoPedido){
+      log('¡Pedido completamente entregado!','ok');
+      mostrarToast('¡Pedido entregado al completo!','green');
+    }else{
+      log(ids.length+' entrega(s) confirmada(s) — stock actualizado','ok');
+    }
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
@@ -1244,9 +1253,14 @@ function verDetalleGrupo(grupoId){
 
 async function confirmarEntrega(id){
   try{
-    await api('PATCH','/entregas/'+id+'/confirmar',{});
+    var res=await api('PATCH','/entregas/'+id+'/confirmar',{});
     await loadAll();
-    log('Entrega confirmada — stock actualizado','ok');
+    if(res&&res.pedidoAutoEntregado){
+      log('✓ Entrega confirmada — ¡Pedido completamente entregado!','ok');
+      mostrarToast('¡Pedido entregado al completo!','green');
+    }else{
+      log('Entrega confirmada — stock actualizado','ok');
+    }
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
@@ -1954,6 +1968,24 @@ function renderHistorial(){
       '</tr>';
     }).join('')+'</tbody></table>';
   }
+}
+
+function mostrarToast(msg, tipo){
+  var existing=document.getElementById('toast-notif');
+  if(existing) existing.remove();
+  var t=document.createElement('div');
+  t.id='toast-notif';
+  t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:9999;'+
+    'background:'+(tipo==='green'?'#2d7a3a':'#1d6fa4')+';color:#fff;'+
+    'padding:14px 24px;border-radius:10px;font-size:14px;font-weight:500;'+
+    'box-shadow:0 4px 20px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;'+
+    'animation:slideUp .3s ease';
+  t.innerHTML='<i class="ti ti-circle-check" style="font-size:20px"></i> '+msg;
+  var style=document.createElement('style');
+  style.textContent='@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+  document.head.appendChild(style);
+  document.body.appendChild(t);
+  setTimeout(function(){if(t.parentNode){t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(function(){t.remove();},300);}},4000);
 }
 
 function log(msg,type=''){
