@@ -336,8 +336,8 @@ app.post('/api/entregas', async (req, res) => {
   const {linea_pedido_id,fecha_carga,cantidad,notas,transportista,mat_camion,mat_remolque,carga_grupo_id} = req.body;
   try {
     const r = await pool.query(
-      `INSERT INTO entregas_parciales (linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,notas) VALUES ($1,$2,$3,'pendiente',$4,$5,$6,$7) RETURNING *`,
-      [linea_pedido_id,fecha_carga,cantidad,notas||null,transportista||null,mat_camion||null,mat_remolque||null]
+      `INSERT INTO entregas_parciales (linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,carga_grupo_id,notas) VALUES ($1,$2,$3,'pendiente',$4,$5,$6,$7,$8) RETURNING *`,
+      [linea_pedido_id,fecha_carga,cantidad,notas||null,transportista||null,mat_camion||null,mat_remolque||null,carga_grupo_id||null]
     );
     res.json(r.rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
@@ -346,8 +346,8 @@ app.put('/api/entregas/:id', async (req, res) => {
   const {fecha_carga,cantidad,notas,estado,transportista,mat_camion,mat_remolque,carga_grupo_id} = req.body;
   try {
     const r = await pool.query(
-      `UPDATE entregas_parciales SET fecha_carga=$1,cantidad=$2,notas=$3,estado=$4,transportista=$5,mat_camion=$6,mat_remolque=$7 WHERE id=$8 RETURNING *`,
-      [fecha_carga,cantidad,notas||null,estado||'pendiente',transportista||null,mat_camion||null,mat_remolque||null,req.params.id]
+      `UPDATE entregas_parciales SET fecha_carga=$1,cantidad=$2,notas=$3,estado=$4,transportista=$5,mat_camion=$6,mat_remolque=$7,carga_grupo_id=$8 WHERE id=$9 RETURNING *`,
+      [fecha_carga,cantidad,notas||null,estado||'pendiente',transportista||null,mat_camion||null,mat_remolque||null,carga_grupo_id||null,req.params.id]
     );
     res.json(r.rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
