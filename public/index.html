@@ -143,6 +143,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 /* INFO BOX */
 .info-box{background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--blue-d);margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
 .warn-box{background:var(--red-l);border:1px solid #fecaca;border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px}
+.sort-btns{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.sort-btn{background:none;border:1px solid var(--border2);border-radius:20px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--text2);font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:3px;transition:all .12s}
+.sort-btn:hover{border-color:var(--blue);color:var(--blue)}
+.sort-btn.active{background:var(--blue-l);border-color:var(--blue);color:var(--blue-d);font-weight:500}
 @media(max-width:700px){.grid2,.grid3,.grid4{grid-template-columns:1fr}.frow,.frow3{grid-template-columns:1fr}}
 </style>
 </head>
@@ -336,6 +340,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 // ── DATA ───────────────────────────────────────────────────────────────────────
 let productos=[], stock=[], clientes=[], pedidos=[], necesidades=[], movimientos=[], entregas=[], parteHoy=null;
 let editId=null, modalType=null;
+let sortField='largo', sortDir='desc';
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
 
 const ESTADOS_PED={
@@ -349,6 +354,19 @@ const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','
 const DOWS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
 const fmtN = n => Math.round(n||0).toLocaleString('es-ES');
+
+function sortedProductos(list){
+  return [...list].sort((a,b)=>{
+    const av=parseFloat(a[sortField])||0, bv=parseFloat(b[sortField])||0;
+    return sortDir==='asc'?av-bv:bv-av;
+  });
+}
+function setSortField(f){
+  if(sortField===f) sortDir=sortDir==='desc'?'asc':'desc';
+  else { sortField=f; sortDir='desc'; }
+  renderProductos(); renderStock(); renderNecesidades();
+  if(parteHoy) renderParte(parteHoy);
+}
 const fmtD = d => { if(!d) return '—'; const s=String(d).substring(0,10); const[y,m,dd]=s.split('-'); return dd+'/'+m+'/'+y; };
 const dimStr = p => p.largo ? p.largo+'×'+p.ancho+'×'+p.alto+' m' : '';
 const prodLabel = p => p.referencia+(dimStr(p)?' · '+dimStr(p):'')+(p.descripcion?' · '+p.descripcion:'');
@@ -522,9 +540,17 @@ function renderParte(parte){
     html+='<div style="padding:10px 16px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> Introduce las unidades fabricadas hoy por tipo. Al cerrar, se suman al stock automáticamente.</div>';
   }
 
+  var sortArrow=sortDir==='desc'?' ↓':' ↑';
+  html+='<div class="sort-btns" style="padding:8px 16px;border-top:1px solid var(--border)">'+
+    '<span style="font-size:11px;color:var(--text2)">Ordenar por:</span>'+
+    '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
+  '</div>';
   tiposPresentes.forEach(tipo=>{
     if(tipo==='accesorio') return;
-    const lineasTipo=(parte.lineas||[]).filter(l=>l.tipo===tipo);
+    const lineasTipo=sortedProductos((parte.lineas||[]).filter(l=>l.tipo===tipo));
     html+='<div style="padding:8px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-top:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
     html+='<div class="parte-grid">';
     lineasTipo.forEach(l=>{
@@ -717,7 +743,16 @@ async function deleteEntrega(id){
 function renderNecesidades(){
   const el=document.getElementById('nec-table');
   if(!necesidades.length){el.innerHTML='<div class="empty"><i class="ti ti-package"></i><p>Sin datos</p></div>';return;}
-  el.innerHTML='<table class="tbl"><thead><tr>'+
+  var sortArrow=sortDir==='desc'?' ↓':' ↑';
+  var sortBar='<div class="sort-btns" style="padding:8px 16px;border-bottom:1px solid var(--border)">'+
+    '<span style="font-size:11px;color:var(--text2)">Ordenar por:</span>'+
+    '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
+  '</div>';
+  const sorted=sortedProductos(necesidades);
+  el.innerHTML=sortBar+'<table class="tbl"><thead><tr>'+
     '<th>Referencia</th><th>Dimensiones</th>'+
     '<th class="r">Total pedido</th>'+
     '<th class="r">Ya entregado</th>'+
@@ -725,7 +760,7 @@ function renderNecesidades(){
     '<th class="r">Stock disponible</th>'+
     '<th class="r">Necesidad neta</th>'+
   '</tr></thead><tbody>'+
-  necesidades.map(n=>{
+  sorted.map(n=>{
     const neta=+n.necesidad_neta||0;
     const rowBg=neta>0?'background:var(--red-l)':+n.stock_actual>0?'background:var(--green-l)':'';
     return '<tr style="'+rowBg+'">'+
@@ -820,9 +855,16 @@ function renderStock(){
   populateMovProducto();
   const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
   const tiposPresentes=[...new Set(stock.map(s=>s.tipo))].sort();
-  let html='';
+  var sortArrow=sortDir==='desc'?' ↓':' ↑';
+  let html='<div class="sort-btns" style="padding:8px 16px">'+
+    '<span style="font-size:11px;color:var(--text2)">Ordenar por:</span>'+
+    '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
+  '</div>';
   tiposPresentes.forEach(tipo=>{
-    const prods=stock.filter(s=>s.tipo===tipo);
+    const prods=sortedProductos(stock.filter(s=>s.tipo===tipo));
     html+='<div style="padding:8px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-bottom:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
     html+='<table class="tbl"><tbody>';
     prods.forEach(s=>{
@@ -873,10 +915,17 @@ async function registrarMovimiento(){
 function renderProductos(){
   const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
   const tiposPresentes=[...new Set(productos.map(p=>p.tipo))].sort();
-  let html='';
+  var sortArrow=sortDir==='desc'?' ↓':' ↑';
+  let html='<div class="sort-btns">'+
+    '<span style="font-size:11px;color:var(--text2)">Ordenar por:</span>'+
+    '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
+  '</div>';
   tiposPresentes.forEach(tipo=>{
     const label=TIPO_LABELS[tipo]||(tipo.charAt(0).toUpperCase()+tipo.slice(1));
-    const prods=productos.filter(p=>p.tipo===tipo);
+    const prods=sortedProductos(productos.filter(p=>p.tipo===tipo));
     if(!prods.length) return;
     html+='<div style="padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)">'+label+'</div>';
     html+='<table class="tbl"><tbody>';
@@ -1189,4 +1238,3 @@ loadAll();
 </script>
 </body>
 </html>
-
