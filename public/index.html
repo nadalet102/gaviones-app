@@ -657,32 +657,53 @@ function renderCal(){
   const cl=document.getElementById('cal-list');
   if(!mesCargas.length){cl.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Sin cargas este mes</p></div>';return;}
 
-  const porFecha={};
+  // Group by fecha + pedido → one row per "carga" (pedido on a date)
+  const grupos={};
   mesCargas.forEach(e=>{
-    const f=String(e.fecha_carga).substring(0,10);
-    if(!porFecha[f]) porFecha[f]=[];
-    porFecha[f].push(e);
+    const key=String(e.fecha_carga).substring(0,10)+'__'+e.pedido_numero;
+    if(!grupos[key]) grupos[key]={
+      fecha:String(e.fecha_carga).substring(0,10),
+      pedido_numero:e.pedido_numero,
+      cliente_nombre:e.cliente_nombre,
+      obra:e.obra,
+      lineas:[],
+    };
+    grupos[key].lineas.push(e);
   });
 
-  cl.innerHTML=Object.entries(porFecha).sort(([a],[b])=>a>b?1:-1).map(([fecha,cargas])=>{
-    const totalUds=cargas.reduce((s,e)=>s+(+e.cantidad||0),0);
-    const confirmadas=cargas.filter(e=>e.estado==='confirmada').length;
-    return '<div style="border-bottom:1px solid var(--border)">'+
-      '<div style="padding:8px 16px 4px;display:flex;align-items:center;justify-content:space-between">'+
-        '<span style="font-size:12px;font-weight:500;color:var(--blue-d)" class="mono">'+fmtD(fecha)+'</span>'+
-        '<span class="dim">'+cargas.length+' cargas · '+fmtN(totalUds)+' ud · '+confirmadas+' confirmadas</span>'+
+  const gruposOrdenados=Object.values(grupos).sort((a,b)=>a.fecha>b.fecha?1:-1);
+  document.getElementById('cal-count').textContent=gruposOrdenados.length;
+
+  cl.innerHTML=gruposOrdenados.map(g=>{
+    const totalUds=g.lineas.reduce((s,e)=>s+(+e.cantidad||0),0);
+    const todasConfirmadas=g.lineas.every(e=>e.estado==='confirmada');
+    const algunaPendiente=g.lineas.some(e=>e.estado==='pendiente');
+    const idsPendientes=g.lineas.filter(e=>e.estado==='pendiente').map(e=>e.id);
+    // Summary of references
+    const resumen=g.lineas.map(e=>e.referencia+(dimStr(e)?' ('+dimStr(e)+')':'')+': '+fmtN(e.cantidad)+' ud').join(' · ');
+    // Fecha editable (only if any pending — change all lines of this group)
+    const fechaInput=algunaPendiente
+      ?'<input type="date" value="'+g.fecha+'" title="Cambiar fecha de toda la carga" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)" onchange="cambiarFechaGrupo(['+idsPendientes.join(',')+'],this.value)">'
+      :'<span class="dim mono" style="font-size:11px">'+fmtD(g.fecha)+'</span>';
+
+    return '<div class="entrega-row" style="align-items:flex-start;padding:10px 16px">'+
+      '<div style="flex:0 0 85px">'+fechaInput+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:500;font-size:13px">'+g.pedido_numero+
+          (g.cliente_nombre?' <span class="dim">— '+g.cliente_nombre+'</span>':'')+
+          (g.obra?' <span class="badge b-steel" style="font-size:9px">'+g.obra+'</span>':'')+
+        '</div>'+
+        '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+resumen+'</div>'+
       '</div>'+
-      cargas.map(e=>'<div class="entrega-row">'+
-        '<div style="font-size:12px;font-weight:500;flex:1">'+e.referencia+' <span class="dim">'+dimStr(e)+'</span></div>'+
-        '<div class="dim" style="flex:1">'+e.pedido_numero+' — '+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div>'+
-        '<div class="entrega-qty">'+fmtN(e.cantidad)+' ud</div>'+
-        (e.estado==='pendiente'
-          ?'<input type="date" value="'+String(e.fecha_carga).substring(0,10)+'" title="Cambiar fecha" style="font-size:11px;padding:2px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)" onchange="cambiarFechaEntrega('+e.id+',this.value)">'
-          :'<span class="dim" style="font-size:11px">'+fmtD(e.fecha_carga)+'</span>')+
-        '<span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span>'+
-        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i> Confirmar</button>':'<button class="btn-icon" title="Ya confirmada" disabled style="opacity:.4"><i class="ti ti-check"></i></button>')+
-        '<button class="btn-icon danger" onclick="deleteEntrega('+e.id+')" title="Eliminar"><i class="ti ti-trash"></i></button>'+
-      '</div>').join('')+
+      '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">'+
+        '<span style="font-family:monospace;font-weight:500;font-size:13px">'+fmtN(totalUds)+' ud</span>'+
+        '<span class="badge '+(todasConfirmadas?'b-green':'b-amber')+'">'+( todasConfirmadas?'Confirmada':'Pendiente')+'</span>'+
+        (algunaPendiente
+          ?'<button class="btn btn-green btn-sm" onclick="confirmarGrupo(['+idsPendientes.join(',')+'])"><i class="ti ti-check"></i> Confirmar</button>'
+          :'')+
+        '<button class="btn-icon" data-fecha="'+g.fecha+'" data-ped="'+g.pedido_numero+'" onclick="verDetalleGrupo(this.dataset.fecha,this.dataset.ped)" title="Ver detalle"><i class="ti ti-eye"></i></button>'+
+        (algunaPendiente?'<button class="btn-icon danger" onclick="deleteGrupo(['+idsPendientes.join(',')+'])" title="Eliminar pendientes"><i class="ti ti-trash"></i></button>':'')+
+      '</div>'+
     '</div>';
   }).join('');
 }
@@ -709,6 +730,38 @@ function showDayCargas(fecha){
     '</tr>').join('')+'</tbody></table>';
   document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
   document.getElementById('overlay').classList.add('open');
+}
+
+async function confirmarGrupo(ids){
+  try{
+    for(const id of ids){ await api('PATCH','/entregas/'+id+'/confirmar',{}); }
+    await loadAll();
+    log(ids.length+' entrega'+(ids.length>1?'s':'')+' confirmada'+(ids.length>1?'s':'')+' — stock actualizado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function cambiarFechaGrupo(ids, nuevaFecha){
+  try{
+    for(const id of ids){ await api('PATCH','/entregas/'+id+'/fecha',{fecha_carga:nuevaFecha}); }
+    entregas.forEach(e=>{ if(ids.includes(e.id)||ids.includes(String(e.id))) e.fecha_carga=nuevaFecha; });
+    renderCal();renderDash();
+    log('Fecha actualizada para toda la carga','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function deleteGrupo(ids){
+    if(!confirm('¿Eliminar esta carga programada?')) return;
+  try{
+    for(const id of ids){ await api('DELETE','/entregas/'+id); }
+    entregas=entregas.filter(e=>!ids.includes(e.id)&&!ids.includes(String(e.id)));
+    renderCal();renderDash();updateStats();
+    log('Carga eliminada');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+function verDetalleGrupo(fecha, pedidoNum){
+  const lineas=entregas.filter(e=>String(e.fecha_carga).substring(0,10)===fecha&&e.pedido_numero===pedidoNum);
+  showDayCargas(fecha);
 }
 
 async function confirmarEntrega(id){
@@ -1311,4 +1364,3 @@ loadAll();
 </script>
 </body>
 </html>
-
