@@ -863,7 +863,7 @@ function editarGrupo(grupoId){
         '</td>'+
         '<td style="padding:8px 10px;text-align:center">'+
           '<div style="display:flex;gap:4px;justify-content:center">'+
-            '<button class="btn-icon" data-eid="'+e.id+'" onclick="imprimirEntregaUnica(this.dataset.eid)" title="Imprimir hoja"><i class="ti ti-printer"></i></button>'+
+            '<button class="btn-icon" data-eid="'+e.id+'" onclick="imprimirEntregaDesdeModal(this.dataset.eid)" title="Imprimir hoja"><i class="ti ti-printer"></i></button>'+
             (isPend
               ?'<button class="btn-icon" style="color:var(--green)" onclick="confirmarEntrega('+e.id+')" title="Confirmar"><i class="ti ti-check"></i></button>'+
                '<button class="btn-icon danger" onclick="deleteEntregaById('+e.id+')" title="Eliminar"><i class="ti ti-trash"></i></button>'
@@ -876,7 +876,7 @@ function editarGrupo(grupoId){
   bodyHTML+='</tbody></table>';
   document.getElementById('modal-body').innerHTML=bodyHTML;
 
-  var footHTML='<button class="btn btn-outline btn-sm" data-gid="'+grupoId+'" onclick="imprimirCargaGrupoById(this.dataset.gid)"><i class="ti ti-printer"></i> Imprimir todo</button>';
+  var footHTML='<button class="btn btn-outline btn-sm" data-gid="'+grupoId+'" onclick="imprimirCargaGrupoDesdeModal(this.dataset.gid)"><i class="ti ti-printer"></i> Imprimir todo</button>';
   if(hayPendientes){
     footHTML+='<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
               '<button class="btn btn-primary" onclick="guardarEdicionGrupo()"><i class="ti ti-device-floppy"></i> Guardar cambios</button>';
@@ -913,9 +913,34 @@ async function guardarEdicionGrupo(){
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
+function imprimirEntregaDesdeModal(entregaId){
+  // Read transport fields from the modal form (user may have just typed them)
+  var trans=document.getElementById('eg-trans')?.value.trim()||null;
+  var matC=document.getElementById('eg-matc')?.value.trim()||null;
+  var matR=document.getElementById('eg-matr')?.value.trim()||null;
+  var fecha=document.getElementById('eg-fecha')?.value||null;
+  var notas=document.getElementById('eg-notas')?.value.trim()||null;
+  // Find entrega and override with form values
+  var e=entregas.find(function(x){return String(x.id)===String(entregaId);});
+  if(!e){log('Entrega no encontrada','warn');return;}
+  // Build a copy with the form's current values taking priority
+  var eCopy=Object.assign({},e,{
+    transportista: trans!==null ? trans : e.transportista,
+    mat_camion:    matC!==null  ? matC  : e.mat_camion,
+    mat_remolque:  matR!==null  ? matR  : e.mat_remolque,
+    fecha_carga:   fecha        ? fecha : e.fecha_carga,
+    notas:         notas!==null ? notas : e.notas
+  });
+  imprimirEntregaUnicaObj(eCopy);
+}
+
 function imprimirEntregaUnica(entregaId){
   var e=entregas.find(function(x){return String(x.id)===String(entregaId);});
   if(!e){log('Entrega no encontrada','warn');return;}
+  imprimirEntregaUnicaObj(e);
+}
+
+function imprimirEntregaUnicaObj(e){
   var conf=e.estado==='confirmada';
   var inner='';
 
@@ -989,6 +1014,32 @@ function imprimirEntregaUnica(entregaId){
   setTimeout(function(){URL.revokeObjectURL(url);},10000);
 }
 
+
+function imprimirCargaGrupoDesdeModal(grupoId){
+  var trans=document.getElementById('eg-trans')?.value.trim()||null;
+  var matC=document.getElementById('eg-matc')?.value.trim()||null;
+  var matR=document.getElementById('eg-matr')?.value.trim()||null;
+  var fecha=document.getElementById('eg-fecha')?.value||null;
+  var notas=document.getElementById('eg-notas')?.value.trim()||null;
+  var lineas=entregas.filter(function(e){
+    if(e.carga_grupo_id) return e.carga_grupo_id===grupoId;
+    return ('SOLO_'+e.id)===grupoId;
+  });
+  if(!lineas.length){log('No hay lineas','warn');return;}
+  // Override transport fields from the form
+  var lineasConDatos=lineas.map(function(e){
+    return Object.assign({},e,{
+      transportista: trans!==null ? trans : e.transportista,
+      mat_camion:    matC!==null  ? matC  : e.mat_camion,
+      mat_remolque:  matR!==null  ? matR  : e.mat_remolque,
+      fecha_carga:   fecha        ? fecha : e.fecha_carga,
+      notas:         notas!==null ? notas : e.notas
+    });
+  });
+  var f=String(lineasConDatos[0].fecha_carga).substring(0,10);
+  var ped=lineasConDatos[0].pedido_numero;
+  imprimirCargaGrupo(f, ped, lineasConDatos);
+}
 
 function imprimirCargaGrupoById(grupoId){
   var lineas=entregas.filter(function(e){
@@ -1917,4 +1968,3 @@ loadAll();
 </script>
 </body>
 </html>
-
