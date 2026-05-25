@@ -421,7 +421,7 @@ async function loadAll(){
   try{
     [productos,stock,clientes,pedidos,necesidades,movimientos,entregas]=await Promise.all([
       api('GET','/productos'),api('GET','/stock'),api('GET','/clientes'),
-      api('GET','/pedidos'),api('GET','/necesidades'),
+      api('GET','/pedidos-gav'),api('GET','/necesidades'),
       api('GET','/stock/movimientos'),api('GET','/entregas')
     ]);
     setSyncStatus('ok');
@@ -1695,9 +1695,9 @@ async function savePedido(){
   };
   try{
     if(editId){
-      await api('PUT','/pedidos/'+editId,data);
+      await api('PUT','/pedidos-gav/'+editId,data);
     }else{
-      await api('POST','/pedidos',data);
+      await api('POST','/pedidos-gav',data);
     }
     await loadAll();
     closeModal();
@@ -1836,7 +1836,7 @@ async function saveCliente(){
 async function deletePedido(id){
   if(!confirm('¿Eliminar este pedido?')) return;
   try{
-    await api('DELETE','/pedidos/'+id);
+    await api('DELETE','/pedidos-gav/'+id);
     pedidos=pedidos.filter(p=>String(p.id)!==String(id));
     await loadAll();
     log('Pedido eliminado');
@@ -1900,7 +1900,7 @@ async function reabrirParte(id){
 async function reactivarPedido(id){
   if(!confirm('Reactivar este pedido?')) return;
   try{
-    await api('PATCH','/pedidos/'+id+'/estado',{estado:'pendiente'});
+    await api('PATCH','/pedidos-gav/'+id+'/estado',{estado:'pendiente'});
     await loadAll();
     loadHistorial();
     log('Pedido reactivado','ok');
@@ -2116,7 +2116,7 @@ async function crearPedidoDesdeImport(pedido){
   };
 
   try{
-    await api('POST','/pedidos',data);
+    await api('POST','/pedidos-gav',data);
     await loadAll();
     closeModal();
     switchTab('pedidos');
