@@ -2088,7 +2088,9 @@ function mostrarModalImport(estado, pedido, errorMsg){
     '<button class="btn btn-primary" onclick="crearPedidoDesdeImport('+JSON.stringify(pedido).replace(/'/g,"\'")+')"><i class="ti ti-check"></i> Crear pedido</button>';
 }
 
-async function crearPedidoDesdeImport(pedido){
+async function crearPedidoDesdeImport(){
+  var pedido=importPedidoPendiente;
+  if(!pedido){log('No hay pedido pendiente de importar','warn');return;}
   // Build lineas matching products in catalogue (skip unmatched ones without ID)
   var lineasFinal=[];
   for(var i=0;i<(pedido.lineas||[]).length;i++){
