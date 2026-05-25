@@ -159,6 +159,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   <div class="tb-right">
     <div class="sync-dot syncing" id="sync-dot"></div>
     <button class="tb-btn highlight" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</button>
+    <button class="tb-btn" onclick="abrirImportPDF()" title="Importar pedido desde PDF de BC"><i class="ti ti-file-import"></i> Importar BC</button>
     <button class="tb-btn accent" onclick="openModal('pedido',null)"><i class="ti ti-plus"></i> Nuevo pedido</button>
     <button class="tb-btn" onclick="loadAll()"><i class="ti ti-refresh"></i></button>
   </div>
@@ -357,6 +358,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 </div>
 
 <!-- MODAL -->
+<input type="file" id="pdf-import-input" accept=".pdf" style="display:none" onchange="procesarImportPDF(this)">
 <div class="overlay" id="overlay">
   <div class="modal" id="modal-box">
     <div class="modal-hdr">
@@ -1968,6 +1970,183 @@ function renderHistorial(){
       '</tr>';
     }).join('')+'</tbody></table>';
   }
+}
+
+// ── IMPORTAR PEDIDO DESDE PDF BC ──────────────────────────────────────────────
+function abrirImportPDF(){
+  document.getElementById('pdf-import-input').value='';
+  document.getElementById('pdf-import-input').click();
+}
+
+async function procesarImportPDF(input){
+  var file=input.files[0];
+  if(!file) return;
+  log('Leyendo PDF...','');
+  mostrarModalImport('cargando');
+
+  // Read PDF as base64
+  var base64=await new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(){res(r.result.split(',')[1]);};
+    r.onerror=function(){rej(new Error('Error leyendo archivo'));};
+    r.readAsDataURL(file);
+  });
+
+  try{
+    var response=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:2000,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},
+            {type:'text',text:`Extrae los datos de este pedido de Business Central y devuelve SOLO un JSON con este formato exacto, sin markdown ni texto adicional:
+{
+  "numero": "PV26/XXXXX",
+  "cliente_nombre": "nombre del cliente (campo Cliente del documento)",
+  "obra": "nombre o referencia de la obra (campo Nº documento externo)",
+  "destino": "dirección completa de descarga",
+  "fecha_pedido": "YYYY-MM-DD",
+  "lineas": [
+    {"referencia": "GVIBRF024", "descripcion": "G Vibrado Forna 200x100x100cm", "cantidad": 71}
+  ]
+}
+IMPORTANTE:
+- En "lineas" incluye SOLO las líneas con referencia tipo GVIBRF, GVIBRFXXX, etc. NO incluyas portes (PORT), geotextil (PROT), ni líneas sin cantidad.
+- "obra" es el campo "Nº documento externo" del PDF
+- "destino" es la dirección del campo "Dirección de descarga"
+- Si un campo no existe pon null`
+            }
+          ]
+        }]
+      })
+    });
+    var data=await response.json();
+    var txt=data.content.map(function(c){return c.text||'';}).join('');
+    // Strip markdown code blocks if present
+    txt=txt.replace(/```json|```/g,'').trim();
+    var pedido=JSON.parse(txt);
+    mostrarModalImport('preview', pedido);
+  }catch(e){
+    mostrarModalImport('error', null, e.message);
+  }
+}
+
+function mostrarModalImport(estado, pedido, errorMsg){
+  var box=document.getElementById('modal-box');
+  box.className='modal wide';
+  document.getElementById('overlay').classList.add('open');
+
+  if(estado==='cargando'){
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-import"></i> Importando PDF de Business Central...';
+    document.getElementById('modal-body').innerHTML=
+      '<div style="text-align:center;padding:40px">'+
+        '<div style="font-size:36px;margin-bottom:12px">⏳</div>'+
+        '<div style="font-size:14px;color:var(--text2)">Claude está leyendo el PDF...</div>'+
+        '<div style="font-size:12px;color:var(--text3);margin-top:6px">Extrayendo referencias, cantidades y datos del cliente</div>'+
+      '</div>';
+    document.getElementById('modal-foot').innerHTML='';
+    return;
+  }
+
+  if(estado==='error'){
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-alert-triangle"></i> Error al leer el PDF';
+    document.getElementById('modal-body').innerHTML=
+      '<div style="background:var(--red-l);border-radius:var(--radius-sm);padding:14px;color:var(--red)">'+
+        '<strong>Error:</strong> '+(errorMsg||'No se pudo extraer la información')+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:12px">Comprueba que el PDF es un pedido de Business Central de Arisac.</div>';
+    document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
+    return;
+  }
+
+  // Preview state — show extracted data for confirmation
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-file-import"></i> Pedido extraído — Revisa y confirma';
+
+  var lineasHTML='';
+  (pedido.lineas||[]).forEach(function(l,i){
+    // Try to find matching product in catalogue
+    var prod=productos.find(function(p){return p.referencia===l.referencia;});
+    var matchColor=prod?'color:var(--green)':'color:var(--amber)';
+    var matchLabel=prod?'<span style="font-size:10px;color:var(--green)"><i class="ti ti-check"></i> En catálogo</span>':'<span style="font-size:10px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> No está en catálogo</span>';
+    lineasHTML+=
+      '<tr style="border-bottom:1px solid var(--border)">'+
+        '<td style="padding:8px 12px;font-family:monospace;font-weight:500;'+matchColor+'">'+l.referencia+'</td>'+
+        '<td style="padding:8px 12px;font-size:12px;color:var(--text2)">'+( l.descripcion||'')+'</td>'+
+        '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-weight:500">'+l.cantidad+'</td>'+
+        '<td style="padding:8px 12px">'+matchLabel+'</td>'+
+      '</tr>';
+  });
+
+  var sinCatalogo=(pedido.lineas||[]).filter(function(l){return!productos.find(function(p){return p.referencia===l.referencia;});}).length;
+
+  document.getElementById('modal-body').innerHTML=
+    // Pedido info
+    '<div style="background:var(--blue-l);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px">'+
+      '<div class="frow3" style="gap:12px">'+
+        '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--blue-d);margin-bottom:3px">Nº Pedido</div>'+
+          '<div style="font-size:16px;font-weight:700;font-family:monospace;color:var(--blue-d)">'+(pedido.numero||'—')+'</div></div>'+
+        '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--blue-d);margin-bottom:3px">Cliente</div>'+
+          '<div style="font-size:13px;font-weight:500">'+(pedido.cliente_nombre||'—')+'</div></div>'+
+        '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--blue-d);margin-bottom:3px">Obra / Ref.</div>'+
+          '<div style="font-size:13px;font-weight:500">'+(pedido.obra||'—')+'</div></div>'+
+      '</div>'+
+      (pedido.destino?'<div style="margin-top:8px;font-size:11px;color:var(--blue-d)"><i class="ti ti-map-pin"></i> '+pedido.destino+'</div>':'')+
+    '</div>'+
+    // Lines
+    (sinCatalogo>0?'<div style="background:var(--amber-l);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> <strong>'+sinCatalogo+' referencia(s)</strong> no están en el catálogo. Se importarán de todos modos — puedes añadirlas al catálogo después.</div>':'')+
+    '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:6px">'+( pedido.lineas||[]).length+' líneas de producto</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:6px">'+
+      '<thead><tr style="background:var(--surface2)">'+
+        '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);font-size:11px">Referencia</th>'+
+        '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);font-size:11px">Descripción</th>'+
+        '<th style="padding:8px 12px;text-align:right;border-bottom:1px solid var(--border);font-size:11px">Cantidad</th>'+
+        '<th style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px">Catálogo</th>'+
+      '</tr></thead><tbody>'+lineasHTML+'</tbody></table>';
+
+  document.getElementById('modal-foot').innerHTML=
+    '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="crearPedidoDesdeImport('+JSON.stringify(pedido).replace(/'/g,"\'")+')"><i class="ti ti-check"></i> Crear pedido</button>';
+}
+
+async function crearPedidoDesdeImport(pedido){
+  // Build lineas matching products in catalogue (skip unmatched ones without ID)
+  var lineasFinal=[];
+  for(var i=0;i<(pedido.lineas||[]).length;i++){
+    var l=pedido.lineas[i];
+    var prod=productos.find(function(p){return p.referencia===l.referencia;});
+    if(prod){
+      lineasFinal.push({producto_id:prod.id, cantidad:l.cantidad});
+    }
+    // Skip lines not in catalogue — user can add manually
+  }
+
+  if(!lineasFinal.length){
+    log('Ninguna referencia coincide con el catálogo. Añade los productos primero.','warn');
+    return;
+  }
+
+  var data={
+    numero:pedido.numero||'',
+    cliente_nombre:pedido.cliente_nombre||'',
+    obra:pedido.obra||'',
+    fecha_pedido:pedido.fecha_pedido||null,
+    estado:'pendiente',
+    tipo_fabricacion:'bajo_pedido',
+    lineas:lineasFinal
+  };
+
+  try{
+    await api('POST','/pedidos',data);
+    await loadAll();
+    closeModal();
+    switchTab('pedidos');
+    var noMatch=(pedido.lineas||[]).length-lineasFinal.length;
+    log('Pedido '+pedido.numero+' importado ('+lineasFinal.length+' lineas)'+(noMatch?' — '+noMatch+' ref. sin catálogo omitidas':''),'ok');
+  }catch(e){log('Error al crear pedido: '+e.message,'warn');}
 }
 
 function mostrarToast(msg, tipo){
