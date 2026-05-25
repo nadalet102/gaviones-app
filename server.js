@@ -230,7 +230,7 @@ app.delete('/api/clientes/:id', async (req, res) => {
 });
 
 // ── PEDIDOS ────────────────────────────────────────────────────────────────────
-app.get('/api/pedidos', async (req, res) => {
+app.get('/api/pedidos-gav', async (req, res) => {
   try {
     const pedidos = (await pool.query(`
       SELECT p.*,c.nombre as cliente_nombre_rel
@@ -249,7 +249,7 @@ app.get('/api/pedidos', async (req, res) => {
     res.json(pedidos);
   } catch(e) { res.status(500).json({error:e.message}); }
 });
-app.post('/api/pedidos', async (req, res) => {
+app.post('/api/pedidos-gav', async (req, res) => {
   const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas} = req.body;
   const client = await pool.connect();
   try {
@@ -272,7 +272,7 @@ app.post('/api/pedidos', async (req, res) => {
   } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
   finally { client.release(); }
 });
-app.put('/api/pedidos/:id', async (req, res) => {
+app.put('/api/pedidos-gav/:id', async (req, res) => {
   const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas} = req.body;
   const client = await pool.connect();
   try {
@@ -303,7 +303,7 @@ app.put('/api/pedidos/:id', async (req, res) => {
   } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
   finally { client.release(); }
 });
-app.delete('/api/pedidos/:id', async (req, res) => {
+app.delete('/api/pedidos-gav/:id', async (req, res) => {
   try {
     const lineas = (await pool.query('SELECT id FROM lineas_pedido WHERE pedido_id=$1',[req.params.id])).rows;
     for(const l of lineas) await pool.query('DELETE FROM entregas_parciales WHERE linea_pedido_id=$1',[l.id]);
@@ -312,7 +312,7 @@ app.delete('/api/pedidos/:id', async (req, res) => {
     res.json({ok:true});
   } catch(e) { res.status(500).json({error:e.message}); }
 });
-app.patch('/api/pedidos/:id/estado', async (req, res) => {
+app.patch('/api/pedidos-gav/:id/estado', async (req, res) => {
   try {
     res.json((await pool.query('UPDATE pedidos SET estado=$1 WHERE id=$2 RETURNING *',[req.body.estado,req.params.id])).rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
