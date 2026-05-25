@@ -2024,6 +2024,7 @@ function mostrarModalImport(estado, pedido, errorMsg){
         '<div style="font-size:14px;color:var(--text2)">Claude está leyendo el PDF...</div>'+
         '<div style="font-size:12px;color:var(--text3);margin-top:6px">Extrayendo referencias, cantidades y datos del cliente</div>'+
       '</div>';
+  importPedidoPendiente = pedido;
     document.getElementById('modal-foot').innerHTML='';
     return;
   }
@@ -2085,25 +2086,31 @@ function mostrarModalImport(estado, pedido, errorMsg){
 
   document.getElementById('modal-foot').innerHTML=
     '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
-    '<button class="btn btn-primary" onclick="crearPedidoDesdeImport('+JSON.stringify(pedido).replace(/'/g,"\'")+')"><i class="ti ti-check"></i> Crear pedido</button>';
+    '<button class="btn btn-primary" onclick="crearPedidoDesdeImport()"><i class="ti ti-check"></i> Crear pedido</button>';
 }
 
 async function crearPedidoDesdeImport(){
   var pedido=importPedidoPendiente;
   if(!pedido){log('No hay pedido pendiente de importar','warn');return;}
-  // Build lineas matching products in catalogue (skip unmatched ones without ID)
+  log('Creando pedido...','');
+
+  // Match references — also try partial match (GVIBRF024 vs GVIBRF024)
   var lineasFinal=[];
   for(var i=0;i<(pedido.lineas||[]).length;i++){
     var l=pedido.lineas[i];
-    var prod=productos.find(function(p){return p.referencia===l.referencia;});
+    // Exact match first, then case-insensitive
+    var prod=productos.find(function(p){return p.referencia===l.referencia;})
+          || productos.find(function(p){return p.referencia&&p.referencia.toUpperCase()===l.referencia.toUpperCase();});
     if(prod){
       lineasFinal.push({producto_id:prod.id, cantidad:l.cantidad});
     }
-    // Skip lines not in catalogue — user can add manually
   }
 
+  // If still nothing, show which refs were tried
   if(!lineasFinal.length){
-    log('Ninguna referencia coincide con el catálogo. Añade los productos primero.','warn');
+    var refs=(pedido.lineas||[]).map(function(l){return l.referencia;}).join(', ');
+    var cats=productos.slice(0,5).map(function(p){return p.referencia;}).join(', ');
+    log('Sin coincidencias. PDF: '+refs+' | Catálogo: '+cats,'warn');
     return;
   }
 
