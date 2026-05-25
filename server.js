@@ -593,6 +593,59 @@ app.get('/api/historial', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
+// ── IMPORTAR PDF BC ───────────────────────────────────────────────────────────
+app.post('/api/importar-pdf', async (req, res) => {
+  const { base64, media_type } = req.body;
+  if(!base64) return res.status(400).json({error:'No se recibio el PDF'});
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if(!apiKey) return res.status(500).json({error:'ANTHROPIC_API_KEY no configurada en Railway'});
+
+  const https = require('https');
+  const payload = JSON.stringify({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'document', source: { type: 'base64', media_type: media_type||'application/pdf', data: base64 } },
+        { type: 'text', text: 'Extrae los datos de este pedido de Business Central y devuelve SOLO un JSON sin markdown:\n{"numero":"PV26/XXXXX","cliente_nombre":"nombre","obra":"campo Nº documento externo","destino":"direccion de descarga","fecha_pedido":"YYYY-MM-DD","lineas":[{"referencia":"GVIBRF024","descripcion":"descripcion","cantidad":71}]}\nIMPORTANTE: lineas solo con referencias GVIBRF. NO incluyas PORT, PROT ni lineas sin cantidad. Si no existe un campo pon null.' }
+      ]
+    }]
+  });
+
+  const options = {
+    hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(payload),
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    }
+  };
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const r = https.request(options, (httpRes) => {
+        let data = '';
+        httpRes.on('data', chunk => data += chunk);
+        httpRes.on('end', () => resolve({ status: httpRes.statusCode, body: data }));
+      });
+      r.on('error', reject);
+      r.write(payload);
+      r.end();
+    });
+
+    if(result.status !== 200) {
+      return res.status(502).json({error: 'Claude API ' + result.status + ': ' + result.body.substring(0,300)});
+    }
+    const data = JSON.parse(result.body);
+    const txt = data.content.map(c => c.text||'').join('').replace(/```json|```/g,'').trim();
+    res.json(JSON.parse(txt));
+  } catch(e) {
+    res.status(500).json({error: e.message});
+  }
+});
+
 app.get('*', (req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 const PORT = process.env.PORT||3000;
 initDB().then(()=>app.listen(PORT,()=>console.log(`Server on port ${PORT}`)));
