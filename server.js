@@ -2,6 +2,8 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
+let PDFParser = null;
+try { PDFParser = require('pdf2json'); } catch(e) { console.warn('pdf2json not available:', e.message); }
 
 const app = express();
 app.use(cors());
@@ -598,7 +600,7 @@ app.post('/api/importar-pdf', async (req, res) => {
   const { base64 } = req.body;
   if(!base64) return res.status(400).json({error:'No se recibio el PDF'});
 
-  const PDFParser = require('pdf2json');
+  if(!PDFParser) return res.status(500).json({error:'pdf2json no disponible en este servidor'});
   const buf = Buffer.from(base64, 'base64');
 
   try {
