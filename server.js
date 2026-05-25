@@ -364,6 +364,24 @@ app.patch('/api/entregas/:id/confirmar', async (req, res) => {
   } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
   finally { client.release(); }
 });
+app.patch('/api/entregas/:id/anular', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const e = (await client.query(
+      'SELECT e.*,l.producto_id,pe.numero as pedido_numero FROM entregas_parciales e JOIN lineas_pedido l ON l.id=e.linea_pedido_id JOIN pedidos pe ON pe.id=l.pedido_id WHERE e.id=$1',
+      [req.params.id]
+    )).rows[0];
+    if(!e) throw new Error('Entrega no encontrada');
+    if(e.estado!=='confirmada') throw new Error('Solo se pueden anular entregas confirmadas');
+    await client.query(`UPDATE entregas_parciales SET estado='pendiente' WHERE id=$1`,[req.params.id]);
+    await stockMovimiento(client,e.producto_id,'entrada',e.cantidad,'Anulacion entrega ped. '+e.pedido_numero,'ANUL-'+req.params.id,new Date().toISOString().slice(0,10));
+    await client.query('COMMIT');
+    res.json({ok:true});
+  } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
+  finally { client.release(); }
+});
+
 app.patch('/api/entregas/:id/fecha', async (req, res) => {
   try {
     const r = await pool.query(
@@ -497,6 +515,54 @@ app.get('/api/necesidades', async (req, res) => {
       pendiente_entregar: Math.max(0, +row.pedido_total - +row.entregado_total),
       necesidad_neta: Math.max(0, +row.pedido_total - +row.entregado_total - +row.stock_actual)
     })));
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+app.patch('/api/partes/:id/reabrir', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const parte = (await client.query('SELECT * FROM partes_produccion WHERE id=$1',[req.params.id])).rows[0];
+    if(!parte) throw new Error('Parte no encontrado');
+    if(parte.estado!=='cerrado') throw new Error('El parte no esta cerrado');
+    // Reverse all stock movements from this parte
+    const lineas = (await client.query('SELECT * FROM partes_lineas WHERE parte_id=$1',[req.params.id])).rows;
+    for(const l of lineas){
+      if(+l.cantidad>0){
+        await stockMovimiento(client,l.producto_id,'salida',l.cantidad,'Reapertura parte '+parte.fecha,'REAB-'+req.params.id,new Date().toISOString().slice(0,10));
+      }
+    }
+    await client.query("UPDATE partes_produccion SET estado='abierto' WHERE id=$1",[req.params.id]);
+    await client.query('COMMIT');
+    res.json({ok:true});
+  } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
+  finally { client.release(); }
+});
+
+app.get('/api/historial', async (req, res) => {
+  try {
+    const pedidosHist = (await pool.query(`
+      SELECT p.*,c.nombre as cliente_nombre_rel
+      FROM pedidos p LEFT JOIN clientes c ON c.id=p.cliente_id
+      WHERE p.estado IN ('entregado','cancelado')
+      ORDER BY p.created_at DESC LIMIT 100`)).rows;
+    const lineas = (await pool.query(`
+      SELECT l.*,pr.referencia,pr.descripcion,pr.tipo,pr.largo,pr.ancho,pr.alto,pr.unidad
+      FROM lineas_pedido l JOIN productos pr ON pr.id=l.producto_id`)).rows;
+    const entregas = (await pool.query(`
+      SELECT e.*,l.cantidad as linea_cantidad,l.pedido_id,
+        pr.referencia,pr.descripcion,pr.largo,pr.ancho,pr.alto,pr.unidad,
+        pe.numero as pedido_numero,pe.cliente_nombre,pe.obra
+      FROM entregas_parciales e
+      JOIN lineas_pedido l ON l.id=e.linea_pedido_id
+      JOIN productos pr ON pr.id=l.producto_id
+      JOIN pedidos pe ON pe.id=l.pedido_id
+      WHERE e.estado='confirmada'
+      ORDER BY e.fecha_carga DESC LIMIT 200`)).rows;
+    pedidosHist.forEach(p=>{
+      p.lineas=lineas.filter(l=>l.pedido_id===p.id);
+    });
+    res.json({pedidos:pedidosHist, entregas});
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
