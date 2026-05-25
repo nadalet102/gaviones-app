@@ -356,13 +356,37 @@ app.patch('/api/entregas/:id/confirmar', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const e = (await client.query('SELECT e.*,l.producto_id,pe.numero as pedido_numero FROM entregas_parciales e JOIN lineas_pedido l ON l.id=e.linea_pedido_id JOIN pedidos pe ON pe.id=l.pedido_id WHERE e.id=$1',[req.params.id])).rows[0];
+    const e = (await client.query(
+      `SELECT e.*,l.producto_id,l.pedido_id,pe.numero as pedido_numero
+       FROM entregas_parciales e
+       JOIN lineas_pedido l ON l.id=e.linea_pedido_id
+       JOIN pedidos_gav pe ON pe.id=l.pedido_id
+       WHERE e.id=$1`,[req.params.id]
+    )).rows[0];
     if(!e) throw new Error('Entrega no encontrada');
     if(e.estado==='confirmada') throw new Error('Ya confirmada');
     await client.query(`UPDATE entregas_parciales SET estado='confirmada' WHERE id=$1`,[req.params.id]);
     await stockMovimiento(client,e.producto_id,'salida',e.cantidad,'Entrega confirmada ped. '+e.pedido_numero,'ENT-'+req.params.id,e.fecha_carga);
+
+    // Check if ALL lines of the pedido are now fully delivered
+    const pedidoId = e.pedido_id;
+    const check = await client.query(`
+      SELECT
+        COALESCE(SUM(l.cantidad),0) as total_pedido,
+        COALESCE(SUM(CASE WHEN ep.estado='confirmada' THEN ep.cantidad ELSE 0 END),0) as total_entregado
+      FROM lineas_pedido l
+      LEFT JOIN entregas_parciales ep ON ep.linea_pedido_id=l.id
+      WHERE l.pedido_id=$1
+    `,[pedidoId]);
+    const {total_pedido, total_entregado} = check.rows[0];
+    let pedidoAutoEntregado = false;
+    if(+total_pedido > 0 && +total_entregado >= +total_pedido) {
+      await client.query(`UPDATE pedidos_gav SET estado='entregado' WHERE id=$1 AND estado NOT IN ('cancelado','entregado')`,[pedidoId]);
+      pedidoAutoEntregado = true;
+    }
+
     await client.query('COMMIT');
-    res.json({ok:true});
+    res.json({ok:true, pedidoAutoEntregado, pedidoId});
   } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
   finally { client.release(); }
 });
