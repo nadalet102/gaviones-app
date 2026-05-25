@@ -375,8 +375,21 @@ app.patch('/api/entregas/:id/fecha', async (req, res) => {
 });
 
 app.delete('/api/entregas/:id', async (req, res) => {
-  try { await pool.query('DELETE FROM entregas_parciales WHERE id=$1',[req.params.id]); res.json({ok:true}); }
-  catch(e) { res.status(500).json({error:e.message}); }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // If confirmed, reverse the stock movement
+    const e = (await client.query('SELECT e.*,l.producto_id FROM entregas_parciales e JOIN lineas_pedido l ON l.id=e.linea_pedido_id WHERE e.id=$1',[req.params.id])).rows[0];
+    if(!e) throw new Error('Entrega no encontrada');
+    if(e.estado==='confirmada'){
+      // Return stock
+      await stockMovimiento(client,e.producto_id,'entrada',e.cantidad,'Anulación entrega confirmada','ANUL-'+req.params.id,new Date().toISOString().slice(0,10));
+    }
+    await client.query('DELETE FROM entregas_parciales WHERE id=$1',[req.params.id]);
+    await client.query('COMMIT');
+    res.json({ok:true, stockRevertido: e.estado==='confirmada'});
+  } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
+  finally { client.release(); }
 });
 
 // ── PARTES DE PRODUCCIÓN ───────────────────────────────────────────────────────
@@ -490,4 +503,3 @@ app.get('/api/necesidades', async (req, res) => {
 app.get('*', (req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 const PORT = process.env.PORT||3000;
 initDB().then(()=>app.listen(PORT,()=>console.log(`Server on port ${PORT}`)));
-
