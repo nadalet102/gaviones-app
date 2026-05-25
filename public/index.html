@@ -1993,42 +1993,16 @@ async function procesarImportPDF(input){
   });
 
   try{
-    var response=await fetch('https://api.anthropic.com/v1/messages',{
+    var response=await fetch('/api/importar-pdf',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:2000,
-        messages:[{
-          role:'user',
-          content:[
-            {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},
-            {type:'text',text:`Extrae los datos de este pedido de Business Central y devuelve SOLO un JSON con este formato exacto, sin markdown ni texto adicional:
-{
-  "numero": "PV26/XXXXX",
-  "cliente_nombre": "nombre del cliente (campo Cliente del documento)",
-  "obra": "nombre o referencia de la obra (campo Nº documento externo)",
-  "destino": "dirección completa de descarga",
-  "fecha_pedido": "YYYY-MM-DD",
-  "lineas": [
-    {"referencia": "GVIBRF024", "descripcion": "G Vibrado Forna 200x100x100cm", "cantidad": 71}
-  ]
-}
-IMPORTANTE:
-- En "lineas" incluye SOLO las líneas con referencia tipo GVIBRF, GVIBRFXXX, etc. NO incluyas portes (PORT), geotextil (PROT), ni líneas sin cantidad.
-- "obra" es el campo "Nº documento externo" del PDF
-- "destino" es la dirección del campo "Dirección de descarga"
-- Si un campo no existe pon null`
-            }
-          ]
-        }]
-      })
+      body:JSON.stringify({base64:base64, media_type:'application/pdf'})
     });
-    var data=await response.json();
-    var txt=data.content.map(function(c){return c.text||'';}).join('');
-    // Strip markdown code blocks if present
-    txt=txt.replace(/```json|```/g,'').trim();
-    var pedido=JSON.parse(txt);
+    if(!response.ok){
+      var err=await response.json();
+      throw new Error(err.error||'Error del servidor');
+    }
+    var pedido=await response.json();
     mostrarModalImport('preview', pedido);
   }catch(e){
     mostrarModalImport('error', null, e.message);
