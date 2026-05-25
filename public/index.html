@@ -224,7 +224,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       <span style="font-size:14px;font-weight:500" id="cal-title"></span>
       <button class="btn btn-outline btn-sm" onclick="calMove(1)"><i class="ti ti-chevron-right"></i></button>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="openModal('entrega',null)"><i class="ti ti-plus"></i> Programar carga</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-sm" onclick="imprimirCalendario()"><i class="ti ti-printer"></i> Imprimir</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('entrega',null)"><i class="ti ti-plus"></i> Programar carga</button>
+    </div>
   </div>
   <div class="cal-grid" id="cal-grid"></div>
   <div class="card">
@@ -681,6 +684,12 @@ function renderCal(){
     const idsPendientes=g.lineas.filter(e=>e.estado==='pendiente').map(e=>e.id);
     // Summary of references
     const resumen=g.lineas.map(e=>e.referencia+(dimStr(e)?' ('+dimStr(e)+')':'')+': '+fmtN(e.cantidad)+' ud').join(' · ');
+    const transInfo=(g.transportista||g.mat_camion)?
+      '<div style="font-size:10px;color:var(--text2);margin-top:2px">'+
+        (g.transportista?'<i class="ti ti-truck" style="font-size:10px"></i> '+g.transportista:'')+ 
+        (g.mat_camion?' · <span style="font-family:monospace">'+g.mat_camion+'</span>':'')+
+        (g.mat_remolque?' / <span style="font-family:monospace">'+g.mat_remolque+'</span>':'')+
+      '</div>':'';
     // Fecha editable (only if any pending — change all lines of this group)
     const fechaInput=algunaPendiente
       ?'<input type="date" value="'+g.fecha+'" title="Cambiar fecha de toda la carga" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)" onchange="cambiarFechaGrupo(['+idsPendientes.join(',')+'],this.value)">'
@@ -693,7 +702,7 @@ function renderCal(){
           (g.cliente_nombre?' <span class="dim">— '+g.cliente_nombre+'</span>':'')+
           (g.obra?' <span class="badge b-steel" style="font-size:9px">'+g.obra+'</span>':'')+
         '</div>'+
-        '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+resumen+'</div>'+
+        '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+resumen+'</div>'+transInfo+
       '</div>'+
       '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">'+
         '<span style="font-family:monospace;font-weight:500;font-size:13px">'+fmtN(totalUds)+' ud</span>'+
@@ -702,6 +711,7 @@ function renderCal(){
           ?'<button class="btn btn-green btn-sm" onclick="confirmarGrupo(['+idsPendientes.join(',')+'])"><i class="ti ti-check"></i> Confirmar</button>'
           :'')+
         '<button class="btn-icon" data-fecha="'+g.fecha+'" data-ped="'+g.pedido_numero+'" onclick="verDetalleGrupo(this.dataset.fecha,this.dataset.ped)" title="Ver detalle"><i class="ti ti-eye"></i></button>'+
+        (algunaPendiente?'<button class="btn-icon" data-ef="'+g.fecha+'" data-ep="'+g.pedido_numero+'" onclick="editarGrupo(this.dataset.ef,this.dataset.ep)" title="Editar carga"><i class="ti ti-pencil"></i></button>':'')+ 
         (algunaPendiente?'<button class="btn-icon danger" onclick="deleteGrupo(['+idsPendientes.join(',')+'])" title="Eliminar pendientes"><i class="ti ti-trash"></i></button>':'')+
       '</div>'+
     '</div>';
@@ -730,6 +740,145 @@ function showDayCargas(fecha){
     '</tr>').join('')+'</tbody></table>';
   document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
   document.getElementById('overlay').classList.add('open');
+}
+
+function editarGrupo(fecha, pedidoNum){
+  // Find all pending entregas for this group
+  const lineasGrupo=entregas.filter(e=>String(e.fecha_carga).substring(0,10)===fecha&&e.estado==='pendiente'&&e.pedido_numero===pedidoNum);
+  if(!lineasGrupo.length){log('No hay líneas pendientes en esta carga','warn');return;}
+  const box=document.getElementById('modal-box');
+  box.className='modal wide';
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-pencil"></i> Editar carga — '+pedidoNum+' · '+fmtD(fecha);
+  document.getElementById('overlay').classList.add('open');
+  editId=null; modalType='editarGrupo';
+
+  // Get shared transport info from first line
+  const trans=lineasGrupo[0].transportista||'';
+  const matC=lineasGrupo[0].mat_camion||'';
+  const matR=lineasGrupo[0].mat_remolque||'';
+
+  document.getElementById('modal-body').innerHTML=
+    '<div class="frow3">'+
+      '<div class="field"><label>Transportista</label><input type="text" id="eg-trans" value="'+trans+'" placeholder="Nombre transportista"></div>'+
+      '<div class="field"><label>Matrícula camión</label><input type="text" id="eg-matc" value="'+matC+'" placeholder="0000 AAA" style="font-family:monospace"></div>'+
+      '<div class="field"><label>Matrícula remolque</label><input type="text" id="eg-matr" value="'+matR+'" placeholder="0000 AAA" style="font-family:monospace"></div>'+
+    '</div>'+
+    '<div class="field"><label>Fecha de carga</label><input type="date" id="eg-fecha" value="'+fecha+'"></div>'+
+    '<div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:6px">Cantidades a cargar</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px">'+
+    '<thead><tr style="background:var(--surface2)">'+
+      '<th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)">Producto</th>'+
+      '<th style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--border)">Total pedido</th>'+
+      '<th style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--border)">Ya entregado</th>'+
+      '<th style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--border)">En esta carga</th>'+
+    '</tr></thead><tbody>'+
+    lineasGrupo.map(e=>{
+      const pedido=pedidos.find(p=>p.numero===e.pedido_numero);
+      const linea=pedido?(pedido.lineas||[]).find(l=>String(l.id)===String(e.linea_pedido_id)):null;
+      const entregado=linea?(linea.entregas||[]).filter(ent=>ent.estado==='confirmada').reduce((s,ent)=>s+(+ent.cantidad||0),0):0;
+      const totalPed=linea?+linea.cantidad:0;
+      return '<tr style="border-bottom:1px solid var(--border)">'+
+        '<td style="padding:8px 10px"><div style="font-weight:500">'+e.referencia+'</div><div class="dim">'+dimStr(e)+'</div></td>'+
+        '<td style="padding:8px 10px;text-align:right;font-family:monospace">'+fmtN(totalPed)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right;font-family:monospace;color:var(--green)">'+fmtN(entregado)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+
+          '<input type="number" data-entrega-id="'+e.id+'" value="'+e.cantidad+'" min="0" '+
+          'style="width:80px;font-size:13px;font-family:monospace;text-align:right;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2)">'+
+        '</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table>'+
+    '<div class="field"><label>Notas</label><input type="text" id="eg-notas" value="'+(lineasGrupo[0].notas||'')+'" placeholder="Observaciones..."></div>';
+
+  document.getElementById('modal-foot').innerHTML=
+    '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="guardarEdicionGrupo()"><i class="ti ti-device-floppy"></i> Guardar cambios</button>';
+}
+
+async function guardarEdicionGrupo(){
+  const trans=document.getElementById('eg-trans').value.trim();
+  const matC=document.getElementById('eg-matc').value.trim();
+  const matR=document.getElementById('eg-matr').value.trim();
+  const fecha=document.getElementById('eg-fecha').value;
+  const notas=document.getElementById('eg-notas').value.trim();
+  if(!fecha){log('La fecha es obligatoria','warn');return;}
+  const inputs=document.querySelectorAll('[data-entrega-id]');
+  try{
+    for(const inp of inputs){
+      const id=inp.dataset.entregaId;
+      const cant=parseFloat(inp.value)||0;
+      const e=entregas.find(x=>String(x.id)===String(id));
+      if(!e) continue;
+      const updated=await api('PUT','/entregas/'+id,{
+        fecha_carga:fecha, cantidad:cant, estado:e.estado,
+        transportista:trans, mat_camion:matC, mat_remolque:matR, notas
+      });
+      Object.assign(e,updated);
+    }
+    await loadAll();
+    closeModal();
+    log('Carga actualizada','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+function imprimirCalendario(){
+  // Build print-friendly HTML of all pending entregas grouped by date+pedido
+  const pendientes=entregas.filter(e=>e.estado==='pendiente').sort((a,b)=>a.fecha_carga>b.fecha_carga?1:-1);
+  if(!pendientes.length){log('No hay cargas pendientes para imprimir','warn');return;}
+
+  const grupos={};
+  pendientes.forEach(e=>{
+    const key=String(e.fecha_carga).substring(0,10)+'__'+e.pedido_numero;
+    if(!grupos[key]) grupos[key]={fecha:String(e.fecha_carga).substring(0,10),pedido_numero:e.pedido_numero,cliente_nombre:e.cliente_nombre,obra:e.obra,transportista:e.transportista,mat_camion:e.mat_camion,mat_remolque:e.mat_remolque,lineas:[]};
+    grupos[key].lineas.push(e);
+  });
+
+  let html='<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px;color:#1a1a2e">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #334155;padding-bottom:12px;margin-bottom:16px">';
+  html+='<div><div style="font-size:20px;font-weight:700">Plan de Cargas</div><div style="font-size:12px;color:#6b7280;margin-top:3px">Generado: '+new Date().toLocaleString('es-ES')+'</div></div>';
+  html+='<div style="text-align:right"><div style="font-size:12px;color:#6b7280">'+Object.keys(grupos).length+' cargas programadas</div><div style="font-size:12px;color:#6b7280">'+fmtN(pendientes.reduce((s,e)=>s+(+e.cantidad||0),0))+' uds totales pendientes</div></div>';
+  html+='</div>';
+
+  Object.values(grupos).sort((a,b)=>a.fecha>b.fecha?1:-1).forEach(g=>{
+    const totalUds=g.lineas.reduce((s,e)=>s+(+e.cantidad||0),0);
+    html+='<div style="margin-bottom:20px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">';
+    html+='<div style="background:#334155;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">';
+    html+='<div style="color:#fff"><span style="font-size:14px;font-weight:600">'+fmtD(g.fecha)+'</span>';
+    html+=' <span style="font-size:13px;margin-left:10px">'+g.pedido_numero+'</span>';
+    if(g.cliente_nombre) html+=' <span style="font-size:12px;color:#94a3b8">— '+g.cliente_nombre+'</span>';
+    if(g.obra) html+=' <span style="font-size:11px;background:rgba(255,255,255,.15);padding:1px 7px;border-radius:10px;color:#e2e8f0">'+g.obra+'</span>';
+    html+='</div>';
+    html+='<div style="text-align:right;color:#fff;font-size:13px;font-weight:500">'+fmtN(totalUds)+' ud</div>';
+    html+='</div>';
+    if(g.transportista||g.mat_camion||g.mat_remolque){
+      html+='<div style="background:#f8f9fb;padding:8px 14px;font-size:12px;color:#6b7280;display:flex;gap:20px;border-bottom:1px solid #e5e7eb">';
+      if(g.transportista) html+='<span><i>🚛</i> '+g.transportista+'</span>';
+      if(g.mat_camion) html+='<span>Camión: <strong style="font-family:monospace">'+g.mat_camion+'</strong></span>';
+      if(g.mat_remolque) html+='<span>Remolque: <strong style="font-family:monospace">'+g.mat_remolque+'</strong></span>';
+      html+='</div>';
+    }
+    html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html+='<thead><tr style="background:#f1f5f9"><th style="padding:7px 14px;text-align:left;font-weight:500;color:#6b7280">Producto</th><th style="padding:7px 14px;text-align:left;font-weight:500;color:#6b7280">Dimensiones</th><th style="padding:7px 14px;text-align:right;font-weight:500;color:#6b7280">Uds. a cargar</th></tr></thead><tbody>';
+    g.lineas.forEach(e=>{
+      html+='<tr style="border-top:1px solid #e5e7eb"><td style="padding:8px 14px;font-weight:500">'+e.referencia+'</td><td style="padding:8px 14px;color:#6b7280">'+dimStr(e)+'</td><td style="padding:8px 14px;text-align:right;font-family:monospace;font-weight:700;font-size:14px">'+fmtN(e.cantidad)+'</td></tr>';
+    });
+    html+='</tbody></table>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  var blob=new Blob([
+    '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Plan de Cargas</title>'+
+    '<style>body{margin:0;padding:0;background:#fff}@media print{@page{margin:1.5cm;size:A4}}</style>'+
+    '</head><body>'+html+
+    '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};}<\/script>'+
+    '</body></html>'
+  ],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.target='_blank'; a.rel='noopener';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},10000);
 }
 
 async function confirmarGrupo(ids){
@@ -1078,6 +1227,11 @@ function openModal(type, id, extraId){
         '<div class="field"><label>Pedido</label><select id="f-pedido" onchange="renderLineasEntrega()">'+pedidoOptions+'</select></div>'+
         '<div class="field"><label>Fecha de carga</label><input type="date" id="f-fecha-carga" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
       '</div>'+
+      '<div class="frow3">'+
+        '<div class="field"><label>Transportista</label><input type="text" id="f-trans" placeholder="Nombre transportista"></div>'+
+        '<div class="field"><label>Matrícula camión</label><input type="text" id="f-matc" placeholder="0000 AAA" style="font-family:monospace"></div>'+
+        '<div class="field"><label>Matrícula remolque</label><input type="text" id="f-matr" placeholder="0000 AAA" style="font-family:monospace"></div>'+
+      '</div>'+
       '<div id="lineas-entrega-container" style="margin-top:4px"></div>'+
       '<div class="field" style="margin-top:8px"><label>Notas</label><input type="text" id="f-enotas" placeholder="Observaciones generales..."></div>';
 
@@ -1268,8 +1422,11 @@ async function saveEntrega(){
 
   if(!lineasACargar.length){log('Introduce al menos una cantidad para cargar','warn');return;}
   try{
+    const trans=document.getElementById('f-trans')?.value.trim()||null;
+    const matC=document.getElementById('f-matc')?.value.trim()||null;
+    const matR=document.getElementById('f-matr')?.value.trim()||null;
     for(const item of lineasACargar){
-      await api('POST','/entregas',{linea_pedido_id:item.linea_pedido_id,fecha_carga:fecha,cantidad:item.cantidad,notas:notas});
+      await api('POST','/entregas',{linea_pedido_id:item.linea_pedido_id,fecha_carga:fecha,cantidad:item.cantidad,notas:notas,transportista:trans,mat_camion:matC,mat_remolque:matR});
     }
     await loadAll();
     closeModal();
@@ -1364,3 +1521,4 @@ loadAll();
 </script>
 </body>
 </html>
+
