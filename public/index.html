@@ -772,7 +772,10 @@ function showDayCargas(fecha){
       '<td><div style="font-weight:500">'+e.pedido_numero+'</div><div class="dim">'+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div></td>'+
       '<td class="r mono">'+fmtN(e.cantidad)+'</td>'+
       '<td><span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span></td>'+
-      '<td>'+(e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+');closeModal()"><i class="ti ti-check"></i> Confirmar</button>':'')+'</td>'+
+      '<td style="display:flex;gap:4px;align-items:center">'+
+        '<button class="btn-icon" data-eid="'+e.id+'" onclick="imprimirEntregaUnica(this.dataset.eid)" title="Imprimir esta linea"><i class="ti ti-printer"></i></button>'+
+        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+');closeModal()"><i class="ti ti-check"></i> Confirmar</button>':'')+
+      '</td>'+
     '</tr>').join('')+'</tbody></table>';
   document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
   document.getElementById('overlay').classList.add('open');
@@ -855,6 +858,70 @@ async function guardarEdicionGrupo(){
     closeModal();
     log('Carga actualizada','ok');
   }catch(e){log('Error: '+e.message,'warn');}
+}
+
+function imprimirEntregaUnica(entregaId){
+  var e=entregas.find(function(x){return String(x.id)===String(entregaId);});
+  if(!e){log('Entrega no encontrada','warn');return;}
+
+  var html='<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:24px;color:#1a1a2e">';
+
+  // Header
+  html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0d4f7a;padding-bottom:14px;margin-bottom:18px">';
+  html+='<div>';
+  html+='<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#0d4f7a;font-weight:600;margin-bottom:4px">Hoja de Carga</div>';
+  html+='<div style="font-size:28px;font-weight:700;font-family:monospace;color:#0d4f7a;letter-spacing:.05em">'+e.referencia+'</div>';
+  html+='<div style="font-size:14px;color:#6b7280;margin-top:4px">'+(dimStr(e)||e.descripcion||'')+'</div>';
+  html+='</div>';
+  html+='<div style="text-align:right">';
+  html+='<div style="font-size:22px;font-weight:700;color:#334155">'+fmtD(e.fecha_carga)+'</div>';
+  html+='<div style="font-size:13px;color:#6b7280;margin-top:2px">'+e.pedido_numero+(e.cliente_nombre?' — '+e.cliente_nombre:'')+'</div>';
+  if(e.obra) html+='<div style="font-size:12px;color:#6b7280;margin-top:2px">Obra: '+e.obra+'</div>';
+  html+='<div style="margin-top:8px"><span style="background:'+(e.estado==='confirmada'?'#e6f5ea':'#fff3e0')+';color:'+(e.estado==='confirmada'?'#2d7a3a':'#8a5200')+';padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600">'+(e.estado==='confirmada'?'✓ Confirmada':'Pendiente')+'</span></div>';
+  html+='</div>';
+  html+='</div>';
+
+  // Transport
+  if(e.transportista||e.mat_camion||e.mat_remolque){
+    html+='<div style="background:#f1f5f9;border-radius:8px;padding:12px 16px;margin-bottom:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+    html+='<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;font-weight:600;margin-bottom:4px">Transportista</div><div style="font-size:14px;font-weight:600">'+(e.transportista||'—')+'</div></div>';
+    html+='<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;font-weight:600;margin-bottom:4px">Matricula camion</div><div style="font-size:16px;font-weight:700;font-family:monospace;letter-spacing:.08em">'+(e.mat_camion||'—')+'</div></div>';
+    html+='<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;font-weight:600;margin-bottom:4px">Matricula remolque</div><div style="font-size:16px;font-weight:700;font-family:monospace;letter-spacing:.08em">'+(e.mat_remolque||'—')+'</div></div>';
+    html+='</div>';
+  }
+
+  // Big quantity box — easy to read for the forklift operator
+  html+='<div style="text-align:center;margin:24px 0;padding:24px;background:#f8f9fb;border-radius:12px;border:2px solid #0d4f7a">';
+  html+='<div style="font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:8px">Unidades a cargar</div>';
+  html+='<div style="font-size:72px;font-weight:700;font-family:monospace;color:#0d4f7a;line-height:1">'+fmtN(e.cantidad)+'</div>';
+  html+='<div style="font-size:18px;color:#6b7280;margin-top:8px">unidades de <strong>'+e.referencia+'</strong></div>';
+  if(dimStr(e)) html+='<div style="font-size:14px;color:#6b7280;margin-top:4px">'+dimStr(e)+'</div>';
+  html+='</div>';
+
+  // Notes
+  if(e.notas) html+='<div style="margin-bottom:18px;background:#fff3e0;border-radius:6px;padding:10px 14px;font-size:13px;color:#8a5200"><strong>Notas:</strong> '+e.notas+'</div>';
+
+  // Signature boxes
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:24px">';
+  html+='<div style="border-top:2px solid #334155;padding-top:10px;text-align:center"><div style="font-size:11px;color:#6b7280;margin-bottom:40px">Firma carretillero</div></div>';
+  html+='<div style="border-top:2px solid #334155;padding-top:10px;text-align:center"><div style="font-size:11px;color:#6b7280;margin-bottom:40px">Nombre y firma</div></div>';
+  html+='</div>';
+
+  html+='<div style="margin-top:16px;font-size:10px;color:#9ca3af;text-align:center">'+e.pedido_numero+' · '+fmtD(e.fecha_carga)+' · GavControl · Generado: '+new Date().toLocaleString('es-ES')+'</div>';
+  html+='</div>';
+
+  var blob=new Blob([
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+    '<title>Hoja Carga — '+e.referencia+' '+fmtD(e.fecha_carga)+'</title>'+
+    '<style>body{margin:0;padding:0;background:#fff}@media print{@page{margin:2cm;size:A4}}</style>'+
+    '</head><body>'+html+
+    '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};}<\/script>'+
+    '</body></html>'
+  ],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},10000);
 }
 
 function imprimirCargaGrupo(fecha, pedidoNum){
@@ -1062,7 +1129,30 @@ async function deleteGrupo(ids){
 
 function verDetalleGrupo(fecha, pedidoNum){
   const lineas=entregas.filter(e=>String(e.fecha_carga).substring(0,10)===fecha&&e.pedido_numero===pedidoNum);
-  showDayCargas(fecha);
+  if(!lineas.length) return;
+  const box=document.getElementById('modal-box');
+  box.className='modal wide';
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-list"></i> '+pedidoNum+' — '+fmtD(fecha);
+  document.getElementById('modal-body').innerHTML=
+    '<table class="tbl"><thead><tr>'+
+      '<th>Referencia</th><th>Dimensiones</th><th class="r">Uds.</th><th>Transportista</th><th>Estado</th><th></th>'+
+    '</tr></thead><tbody>'+
+    lineas.map(e=>'<tr>'+
+      '<td class="mono" style="font-weight:500;color:var(--blue-d)">'+e.referencia+'</td>'+
+      '<td class="dim">'+dimStr(e)+'</td>'+
+      '<td class="r mono" style="font-weight:500;font-size:15px">'+fmtN(e.cantidad)+'</td>'+
+      '<td class="dim">'+(e.transportista||'—')+(e.mat_camion?' <span style="font-family:monospace">'+e.mat_camion+'</span>':'')+'</td>'+
+      '<td><span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span></td>'+
+      '<td style="display:flex;gap:4px;align-items:center">'+
+        '<button class="btn btn-outline btn-sm" data-eid="'+e.id+'" onclick="imprimirEntregaUnica(this.dataset.eid)" title="Imprimir esta linea"><i class="ti ti-printer"></i> Imprimir</button>'+
+        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+');closeModal()"><i class="ti ti-check"></i></button>':'')+
+      '</td>'+
+    '</tr>').join('')+
+    '</tbody></table>';
+  document.getElementById('modal-foot').innerHTML=
+    '<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>'+
+    '<button class="btn btn-primary" data-pf="'+fecha+'" data-pp="'+pedidoNum+'" onclick="imprimirCargaGrupo(this.dataset.pf,this.dataset.pp);closeModal()"><i class="ti ti-printer"></i> Imprimir todo el grupo</button>';
+  document.getElementById('overlay').classList.add('open');
 }
 
 async function confirmarEntrega(id){
