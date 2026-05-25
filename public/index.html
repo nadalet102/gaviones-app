@@ -713,7 +713,7 @@ function renderCal(){
         '<button class="btn-icon" data-fecha="'+g.fecha+'" data-ped="'+g.pedido_numero+'" onclick="verDetalleGrupo(this.dataset.fecha,this.dataset.ped)" title="Ver detalle"><i class="ti ti-eye"></i></button>'+
         '<button class="btn-icon" data-pf="'+g.fecha+'" data-pp="'+g.pedido_numero+'" onclick="imprimirCargaGrupo(this.dataset.pf,this.dataset.pp)" title="Imprimir esta carga"><i class="ti ti-printer"></i></button>'+
         (algunaPendiente?'<button class="btn-icon" data-ef="'+g.fecha+'" data-ep="'+g.pedido_numero+'" onclick="editarGrupo(this.dataset.ef,this.dataset.ep)" title="Editar carga"><i class="ti ti-pencil"></i></button>':'')+ 
-        (algunaPendiente?'<button class="btn-icon danger" onclick="deleteGrupo(['+idsPendientes.join(',')+'])" title="Eliminar pendientes"><i class="ti ti-trash"></i></button>':'')+
+        '<button class="btn-icon danger" data-ids="'+g.lineas.map(e=>e.id).join(',')+'" onclick="deleteGrupoById(this.dataset.ids)" title="Eliminar carga"><i class="ti ti-trash"></i></button>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -1001,14 +1001,28 @@ async function cambiarFechaGrupo(ids, nuevaFecha){
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
-async function deleteGrupo(ids){
-    if(!confirm('¿Eliminar esta carga programada?')) return;
+async function deleteGrupoById(idsStr){
+  const ids=idsStr.split(',').map(x=>x.trim()).filter(Boolean);
+  const lineas=entregas.filter(e=>ids.includes(String(e.id)));
+  const confirmadas=lineas.filter(e=>e.estado==='confirmada');
+  const pendientes=lineas.filter(e=>e.estado==='pendiente');
+  let msg='¿Eliminar esta carga programada?';
+  if(confirmadas.length>0){
+    msg='Hay lineas ya confirmadas (stock descontado). Al eliminar, el stock se devolvera automaticamente. Continuar?';
+
+
+  }
+  if(!confirm(msg)) return;
   try{
     for(const id of ids){ await api('DELETE','/entregas/'+id); }
-    entregas=entregas.filter(e=>!ids.includes(e.id)&&!ids.includes(String(e.id)));
-    renderCal();renderDash();updateStats();
-    log('Carga eliminada');
+    await loadAll();
+    const msg2='Carga eliminada'+(confirmadas.length>0?' — stock devuelto ('+fmtN(confirmadas.reduce((s,e)=>s+(+e.cantidad||0),0))+' ud)':'');
+    log(msg2,'ok');
   }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function deleteGrupo(ids){
+  await deleteGrupoById(ids.join(','));
 }
 
 function verDetalleGrupo(fecha, pedidoNum){
@@ -1035,13 +1049,14 @@ async function cambiarFechaEntrega(id, nuevaFecha){
 }
 
 async function deleteEntrega(id){
-  if(!confirm('¿Eliminar esta carga programada?')) return;
+  var e=entregas.find(function(x){return String(x.id)===String(id);});
+  var msg=e&&e.estado==='confirmada'?'Entrega confirmada: el stock se devolvera al eliminar. Continuar?':'Eliminar esta carga programada?';
+  if(!confirm(msg)) return;
   try{
-    await api('DELETE','/entregas/'+id);
-    entregas=entregas.filter(e=>e.id!==id);
-    renderCal();renderDash();
-    log('Carga eliminada');
-  }catch(e){log('Error: '+e.message,'warn');}
+    var res=await api('DELETE','/entregas/'+id);
+    await loadAll();
+    log('Carga eliminada'+(res&&res.stockRevertido?' - stock devuelto':''),'ok');
+  }catch(err){log('Error: '+err.message,'warn');}
 }
 
 // ── NECESIDADES ────────────────────────────────────────────────────────────────
