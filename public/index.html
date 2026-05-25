@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Producción — Gaviones</title>
+<title>GavControl — Producción y Pedidos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 :root{
-  --bg:#f0f2f5;--surface:#fff;--surface2:#f8f9fb;
+  --bg:#f0f2f5;--surface:#fff;--surface2:#f8f9fb;--surface3:#f0f2f5;
   --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);
   --text:#1a1a2e;--text2:#6b7280;--text3:#9ca3af;
   --blue:#1d6fa4;--blue-l:#e8f3fb;--blue-d:#0d4f7a;
@@ -22,49 +22,43 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
-/* TOPBAR */
-.topbar{background:var(--steel);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.15)}
+.topbar{background:var(--steel);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .tb-brand{display:flex;align-items:center;gap:10px}
 .tb-logo{width:34px;height:34px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px}
-.tb-name{font-size:15px;font-weight:600;color:#fff;letter-spacing:-.01em}
+.tb-name{font-size:15px;font-weight:600;color:#fff}
 .tb-sub{font-size:10px;color:#94a3b8;margin-top:1px}
 .tb-right{display:flex;gap:6px;align-items:center}
-.tb-btn{background:rgba(255,255,255,0.1);border:none;border-radius:var(--radius-sm);padding:6px 12px;color:#e2e8f0;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;transition:background .12s}
-.tb-btn:hover{background:rgba(255,255,255,0.18)}
+.tb-btn{background:rgba(255,255,255,.1);border:none;border-radius:var(--radius-sm);padding:6px 12px;color:#e2e8f0;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;transition:background .12s}
+.tb-btn:hover{background:rgba(255,255,255,.18)}
 .tb-btn.accent{background:#2563eb;color:#fff}
-.tb-btn.accent:hover{background:#1d4ed8}
 .sync-dot{width:7px;height:7px;border-radius:50%;background:#86efac}
 .sync-dot.syncing{background:#fde68a;animation:pulse 1s infinite}
 .sync-dot.error{background:#fca5a5}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-/* STATROW */
 .statrow{background:var(--blue-d);padding:7px 20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
 .st{display:flex;align-items:baseline;gap:4px}
 .st-v{font-size:15px;font-weight:500;color:#fff;font-family:'DM Mono',monospace}
 .st-l{font-size:10px;color:#93c5fd}
-.st-sep{width:1px;height:16px;background:rgba(255,255,255,0.2)}
-/* TABS */
+.st-sep{width:1px;height:16px;background:rgba(255,255,255,.2)}
 .tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 20px;overflow-x:auto}
 .tab{padding:12px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:all .12s}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab.highlight{color:var(--green)}
+.tab.highlight.active{color:var(--green);border-bottom-color:var(--green)}
 .view{display:none}.view.active{display:block}
 .container{max-width:1280px;margin:0 auto;padding:16px 20px}
-/* CARDS & PANELS */
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:12px}
 .card-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .card-title{font-size:12px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:5px}
 .card-body{padding:14px 16px}
-/* GRID LAYOUTS */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-/* KPI CARD */
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
 .kpi-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:6px}
 .kpi-value{font-size:26px;font-weight:300;font-family:'DM Mono',monospace;line-height:1}
 .kpi-sub{font-size:11px;color:var(--text2);margin-top:4px}
-/* TABLE */
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tbl th{padding:9px 12px;text-align:left;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap}
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -72,7 +66,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .tbl tr:hover td{background:var(--surface2)}
 .tbl th.r,.tbl td.r{text-align:right}
 .tbl th.c,.tbl td.c{text-align:center}
-/* BADGES */
 .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:500;white-space:nowrap}
 .b-blue{background:var(--blue-l);color:var(--blue-d)}
 .b-green{background:var(--green-l);color:var(--green)}
@@ -81,17 +74,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .b-purple{background:var(--purple-l);color:var(--purple)}
 .b-steel{background:var(--steel-l);color:var(--steel)}
 .b-gray{background:#f3f4f6;color:#6b7280}
-/* BUTTONS */
 .btn{border:none;border-radius:var(--radius-sm);padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;transition:all .12s}
 .btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--blue-d)}
 .btn-green{background:var(--green);color:#fff}.btn-green:hover{opacity:.88}
+.btn-amber{background:var(--amber);color:#fff}.btn-amber:hover{opacity:.88}
 .btn-outline{background:none;border:1px solid var(--border2);color:var(--text2)}.btn-outline:hover{background:var(--surface2);color:var(--text)}
 .btn-sm{padding:4px 9px;font-size:11px}
 .btn-danger{background:var(--red);color:#fff}.btn-danger:hover{opacity:.88}
 .btn-icon{background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:4px;font-size:13px;color:var(--text2)}
 .btn-icon:hover{background:var(--surface2);color:var(--text)}
 .btn-icon.danger:hover{background:var(--red-l);color:var(--red)}
-/* FORM */
 .field{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
 .field label{font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
 .field input,.field select,.field textarea{font-size:13px;width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;outline:none}
@@ -99,103 +91,148 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .field textarea{min-height:60px;resize:vertical}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-/* MODAL */
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:flex-start;justify-content:center;z-index:200;padding-top:50px;overflow-y:auto}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);align-items:flex-start;justify-content:center;z-index:200;padding-top:50px;overflow-y:auto}
 .overlay.open{display:flex}
 .modal{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);width:560px;max-width:95vw;overflow:hidden;margin-bottom:30px}
-.modal.wide{width:720px}
+.modal.wide{width:760px}
+.modal.narrow{width:420px}
 .modal-hdr{background:var(--steel);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
 .modal-title{font-size:13px;font-weight:500;color:#fff;display:flex;align-items:center;gap:6px}
 .modal-x{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;padding:2px}
 .modal-x:hover{color:#fff}
-.modal-body{padding:16px;max-height:70vh;overflow-y:auto}
+.modal-body{padding:16px;max-height:72vh;overflow-y:auto}
 .modal-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:var(--surface2)}
-/* PROGRESS BAR */
 .prog{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px}
 .prog-fill{height:6px;border-radius:3px;transition:width .3s}
-/* NECESIDADES ALERTS */
-.alert-row{background:var(--red-l);border-left:3px solid var(--red)}
-.ok-row{background:var(--green-l)}
-/* LINEAS PEDIDO */
-.lineas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
-.lineas-table th{padding:6px 8px;background:var(--surface2);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);border-bottom:1px solid var(--border)}
-.lineas-table td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
-.lineas-table tr:last-child td{border-bottom:none}
-/* STOCK INDICATOR */
 .stock-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:500;font-family:'DM Mono',monospace}
 .sc-ok{background:var(--green-l);color:var(--green)}
 .sc-warn{background:var(--amber-l);color:var(--amber)}
 .sc-bad{background:var(--red-l);color:var(--red)}
-/* EMPTY */
 .empty{text-align:center;padding:40px 20px;color:var(--text2)}
 .empty i{font-size:38px;display:block;margin-bottom:10px;opacity:.25}
-/* MISC */
 .dim{color:var(--text2);font-size:11px}
 .mono{font-family:'DM Mono',monospace}
-.sep{height:1px;background:var(--border);margin:14px 0}
+.sep{height:1px;background:var(--border);margin:12px 0}
 .statusbar{background:var(--surface);border-top:1px solid var(--border);padding:7px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;bottom:0;z-index:50}
 .sb-msg{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:5px}
 .sb-msg.ok{color:var(--green)}.sb-msg.warn{color:var(--amber)}
+/* PARTE DIARIO */
+.parte-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;padding:14px 16px}
+.parte-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}
+.parte-ref{font-size:11px;font-weight:500;color:var(--blue-d);margin-bottom:2px}
+.parte-dim{font-size:10px;color:var(--text2);margin-bottom:6px}
+.parte-input{width:100%;font-size:16px;font-weight:500;text-align:center;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:6px;font-family:'DM Mono',monospace;background:var(--surface);color:var(--text);outline:none}
+.parte-input:focus{border-color:var(--green)}
+.parte-input.has-value{background:var(--green-l);border-color:var(--green);color:var(--green)}
+/* CALENDARIO */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
+.cal-dow{background:var(--surface2);text-align:center;padding:7px;font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.cal-day{background:var(--surface);padding:6px;min-height:90px;cursor:default}
+.cal-day.other{background:var(--surface2);opacity:.6}
+.cal-day.today{background:#eff6ff}
+.cal-day.has-cargas{cursor:pointer}
+.cal-day.has-cargas:hover{background:var(--blue-l)}
+.cal-dn{font-size:11px;color:var(--text2);margin-bottom:3px;font-weight:500}
+.cal-day.today .cal-dn{color:var(--blue);font-weight:700}
+.cal-chip{border-radius:3px;padding:2px 5px;font-size:10px;font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+/* ENTREGAS */
+.entrega-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px}
+.entrega-row:last-child{border-bottom:none}
+.entrega-fecha{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);width:80px;flex-shrink:0}
+.entrega-qty{font-family:'DM Mono',monospace;font-weight:500;width:50px;text-align:right;flex-shrink:0}
+/* INFO BOX */
+.info-box{background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--blue-d);margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
+.warn-box{background:var(--red-l);border:1px solid #fecaca;border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px}
 @media(max-width:700px){.grid2,.grid3,.grid4{grid-template-columns:1fr}.frow,.frow3{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
 <div class="topbar">
   <div class="tb-brand">
     <div class="tb-logo"><i class="ti ti-box"></i></div>
-    <div>
-      <div class="tb-name">GavControl</div>
-      <div class="tb-sub" id="tb-sub">Cargando...</div>
-    </div>
+    <div><div class="tb-name">GavControl</div><div class="tb-sub" id="tb-sub">Cargando...</div></div>
   </div>
   <div class="tb-right">
     <div class="sync-dot syncing" id="sync-dot"></div>
+    <button class="tb-btn highlight" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</button>
     <button class="tb-btn accent" onclick="openModal('pedido',null)"><i class="ti ti-plus"></i> Nuevo pedido</button>
     <button class="tb-btn" onclick="loadAll()"><i class="ti ti-refresh"></i></button>
   </div>
 </div>
-
 <div class="statrow">
   <div class="st"><span class="st-v" id="st-pedidos">—</span><span class="st-l">pedidos activos</span></div>
   <div class="st-sep"></div>
-  <div class="st"><span class="st-v" id="st-uds">—</span><span class="st-l">uds. pedidas</span></div>
+  <div class="st"><span class="st-v" id="st-fabricar" style="color:#fca5a5">—</span><span class="st-l">uds. a fabricar</span></div>
   <div class="st-sep"></div>
-  <div class="st"><span class="st-v" id="st-fabricar">—</span><span class="st-l">uds. a fabricar</span></div>
+  <div class="st"><span class="st-v" id="st-stock">—</span><span class="st-l">en stock</span></div>
   <div class="st-sep"></div>
-  <div class="st"><span class="st-v" id="st-stock">—</span><span class="st-l">uds. en stock</span></div>
+  <div class="st"><span class="st-v" id="st-proxima">—</span><span class="st-l">próxima carga</span></div>
   <div class="st-sep"></div>
-  <div class="st"><span class="st-v" id="st-ordenes">—</span><span class="st-l">OF abiertas</span></div>
+  <div class="st"><span class="st-v" id="st-hoy">—</span><span class="st-l">cargas hoy</span></div>
 </div>
-
 <div class="tabs-bar">
   <div class="tab active" id="tab-dash" onclick="switchTab('dash')"><i class="ti ti-layout-dashboard"></i> Panel</div>
-  <div class="tab" id="tab-pedidos" onclick="switchTab('pedidos')"><i class="ti ti-file-text"></i> Pedidos</div>
+  <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
+  <div class="tab" id="tab-cal" onclick="switchTab('cal')"><i class="ti ti-calendar"></i> Calendario cargas</div>
   <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-alert-triangle"></i> Necesidades</div>
-  <div class="tab" id="tab-fabricacion" onclick="switchTab('fabricacion')"><i class="ti ti-tool"></i> Fabricación</div>
+  <div class="tab" id="tab-pedidos" onclick="switchTab('pedidos')"><i class="ti ti-file-text"></i> Pedidos</div>
   <div class="tab" id="tab-stock" onclick="switchTab('stock')"><i class="ti ti-package"></i> Stock</div>
   <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
   <div class="tab" id="tab-clientes" onclick="switchTab('clientes')"><i class="ti ti-users"></i> Clientes</div>
 </div>
 
-<!-- PANEL PRINCIPAL -->
+<!-- PANEL -->
 <div class="view active" id="view-dash">
 <div class="container">
   <div class="grid4" id="kpis" style="margin-bottom:14px"></div>
   <div class="grid2">
     <div class="card">
+      <div class="card-hdr"><div class="card-title"><i class="ti ti-truck"></i> Cargas próximas (7 días)</div></div>
+      <div id="dash-cargas-proximas"></div>
+    </div>
+    <div class="card">
       <div class="card-hdr"><div class="card-title"><i class="ti ti-alert-triangle"></i> Necesidades urgentes</div><button class="btn btn-outline btn-sm" onclick="switchTab('nec')">Ver todo</button></div>
       <div id="dash-nec"></div>
     </div>
-    <div class="card">
-      <div class="card-hdr"><div class="card-title"><i class="ti ti-file-text"></i> Últimos pedidos</div><button class="btn btn-outline btn-sm" onclick="switchTab('pedidos')">Ver todo</button></div>
-      <div id="dash-pedidos"></div>
-    </div>
   </div>
   <div class="card" style="margin-top:14px">
-    <div class="card-hdr"><div class="card-title"><i class="ti ti-tool"></i> Órdenes de fabricación abiertas</div></div>
-    <div id="dash-of"></div>
+    <div class="card-hdr"><div class="card-title"><i class="ti ti-file-text"></i> Pedidos activos</div><button class="btn btn-outline btn-sm" onclick="switchTab('pedidos')">Ver todos</button></div>
+    <div id="dash-pedidos-activos"></div>
   </div>
+</div>
+</div>
+
+<!-- PARTE DIARIO -->
+<div class="view" id="view-parte">
+<div class="container">
+  <div id="parte-container"></div>
+</div>
+</div>
+
+<!-- CALENDARIO -->
+<div class="view" id="view-cal">
+<div class="container">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-outline btn-sm" onclick="calMove(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span style="font-size:14px;font-weight:500" id="cal-title"></span>
+      <button class="btn btn-outline btn-sm" onclick="calMove(1)"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openModal('entrega',null)"><i class="ti ti-plus"></i> Programar carga</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><i class="ti ti-list"></i> Cargas del mes</div><span class="badge b-blue" id="cal-count">0</span></div>
+    <div id="cal-list"></div>
+  </div>
+</div>
+</div>
+
+<!-- NECESIDADES -->
+<div class="view" id="view-nec">
+<div class="container">
+  <div class="info-box"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div><strong>Necesidad neta</strong> = Total pedido − Ya entregado − Stock disponible. En rojo: hay que fabricar. El stock actual cubre lo verde.</div></div>
+  <div class="card"><div id="nec-table"></div></div>
 </div>
 </div>
 
@@ -203,87 +240,54 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <div class="view" id="view-pedidos">
 <div class="container">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <input type="text" id="ped-search" placeholder="Buscar cliente, número, obra..." oninput="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:220px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" id="ped-search" placeholder="Buscar..." oninput="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:200px">
       <select id="ped-estado" onchange="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
-        <option value="">Todos los estados</option>
+        <option value="">Todos</option>
         <option value="pendiente">Pendiente</option>
         <option value="en_produccion">En producción</option>
-        <option value="listo">Listo para entregar</option>
+        <option value="listo">Listo</option>
         <option value="entregado">Entregado</option>
         <option value="cancelado">Cancelado</option>
       </select>
     </div>
     <button class="btn btn-primary" onclick="openModal('pedido',null)"><i class="ti ti-plus"></i> Nuevo pedido</button>
   </div>
-  <div class="card"><div id="pedidos-list"></div></div>
-</div>
-</div>
-
-<!-- NECESIDADES -->
-<div class="view" id="view-nec">
-<div class="container">
-  <div class="card" style="margin-bottom:12px;padding:10px 16px;background:var(--blue-l);border-color:#bfdbfe">
-    <div style="font-size:12px;color:var(--blue-d)"><i class="ti ti-info-circle"></i> <strong>Necesidades netas</strong> = Pedidos activos − Stock disponible − En fabricación. En rojo: hay que fabricar. En verde: stock suficiente.</div>
-  </div>
-  <div class="card"><div id="nec-table"></div></div>
-</div>
-</div>
-
-<!-- FABRICACION -->
-<div class="view" id="view-fabricacion">
-<div class="container">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-    <div style="display:flex;gap:8px">
-      <select id="of-estado" onchange="renderOrdenes()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
-        <option value="">Todas</option>
-        <option value="pendiente">Pendiente</option>
-        <option value="en_curso">En curso</option>
-        <option value="completada">Completada</option>
-      </select>
-    </div>
-    <button class="btn btn-primary" onclick="openModal('orden',null)"><i class="ti ti-plus"></i> Nueva OF</button>
-  </div>
-  <div class="card"><div id="ordenes-list"></div></div>
+  <div id="pedidos-list"></div>
 </div>
 </div>
 
 <!-- STOCK -->
 <div class="view" id="view-stock">
 <div class="container">
-  <div class="grid2" style="margin-bottom:14px">
+  <div class="grid2">
     <div class="card">
       <div class="card-hdr"><div class="card-title"><i class="ti ti-package"></i> Stock actual</div></div>
       <div id="stock-list"></div>
     </div>
-    <div class="card">
-      <div class="card-hdr">
-        <div class="card-title"><i class="ti ti-transfer"></i> Registrar movimiento</div>
-      </div>
-      <div class="card-body">
-        <div class="field"><label>Producto</label>
-          <select id="mov-producto"><option value="">Seleccionar...</option></select>
-        </div>
-        <div class="frow">
-          <div class="field"><label>Tipo</label>
-            <select id="mov-tipo">
-              <option value="entrada">Entrada (fabricación/compra)</option>
-              <option value="salida">Salida (entrega/consumo)</option>
-              <option value="ajuste">Ajuste de inventario</option>
-            </select>
+    <div>
+      <div class="card">
+        <div class="card-hdr"><div class="card-title"><i class="ti ti-transfer"></i> Movimiento manual</div></div>
+        <div class="card-body">
+          <div class="field"><label>Producto</label><select id="mov-producto"><option value="">Seleccionar...</option></select></div>
+          <div class="frow">
+            <div class="field"><label>Tipo</label>
+              <select id="mov-tipo">
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
+                <option value="ajuste">Ajuste inventario</option>
+              </select>
+            </div>
+            <div class="field"><label>Cantidad</label><input type="number" id="mov-cantidad" min="1" placeholder="0"></div>
           </div>
-          <div class="field"><label>Cantidad</label>
-            <input type="number" id="mov-cantidad" min="1" placeholder="0">
-          </div>
+          <div class="field"><label>Motivo</label><input type="text" id="mov-motivo" placeholder="Motivo del movimiento..."></div>
+          <button class="btn btn-green" style="width:100%" onclick="registrarMovimiento()"><i class="ti ti-check"></i> Registrar</button>
         </div>
-        <div class="field"><label>Motivo / referencia</label>
-          <input type="text" id="mov-motivo" placeholder="Ej: OF-001, Pedido P-2024-001...">
-        </div>
-        <button class="btn btn-green" style="width:100%" onclick="registrarMovimiento()"><i class="ti ti-check"></i> Registrar movimiento</button>
       </div>
-      <div class="sep" style="margin:0"></div>
-      <div class="card-hdr" style="border-top:none;border-bottom:none;padding-bottom:4px"><div class="card-title"><i class="ti ti-history"></i> Últimos movimientos</div></div>
-      <div id="mov-list" style="max-height:320px;overflow-y:auto"></div>
+      <div class="card">
+        <div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Últimos movimientos</div></div>
+        <div id="mov-list" style="max-height:300px;overflow-y:auto"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -292,8 +296,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <!-- CATÁLOGO -->
 <div class="view" id="view-productos">
 <div class="container">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div style="font-size:13px;color:var(--text2)">Productos y dimensiones registrados</div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;color:var(--text2)">Catálogo de productos y dimensiones</div>
     <button class="btn btn-primary" onclick="openModal('producto',null)"><i class="ti ti-plus"></i> Nuevo producto</button>
   </div>
   <div class="card"><div id="productos-list"></div></div>
@@ -327,34 +331,30 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 </div>
 
 <script>
-// ── DATA ──────────────────────────────────────────────────────────────────────
-let productos=[], stock=[], clientes=[], pedidos=[], ordenes=[], necesidades=[], movimientos=[];
+// ── DATA ───────────────────────────────────────────────────────────────────────
+let productos=[], stock=[], clientes=[], pedidos=[], necesidades=[], movimientos=[], entregas=[], parteHoy=null;
 let editId=null, modalType=null;
+let calY=new Date().getFullYear(), calM=new Date().getMonth();
 
-const ESTADOS_PED = {
+const ESTADOS_PED={
   pendiente:{label:'Pendiente',badge:'b-blue'},
   en_produccion:{label:'En producción',badge:'b-amber'},
   listo:{label:'Listo',badge:'b-purple'},
   entregado:{label:'Entregado',badge:'b-green'},
   cancelado:{label:'Cancelado',badge:'b-gray'}
 };
-const ESTADOS_OF = {
-  pendiente:{label:'Pendiente',badge:'b-blue'},
-  en_curso:{label:'En curso',badge:'b-amber'},
-  completada:{label:'Completada',badge:'b-green'},
-  cancelada:{label:'Cancelada',badge:'b-gray'}
-};
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DOWS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
 const fmtN = n => Math.round(n||0).toLocaleString('es-ES');
 const fmtD = d => { if(!d) return '—'; const s=String(d).substring(0,10); const[y,m,dd]=s.split('-'); return dd+'/'+m+'/'+y; };
-const dimStr = p => p.largo ? `${p.largo}×${p.ancho}×${p.alto} m` : '';
-const prodLabel = p => p.referencia + (dimStr(p) ? ' · '+dimStr(p) : '') + (p.descripcion?' · '+p.descripcion:'');
+const dimStr = p => p.largo ? p.largo+'×'+p.ancho+'×'+p.alto+' m' : '';
+const prodLabel = p => p.referencia+(dimStr(p)?' · '+dimStr(p):'')+(p.descripcion?' · '+p.descripcion:'');
 
 function setSyncStatus(s){
   document.getElementById('sync-dot').className='sync-dot'+(s==='ok'?'':s==='err'?' error':' syncing');
   document.getElementById('tb-sub').textContent=s==='ok'?'Sincronizado':s==='err'?'Error':'Cargando...';
 }
-
 async function api(method,path,body){
   const opts={method,headers:{'Content-Type':'application/json'}};
   if(body) opts.body=JSON.stringify(body);
@@ -362,120 +362,365 @@ async function api(method,path,body){
   if(!r.ok) throw new Error(await r.text());
   return r.json();
 }
-
 async function loadAll(){
   setSyncStatus('loading');
   try{
-    [productos,stock,clientes,pedidos,ordenes,necesidades,movimientos]=await Promise.all([
+    [productos,stock,clientes,pedidos,necesidades,movimientos,entregas]=await Promise.all([
       api('GET','/productos'),api('GET','/stock'),api('GET','/clientes'),
-      api('GET','/pedidos'),api('GET','/ordenes'),api('GET','/necesidades'),
-      api('GET','/stock/movimientos')
+      api('GET','/pedidos'),api('GET','/necesidades'),
+      api('GET','/stock/movimientos'),api('GET','/entregas')
     ]);
     setSyncStatus('ok');
-    renderAll();
+    const t=document.querySelector('.tab.active')?.id?.replace('tab-','');
+    renderAll(t);
   }catch(e){setSyncStatus('err');log('Error: '+e.message,'warn');}
 }
-
-function renderAll(){
+function renderAll(t){
   updateStats();
-  const t=document.querySelector('.tab.active')?.id?.replace('tab-','');
-  if(t==='dash') renderDash();
-  else if(t==='pedidos') renderPedidos();
+  renderDash();
+  if(t==='pedidos') renderPedidos();
   else if(t==='nec') renderNecesidades();
-  else if(t==='fabricacion') renderOrdenes();
   else if(t==='stock') renderStock();
   else if(t==='productos') renderProductos();
   else if(t==='clientes') renderClientes();
-  renderDash(); // always keep dash fresh
+  else if(t==='cal') renderCal();
+  else if(t==='parte') loadParteHoy();
 }
-
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.id==='tab-'+t));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+t));
   if(t==='dash') renderDash();
-  else if(t==='pedidos') renderPedidos();
+  else if(t==='parte') loadParteHoy();
+  else if(t==='cal') renderCal();
   else if(t==='nec') renderNecesidades();
-  else if(t==='fabricacion') renderOrdenes();
+  else if(t==='pedidos') renderPedidos();
   else if(t==='stock') renderStock();
   else if(t==='productos') renderProductos();
   else if(t==='clientes') renderClientes();
 }
 
-// ── STATS ─────────────────────────────────────────────────────────────────────
+// ── STATS ──────────────────────────────────────────────────────────────────────
 function updateStats(){
   const activos=pedidos.filter(p=>!['entregado','cancelado'].includes(p.estado));
-  const uds=activos.reduce((s,p)=>(p.lineas||[]).reduce((ss,l)=>ss+(+l.cantidad||0),s),0);
-  const stockTotal=stock.reduce((s,st)=>s+(+st.cantidad||0),0);
   const aFabricar=necesidades.reduce((s,n)=>s+(+n.necesidad_neta||0),0);
-  const ofAbiertas=ordenes.filter(o=>!['completada','cancelada'].includes(o.estado)).length;
+  const stockTotal=stock.reduce((s,st)=>s+(+st.cantidad||0),0);
+  const hoy=new Date().toISOString().slice(0,10);
+  const cargasHoy=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,10)===hoy&&e.estado==='pendiente').length;
+  const proximas=entregas.filter(e=>e.estado==='pendiente'&&e.fecha_carga&&String(e.fecha_carga).substring(0,10)>=hoy).sort((a,b)=>a.fecha_carga>b.fecha_carga?1:-1);
+  const proxFecha=proximas.length?fmtD(proximas[0].fecha_carga):'—';
   document.getElementById('st-pedidos').textContent=activos.length;
-  document.getElementById('st-uds').textContent=fmtN(uds);
   document.getElementById('st-fabricar').textContent=fmtN(aFabricar);
   document.getElementById('st-stock').textContent=fmtN(stockTotal);
-  document.getElementById('st-ordenes').textContent=ofAbiertas;
+  document.getElementById('st-proxima').textContent=proxFecha;
+  document.getElementById('st-hoy').textContent=cargasHoy;
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+// ── DASHBOARD ──────────────────────────────────────────────────────────────────
 function renderDash(){
   const activos=pedidos.filter(p=>!['entregado','cancelado'].includes(p.estado));
-  const uds=activos.reduce((s,p)=>(p.lineas||[]).reduce((ss,l)=>ss+(+l.cantidad||0),s),0);
-  const stockTotal=stock.reduce((s,st)=>s+(+st.cantidad||0),0);
   const aFabricar=necesidades.reduce((s,n)=>s+(+n.necesidad_neta||0),0);
-  const ofAbiertas=ordenes.filter(o=>!['completada','cancelada'].includes(o.estado));
+  const stockTotal=stock.reduce((s,st)=>s+(+st.cantidad||0),0);
   const alertas=necesidades.filter(n=>+n.necesidad_neta>0);
+  const hoy=new Date().toISOString().slice(0,10);
+  const en7=new Date(); en7.setDate(en7.getDate()+7);
+  const fecha7=en7.toISOString().slice(0,10);
+  const proxCargas=entregas.filter(e=>e.estado==='pendiente'&&e.fecha_carga&&String(e.fecha_carga).substring(0,10)>=hoy&&String(e.fecha_carga).substring(0,10)<=fecha7).sort((a,b)=>a.fecha_carga>b.fecha_carga?1:-1);
 
-  document.getElementById('kpis').innerHTML=`
-    <div class="kpi"><div class="kpi-label">Pedidos activos</div><div class="kpi-value">${activos.length}</div><div class="kpi-sub">${pedidos.filter(p=>p.estado==='en_produccion').length} en producción</div></div>
-    <div class="kpi"><div class="kpi-label">Unidades pedidas</div><div class="kpi-value">${fmtN(uds)}</div><div class="kpi-sub">en pedidos activos</div></div>
-    <div class="kpi"><div class="kpi-label">A fabricar (neto)</div><div class="kpi-value" style="color:${aFabricar>0?'var(--red)':'var(--green)'}">${fmtN(aFabricar)}</div><div class="kpi-sub">${alertas.length} referencias con déficit</div></div>
-    <div class="kpi"><div class="kpi-label">Stock total</div><div class="kpi-value" style="color:var(--green)">${fmtN(stockTotal)}</div><div class="kpi-sub">unidades disponibles</div></div>`;
+  document.getElementById('kpis').innerHTML=
+    '<div class="kpi"><div class="kpi-label">Pedidos activos</div><div class="kpi-value">'+activos.length+'</div><div class="kpi-sub">'+activos.filter(p=>p.estado==='en_produccion').length+' en producción</div></div>'+
+    '<div class="kpi"><div class="kpi-label">A fabricar</div><div class="kpi-value" style="color:'+(aFabricar>0?'var(--red)':'var(--green)')+'">'+fmtN(aFabricar)+'</div><div class="kpi-sub">'+alertas.length+' referencias con déficit</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Stock total</div><div class="kpi-value" style="color:var(--green)">'+fmtN(stockTotal)+'</div><div class="kpi-sub">unidades disponibles</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Cargas próx. 7d</div><div class="kpi-value">'+proxCargas.length+'</div><div class="kpi-sub">entregas programadas</div></div>';
 
-  // Alertas necesidades
-  const necEl=document.getElementById('dash-nec');
-  if(!alertas.length){
-    necEl.innerHTML=`<div class="empty"><i class="ti ti-circle-check" style="color:var(--green)"></i><p style="color:var(--green)">Stock suficiente para todos los pedidos</p></div>`;
-  } else {
-    necEl.innerHTML=`<table class="tbl"><thead><tr><th>Producto</th><th class="r">Pedido</th><th class="r">Stock</th><th class="r">A fabricar</th></tr></thead><tbody>
-      ${alertas.slice(0,6).map(n=>`<tr>
-        <td><div style="font-weight:500">${n.referencia}</div><div class="dim">${dimStr(n)}</div></td>
-        <td class="r mono">${fmtN(n.pedido_total)}</td>
-        <td class="r mono">${fmtN(n.stock_actual)}</td>
-        <td class="r"><span class="badge b-red">${fmtN(n.necesidad_neta)}</span></td>
-      </tr>`).join('')}
-    </tbody></table>`;
+  // Cargas próximas
+  const cp=document.getElementById('dash-cargas-proximas');
+  if(!proxCargas.length){
+    cp.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Sin cargas programadas esta semana</p></div>';
+  }else{
+    cp.innerHTML='<table class="tbl"><thead><tr><th>Fecha</th><th>Pedido</th><th>Producto</th><th class="r">Uds.</th><th class="c">Estado</th><th></th></tr></thead><tbody>'+
+    proxCargas.map(e=>'<tr>'+
+      '<td class="mono" style="font-weight:500;color:var(--blue)">'+fmtD(e.fecha_carga)+'</td>'+
+      '<td><div style="font-weight:500">'+e.pedido_numero+'</div><div class="dim">'+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div></td>'+
+      '<td><div style="font-weight:500">'+e.referencia+'</div><div class="dim">'+dimStr(e)+'</div></td>'+
+      '<td class="r mono">'+fmtN(e.cantidad)+'</td>'+
+      '<td class="c"><span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span></td>'+
+      '<td>'+(e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i> Confirmar</button>':'')+'</td>'+
+    '</tr>').join('')+'</tbody></table>';
   }
 
-  // Últimos pedidos
-  document.getElementById('dash-pedidos').innerHTML=pedidos.slice(0,6).length?`<table class="tbl"><thead><tr><th>Nº</th><th>Cliente</th><th>Entrega</th><th>Estado</th></tr></thead><tbody>
-    ${pedidos.slice(0,6).map(p=>{const sc=ESTADOS_PED[p.estado]||ESTADOS_PED.pendiente; return`<tr>
-      <td><span class="mono" style="font-weight:500">${p.numero}</span>${p.obra?`<div class="dim">${p.obra}</div>`:''}</td>
-      <td>${p.cliente_nombre||p.cliente_nombre_rel||'—'}</td>
-      <td class="dim">${fmtD(p.fecha_entrega)}</td>
-      <td><span class="badge ${sc.badge}">${sc.label}</span></td>
-    </tr>`}).join('')}
-  </tbody></table>`:
-  `<div class="empty"><i class="ti ti-file-text"></i><p>Sin pedidos aún</p></div>`;
+  // Necesidades urgentes
+  const necEl=document.getElementById('dash-nec');
+  if(!alertas.length){
+    necEl.innerHTML='<div class="empty"><i class="ti ti-circle-check" style="color:var(--green)"></i><p style="color:var(--green)">Stock suficiente</p></div>';
+  }else{
+    necEl.innerHTML='<table class="tbl"><thead><tr><th>Producto</th><th class="r">Pedido</th><th class="r">Stock</th><th class="r">Fabricar</th></tr></thead><tbody>'+
+    alertas.slice(0,5).map(n=>'<tr>'+
+      '<td><div style="font-weight:500">'+n.referencia+'</div><div class="dim">'+dimStr(n)+'</div></td>'+
+      '<td class="r mono">'+fmtN(n.pedido_total)+'</td>'+
+      '<td class="r"><span class="stock-chip sc-'+(+n.stock_actual>0?'warn':'bad')+'">'+fmtN(n.stock_actual)+'</span></td>'+
+      '<td class="r"><span class="badge b-red">'+fmtN(n.necesidad_neta)+'</span></td>'+
+    '</tr>').join('')+'</tbody></table>';
+  }
 
-  // OF abiertas
-  document.getElementById('dash-of').innerHTML=ofAbiertas.length?`<table class="tbl"><thead><tr><th>OF</th><th>Producto</th><th>Pedido</th><th class="r">Cant.</th><th class="r">Hecho</th><th>Estado</th><th>Progreso</th></tr></thead><tbody>
-    ${ofAbiertas.map(o=>{
-      const sc=ESTADOS_OF[o.estado]||ESTADOS_OF.pendiente;
-      const pct=o.cantidad>0?Math.min(100,Math.round((o.cantidad_hecha/o.cantidad)*100)):0;
-      return`<tr>
-        <td class="mono" style="font-weight:500">${o.numero}</td>
-        <td><div style="font-weight:500">${o.referencia||'—'}</div><div class="dim">${dimStr(o)}</div></td>
-        <td class="dim">${o.pedido_numero||'Stock'}</td>
-        <td class="r mono">${fmtN(o.cantidad)}</td>
-        <td class="r mono">${fmtN(o.cantidad_hecha)}</td>
-        <td><span class="badge ${sc.badge}">${sc.label}</span></td>
-        <td style="min-width:80px"><div class="prog"><div class="prog-fill" style="width:${pct}%;background:${pct===100?'var(--green)':'var(--blue)'}"></div></div><div class="dim">${pct}%</div></td>
-      </tr>`;
-    }).join('')}
-  </tbody></table>`:
-  `<div class="empty"><i class="ti ti-tool"></i><p>Sin órdenes de fabricación abiertas</p></div>`;
+  // Pedidos activos
+  const pa=document.getElementById('dash-pedidos-activos');
+  if(!activos.length){pa.innerHTML='<div class="empty"><i class="ti ti-file-text"></i><p>Sin pedidos activos</p></div>';return;}
+  pa.innerHTML='<table class="tbl"><thead><tr><th>Nº</th><th>Cliente / Obra</th><th>Entrega</th><th>Estado</th><th class="r">Pendiente entregar</th><th></th></tr></thead><tbody>'+
+  activos.slice(0,8).map(p=>{
+    const sc=ESTADOS_PED[p.estado]||ESTADOS_PED.pendiente;
+    const pendiente=(p.lineas||[]).reduce((s,l)=>{
+      const entregado=(l.entregas||[]).filter(e=>e.estado==='confirmada').reduce((ss,e)=>ss+(+e.cantidad||0),0);
+      return s+Math.max(0,(+l.cantidad||0)-entregado);
+    },0);
+    return '<tr>'+
+      '<td class="mono" style="font-weight:500;color:var(--blue)">'+p.numero+'</td>'+
+      '<td><div style="font-weight:500">'+(p.cliente_nombre||p.cliente_nombre_rel||'—')+'</div>'+(p.obra?'<div class="dim">'+p.obra+'</div>':'')+'</td>'+
+      '<td class="dim">'+fmtD(p.fecha_entrega)+'</td>'+
+      '<td><span class="badge '+sc.badge+'">'+sc.label+'</span></td>'+
+      '<td class="r mono">'+fmtN(pendiente)+' ud</td>'+
+      '<td><button class="btn-icon" onclick="verPedido(\''+p.id+'\')"><i class="ti ti-eye"></i></button></td>'+
+    '</tr>';
+  }).join('')+'</tbody></table>';
 }
 
-// ── PEDIDOS ───────────────────────────────────────────────────────────────────
+// ── PARTE DIARIO ───────────────────────────────────────────────────────────────
+async function loadParteHoy(){
+  const el=document.getElementById('parte-container');
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text2)"><i class="ti ti-loader" style="font-size:24px"></i><div style="margin-top:8px">Cargando parte...</div></div>';
+  try{
+    parteHoy=await api('GET','/partes/hoy');
+    renderParte(parteHoy);
+  }catch(e){el.innerHTML='<div class="empty"><i class="ti ti-x-circle"></i><p>Error al cargar el parte</p></div>';}
+}
+
+function renderParte(parte){
+  const el=document.getElementById('parte-container');
+  const cerrado=parte.estado==='cerrado';
+  const total=(parte.lineas||[]).reduce((s,l)=>s+(+l.cantidad||0),0);
+  const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
+  const tiposPresentes=[...new Set((parte.lineas||[]).map(l=>l.tipo))];
+
+  let html='<div class="card">'+
+    '<div class="card-hdr">'+
+      '<div class="card-title"><i class="ti ti-clipboard-list"></i> Parte de producción — '+fmtD(parte.fecha)+'</div>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+        '<span class="badge '+(cerrado?'b-green':'b-amber')+'">'+(cerrado?'Cerrado':'Abierto')+'</span>'+
+        (cerrado?'':'<button class="btn btn-green" onclick="cerrarParte('+parte.id+')"><i class="ti ti-lock"></i> Cerrar parte y actualizar stock</button>')+
+      '</div>'+
+    '</div>';
+
+  if(cerrado){
+    html+='<div class="info-box" style="margin:12px 16px"><i class="ti ti-check-circle" style="color:var(--green)"></i><div>Parte cerrado — el stock fue actualizado con esta producción.</div></div>';
+  }else{
+    html+='<div style="padding:10px 16px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> Introduce las unidades fabricadas hoy por tipo. Al cerrar, se suman al stock automáticamente.</div>';
+  }
+
+  tiposPresentes.forEach(tipo=>{
+    if(tipo==='accesorio') return;
+    const lineasTipo=(parte.lineas||[]).filter(l=>l.tipo===tipo);
+    html+='<div style="padding:8px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-top:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
+    html+='<div class="parte-grid">';
+    lineasTipo.forEach(l=>{
+      const val=+l.cantidad||0;
+      html+='<div class="parte-item">'+
+        '<div class="parte-ref">'+l.referencia+'</div>'+
+        '<div class="parte-dim">'+dimStr(l)+'</div>'+
+        '<input type="number" class="parte-input'+(val>0?' has-value':'')+'" '+
+          'value="'+(val||'')+'" placeholder="0" min="0" '+
+          (cerrado?'disabled':'')+
+          ' onchange="updateParteLinea('+parte.id+','+l.producto_id+',this.value,this)">'+
+      '</div>';
+    });
+    html+='</div>';
+  });
+
+  html+='<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">'+
+    '<div style="font-size:13px;color:var(--text2)">Total fabricado hoy: <strong class="mono">'+fmtN(total)+' uds</strong></div>'+
+  '</div></div>';
+
+  // Historial partes anteriores
+  html+='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de producción</div></div>';
+  html+='<div style="padding:8px 16px;color:var(--text2);font-size:12px">Haz clic en un día para ver el detalle</div>';
+  html+='<table class="tbl"><thead><tr><th>Fecha</th><th class="r">Total fabricado</th><th>Estado</th><th>Detalle</th></tr></thead><tbody id="historial-partes"></tbody></table></div>';
+
+  el.innerHTML=html;
+  loadHistorialPartes();
+}
+
+async function loadHistorialPartes(){
+  try{
+    const partes=await api('GET','/partes');
+    const el=document.getElementById('historial-partes');
+    if(!el) return;
+    if(!partes.length){el.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text2)">Sin historial aún</td></tr>';return;}
+    el.innerHTML=partes.map(p=>{
+      const total=(p.lineas||[]).reduce((s,l)=>s+(+l.cantidad||0),0);
+      const resumen=(p.lineas||[]).filter(l=>+l.cantidad>0).map(l=>l.referencia+': '+fmtN(l.cantidad)).join(', ')||'—';
+      return '<tr>'+
+        '<td class="mono" style="font-weight:500">'+fmtD(p.fecha)+'</td>'+
+        '<td class="r mono" style="font-weight:500;color:var(--green)">'+fmtN(total)+' ud</td>'+
+        '<td><span class="badge '+(p.estado==='cerrado'?'b-green':'b-amber')+'">'+(p.estado==='cerrado'?'Cerrado':'Abierto')+'</span></td>'+
+        '<td class="dim" style="font-size:11px">'+resumen+'</td>'+
+      '</tr>';
+    }).join('');
+  }catch(e){}
+}
+
+async function updateParteLinea(parteId, productoId, valor, inputEl){
+  const v=Math.max(0,parseInt(valor)||0);
+  inputEl.value=v;
+  inputEl.className='parte-input'+(v>0?' has-value':'');
+  try{
+    await api('PATCH','/partes/'+parteId+'/linea',{producto_id:productoId,cantidad:v});
+    // Update local total
+    if(parteHoy){
+      const l=parteHoy.lineas.find(x=>String(x.producto_id)===String(productoId));
+      if(l) l.cantidad=v;
+      const total=(parteHoy.lineas||[]).reduce((s,l)=>s+(+l.cantidad||0),0);
+      const totEl=document.querySelector('.parte-container-total');
+    }
+  }catch(e){log('Error al guardar','warn');}
+}
+
+async function cerrarParte(id){
+  if(!confirm('¿Cerrar el parte de hoy? El stock se actualizará con las cantidades introducidas.')) return;
+  try{
+    await api('POST','/partes/'+id+'/cerrar',{});
+    await loadAll();
+    loadParteHoy();
+    log('Parte cerrado — stock actualizado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+// ── CALENDARIO ─────────────────────────────────────────────────────────────────
+function renderCal(){
+  document.getElementById('cal-title').textContent=MESES[calM]+' '+calY;
+  const first=new Date(calY,calM,1);
+  const startDow=(first.getDay()+6)%7;
+  const dim=new Date(calY,calM+1,0).getDate();
+  const today=new Date();
+  const mesStr=calY+'-'+String(calM+1).padStart(2,'0');
+
+  let html=DOWS.map(d=>'<div class="cal-dow">'+d+'</div>').join('');
+  for(let i=0;i<startDow;i++) html+='<div class="cal-day other"></div>';
+  for(let d=1;d<=dim;d++){
+    const ds=mesStr+'-'+String(d).padStart(2,'0');
+    const isToday=today.getFullYear()===calY&&today.getMonth()===calM&&today.getDate()===d;
+    const dayEntregas=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,10)===ds);
+    const hasCargas=dayEntregas.length>0;
+    html+='<div class="cal-day'+(isToday?' today':'')+(hasCargas?' has-cargas':'')+'"'+(hasCargas?' onclick="showDayCargas(\''+ds+'\')"':'')+'>'+
+      '<div class="cal-dn">'+d+'</div>'+
+      dayEntregas.slice(0,3).map(e=>{
+        const col=e.estado==='confirmada'?'background:#e6f5ea;color:#2d7a3a':'background:#fff3e0;color:#8a5200';
+        return '<span class="cal-chip" style="'+col+'">'+e.referencia+' ('+fmtN(e.cantidad)+')</span>';
+      }).join('')+
+      (dayEntregas.length>3?'<span class="cal-chip" style="background:var(--surface2);color:var(--text2)">+'+( dayEntregas.length-3)+' más</span>':'')+
+    '</div>';
+  }
+  document.getElementById('cal-grid').innerHTML=html;
+
+  const mesCargas=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,7)===mesStr);
+  document.getElementById('cal-count').textContent=mesCargas.length;
+  const cl=document.getElementById('cal-list');
+  if(!mesCargas.length){cl.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Sin cargas este mes</p></div>';return;}
+
+  const porFecha={};
+  mesCargas.forEach(e=>{
+    const f=String(e.fecha_carga).substring(0,10);
+    if(!porFecha[f]) porFecha[f]=[];
+    porFecha[f].push(e);
+  });
+
+  cl.innerHTML=Object.entries(porFecha).sort(([a],[b])=>a>b?1:-1).map(([fecha,cargas])=>{
+    const totalUds=cargas.reduce((s,e)=>s+(+e.cantidad||0),0);
+    const confirmadas=cargas.filter(e=>e.estado==='confirmada').length;
+    return '<div style="border-bottom:1px solid var(--border)">'+
+      '<div style="padding:8px 16px 4px;display:flex;align-items:center;justify-content:space-between">'+
+        '<span style="font-size:12px;font-weight:500;color:var(--blue-d)" class="mono">'+fmtD(fecha)+'</span>'+
+        '<span class="dim">'+cargas.length+' cargas · '+fmtN(totalUds)+' ud · '+confirmadas+' confirmadas</span>'+
+      '</div>'+
+      cargas.map(e=>'<div class="entrega-row">'+
+        '<div style="font-size:12px;font-weight:500;flex:1">'+e.referencia+' <span class="dim">'+dimStr(e)+'</span></div>'+
+        '<div class="dim" style="flex:1">'+e.pedido_numero+' — '+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div>'+
+        '<div class="entrega-qty">'+fmtN(e.cantidad)+' ud</div>'+
+        '<span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span>'+
+        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i></button>':'<button class="btn-icon" title="Ya confirmada" disabled><i class="ti ti-check"></i></button>')+
+        '<button class="btn-icon danger" onclick="deleteEntrega('+e.id+')" title="Eliminar"><i class="ti ti-trash"></i></button>'+
+      '</div>').join('')+
+    '</div>';
+  }).join('');
+}
+
+function calMove(d){
+  if(d<0){if(calM===0){calM=11;calY--;}else calM--;}
+  else{if(calM===11){calM=0;calY++;}else calM++;}
+  renderCal();
+}
+
+function showDayCargas(fecha){
+  const dayEntregas=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,10)===fecha);
+  const box=document.getElementById('modal-box');
+  box.className='modal';
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-calendar"></i> Cargas del '+fmtD(fecha);
+  document.getElementById('modal-body').innerHTML=
+    '<table class="tbl"><thead><tr><th>Producto</th><th>Pedido</th><th class="r">Uds.</th><th>Estado</th><th></th></tr></thead><tbody>'+
+    dayEntregas.map(e=>'<tr>'+
+      '<td><div style="font-weight:500">'+e.referencia+'</div><div class="dim">'+dimStr(e)+'</div></td>'+
+      '<td><div style="font-weight:500">'+e.pedido_numero+'</div><div class="dim">'+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div></td>'+
+      '<td class="r mono">'+fmtN(e.cantidad)+'</td>'+
+      '<td><span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span></td>'+
+      '<td>'+(e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+');closeModal()"><i class="ti ti-check"></i> Confirmar</button>':'')+'</td>'+
+    '</tr>').join('')+'</tbody></table>';
+  document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
+  document.getElementById('overlay').classList.add('open');
+}
+
+async function confirmarEntrega(id){
+  try{
+    await api('PATCH','/entregas/'+id+'/confirmar',{});
+    await loadAll();
+    log('Entrega confirmada — stock actualizado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function deleteEntrega(id){
+  if(!confirm('¿Eliminar esta carga programada?')) return;
+  try{
+    await api('DELETE','/entregas/'+id);
+    entregas=entregas.filter(e=>e.id!==id);
+    renderCal();renderDash();
+    log('Carga eliminada');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+// ── NECESIDADES ────────────────────────────────────────────────────────────────
+function renderNecesidades(){
+  const el=document.getElementById('nec-table');
+  if(!necesidades.length){el.innerHTML='<div class="empty"><i class="ti ti-package"></i><p>Sin datos</p></div>';return;}
+  el.innerHTML='<table class="tbl"><thead><tr>'+
+    '<th>Referencia</th><th>Dimensiones</th>'+
+    '<th class="r">Total pedido</th>'+
+    '<th class="r">Ya entregado</th>'+
+    '<th class="r">Pendiente entregar</th>'+
+    '<th class="r">Stock disponible</th>'+
+    '<th class="r">Necesidad neta</th>'+
+  '</tr></thead><tbody>'+
+  necesidades.map(n=>{
+    const neta=+n.necesidad_neta||0;
+    const rowBg=neta>0?'background:var(--red-l)':+n.stock_actual>0?'background:var(--green-l)':'';
+    return '<tr style="'+rowBg+'">'+
+      '<td class="mono" style="font-weight:500">'+n.referencia+'</td>'+
+      '<td class="dim">'+dimStr(n)+'</td>'+
+      '<td class="r mono">'+fmtN(n.pedido_total)+'</td>'+
+      '<td class="r mono" style="color:var(--green)">'+fmtN(n.entregado_total)+'</td>'+
+      '<td class="r mono">'+fmtN(n.pendiente_entregar)+'</td>'+
+      '<td class="r"><span class="stock-chip sc-'+(+n.stock_actual>10?'ok':+n.stock_actual>0?'warn':'bad')+'">'+fmtN(n.stock_actual)+'</span></td>'+
+      '<td class="r">'+( neta>0?'<span class="badge b-red"><i class="ti ti-alert-triangle" style="font-size:10px"></i> FABRICAR '+fmtN(neta)+'</span>':'<span class="badge b-green"><i class="ti ti-check" style="font-size:10px"></i> OK</span>')+'</td>'+
+    '</tr>';
+  }).join('')+'</tbody></table>';
+}
+
+// ── PEDIDOS ────────────────────────────────────────────────────────────────────
 function renderPedidos(){
   const search=(document.getElementById('ped-search')?.value||'').toLowerCase();
   const estadoF=document.getElementById('ped-estado')?.value||'';
@@ -483,221 +728,104 @@ function renderPedidos(){
   if(search) list=list.filter(p=>(p.numero||'').toLowerCase().includes(search)||(p.cliente_nombre||'').toLowerCase().includes(search)||(p.obra||'').toLowerCase().includes(search));
   if(estadoF) list=list.filter(p=>p.estado===estadoF);
   const el=document.getElementById('pedidos-list');
-  if(!list.length){el.innerHTML=`<div class="empty"><i class="ti ti-file-text"></i><p>No hay pedidos</p></div>`;return;}
-  el.innerHTML=`<table class="tbl"><thead><tr>
-    <th>Nº Pedido</th><th>Cliente / Obra</th><th>F. Pedido</th><th>F. Entrega</th>
-    <th class="r">Uds.</th><th class="c">Tipo</th><th>Estado</th><th>Progreso fab.</th><th></th>
-  </tr></thead><tbody>
-  ${list.map(p=>{
+  if(!list.length){el.innerHTML='<div class="card"><div class="empty"><i class="ti ti-file-text"></i><p>No hay pedidos</p></div></div>';return;}
+  el.innerHTML=list.map(p=>{
     const sc=ESTADOS_PED[p.estado]||ESTADOS_PED.pendiente;
-    const totalUds=(p.lineas||[]).reduce((s,l)=>s+(+l.cantidad||0),0);
-    const totalFab=(p.lineas||[]).reduce((s,l)=>s+(+l.cantidad_fabricada||0),0);
-    const pct=totalUds>0?Math.min(100,Math.round(totalFab/totalUds*100)):0;
-    return`<tr>
-      <td><span class="mono" style="font-weight:500;color:var(--blue)">${p.numero}</span></td>
-      <td>
-        <div style="font-weight:500">${p.cliente_nombre||p.cliente_nombre_rel||'—'}</div>
-        ${p.obra?`<div class="dim"><i class="ti ti-building" style="font-size:10px"></i> ${p.obra}</div>`:''}
-      </td>
-      <td class="dim">${fmtD(p.fecha_pedido)}</td>
-      <td class="dim">${fmtD(p.fecha_entrega)}</td>
-      <td class="r mono">${fmtN(totalUds)}</td>
-      <td class="c"><span class="badge ${p.tipo_fabricacion==='stock'?'b-purple':'b-steel'}">${p.tipo_fabricacion==='stock'?'Stock':'Bajo pedido'}</span></td>
-      <td><span class="badge ${sc.badge}">${sc.label}</span></td>
-      <td style="min-width:90px">
-        <div class="prog"><div class="prog-fill" style="width:${pct}%;background:${pct===100?'var(--green)':'var(--blue)'}"></div></div>
-        <div class="dim">${fmtN(totalFab)} / ${fmtN(totalUds)} ud (${pct}%)</div>
-      </td>
-      <td>
-        <button class="btn-icon" onclick="openModal('pedido','${p.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
-        <button class="btn-icon" onclick="verDetallePedido('${p.id}')" title="Ver detalle"><i class="ti ti-eye"></i></button>
-        <button class="btn-icon danger" onclick="deletePedido('${p.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>
-      </td>
-    </tr>
-    <tr style="background:var(--surface2)">
-      <td colspan="9" style="padding:0 12px 8px">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          ${(p.lineas||[]).map(l=>'<span style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font-size:11px">'
-            +'<span style="font-weight:500">'+( l.referencia||'—')+'</span>'
-            +'<span style="color:var(--text2)"> '+dimStr(l)+'</span>'
-            +'<span class="mono" style="color:var(--blue);margin-left:5px">'+fmtN(l.cantidad)+' ud</span>'
-            +(+l.cantidad_fabricada>0?'<span style="color:var(--green);margin-left:3px">('+fmtN(l.cantidad_fabricada)+' fab.)</span>':'')
-            +'</span>').join('')}
-        </div>
-      </td>
-    </tr>`;
-  }).join('')}
-  </tbody></table>`;
+    const lineas=p.lineas||[];
+    const totalUds=lineas.reduce((s,l)=>s+(+l.cantidad||0),0);
+    const totalEntregado=lineas.reduce((s,l)=>{
+      const ent=(l.entregas||[]).filter(e=>e.estado==='confirmada').reduce((ss,e)=>ss+(+e.cantidad||0),0);
+      return s+ent;
+    },0);
+    const pct=totalUds>0?Math.min(100,Math.round(totalEntregado/totalUds*100)):0;
+    const entregasPend=entregas.filter(e=>lineas.some(l=>String(l.id)===String(e.linea_pedido_id))&&e.estado==='pendiente');
+    return '<div class="card">'+
+      '<div class="card-hdr">'+
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+          '<span class="mono" style="font-size:15px;font-weight:600;color:var(--blue)">'+p.numero+'</span>'+
+          '<span style="font-weight:500">'+(p.cliente_nombre||p.cliente_nombre_rel||'—')+'</span>'+
+          (p.obra?'<span class="badge b-steel"><i class="ti ti-building" style="font-size:10px"></i> '+p.obra+'</span>':'')+
+          '<span class="badge '+sc.badge+'">'+sc.label+'</span>'+
+          (p.tipo_fabricacion==='stock'?'<span class="badge b-purple">Desde stock</span>':'')+
+        '</div>'+
+        '<div style="display:flex;gap:6px;align-items:center">'+
+          '<span class="dim">Entrega: '+fmtD(p.fecha_entrega)+'</span>'+
+          '<button class="btn-icon" onclick="openModal(\'pedido\',\''+p.id+'\')"><i class="ti ti-pencil"></i></button>'+
+          '<button class="btn-icon danger" onclick="deletePedido(\''+p.id+'\')"><i class="ti ti-trash"></i></button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="card-body" style="padding:10px 16px">'+
+        '<div style="display:flex;gap:4px;margin-bottom:8px;align-items:center">'+
+          '<div class="prog" style="flex:1"><div class="prog-fill" style="width:'+pct+'%;background:'+(pct===100?'var(--green)':'var(--blue)')+'"></div></div>'+
+          '<span class="dim">'+fmtN(totalEntregado)+' / '+fmtN(totalUds)+' ud entregadas ('+pct+'%)</span>'+
+        '</div>'+
+        '<table class="tbl" style="font-size:12px"><thead><tr>'+
+          '<th>Producto</th><th class="r">Pedido</th><th class="r">Entregado</th><th class="r">Pendiente</th>'+
+          '<th>Próx. carga</th><th></th>'+
+        '</tr></thead><tbody>'+
+        lineas.map(l=>{
+          const ent=(l.entregas||[]).filter(e=>e.estado==='confirmada').reduce((s,e)=>s+(+e.cantidad||0),0);
+          const pend=Math.max(0,(+l.cantidad||0)-ent);
+          const entPend=(l.entregas||[]).filter(e=>e.estado==='pendiente').sort((a,b)=>a.fecha_carga>b.fecha_carga?1:-1);
+          const proxCarga=entPend.length?fmtD(entPend[0].fecha_carga)+'<span class="dim"> ('+fmtN(entPend[0].cantidad)+' ud)</span>':'<span class="dim">—</span>';
+          return '<tr>'+
+            '<td><div style="font-weight:500">'+l.referencia+'</div><div class="dim">'+dimStr(l)+'</div></td>'+
+            '<td class="r mono">'+fmtN(l.cantidad)+'</td>'+
+            '<td class="r mono" style="color:var(--green)">'+fmtN(ent)+'</td>'+
+            '<td class="r mono" style="color:'+(pend>0?'var(--red)':'var(--green)')+'">'+fmtN(pend)+'</td>'+
+            '<td>'+proxCarga+'</td>'+
+            '<td><button class="btn btn-outline btn-sm" onclick="openModal(\'entrega\',null,'+l.id+')"><i class="ti ti-calendar-plus"></i> Programar</button></td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>'+
+        (entregasPend.length?'<div style="margin-top:8px;font-size:11px;color:var(--text2)">'+entregasPend.length+' cargas pendientes programadas</div>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 
-// ── NECESIDADES ───────────────────────────────────────────────────────────────
-function renderNecesidades(){
-  const el=document.getElementById('nec-table');
-  if(!necesidades.length){el.innerHTML=`<div class="empty"><i class="ti ti-package"></i><p>Sin datos</p></div>`;return;}
-  el.innerHTML=`<table class="tbl"><thead><tr>
-    <th>Referencia</th><th>Descripción</th><th>Dimensiones</th>
-    <th class="r">Pedido<br><span style="font-weight:400;font-size:9px">(activos)</span></th>
-    <th class="r">Stock<br><span style="font-weight:400;font-size:9px">(disponible)</span></th>
-    <th class="r">En fabricación</th>
-    <th class="r">Necesidad neta</th>
-    <th class="c">Acción</th>
-  </tr></thead><tbody>
-  ${necesidades.map(n=>{
-    const neta=+n.necesidad_neta||0;
-    const rowClass=neta>0?'alert-row':+n.stock_actual>0?'ok-row':'';
-    return`<tr class="${rowClass}">
-      <td><span class="mono" style="font-weight:500">${n.referencia}</span></td>
-      <td class="dim">${n.descripcion||'—'}</td>
-      <td class="dim mono">${dimStr(n)||'—'}</td>
-      <td class="r mono">${fmtN(n.pedido_total)}</td>
-      <td class="r">
-        <span class="stock-chip ${+n.stock_actual>0?'sc-ok':'sc-bad'}">${fmtN(n.stock_actual)}</span>
-      </td>
-      <td class="r mono">${fmtN(n.en_fabricacion)}</td>
-      <td class="r">
-        ${neta>0
-          ?`<span class="badge b-red"><i class="ti ti-alert-triangle" style="font-size:10px"></i> FABRICAR ${fmtN(neta)}</span>`
-          :`<span class="badge b-green"><i class="ti ti-check" style="font-size:10px"></i> OK</span>`}
-      </td>
-      <td class="c">
-        ${neta>0?`<button class="btn btn-primary btn-sm" onclick="crearOFRapida('${n.producto_id}','${n.referencia}',${neta})"><i class="ti ti-plus"></i> Crear OF</button>`:''}
-      </td>
-    </tr>`;
-  }).join('')}
-  </tbody></table>`;
+function verPedido(id){
+  const p=pedidos.find(x=>String(x.id)===String(id));
+  if(!p) return;
+  openModal('pedido_ver',id);
 }
 
-function crearOFRapida(prodId, ref, cantidad){
-  const num='OF-'+String(Date.now()).slice(-6);
-  openModalOF({producto_id:prodId, referencia:ref, cantidad_sugerida:cantidad, numero:num});
-}
-
-// ── FABRICACION ───────────────────────────────────────────────────────────────
-function renderOrdenes(){
-  const estadoF=document.getElementById('of-estado')?.value||'';
-  let list=ordenes;
-  if(estadoF) list=list.filter(o=>o.estado===estadoF);
-  const el=document.getElementById('ordenes-list');
-  if(!list.length){el.innerHTML=`<div class="empty"><i class="ti ti-tool"></i><p>Sin órdenes</p></div>`;return;}
-  el.innerHTML=`<table class="tbl"><thead><tr>
-    <th>Nº OF</th><th>Producto</th><th>Pedido vinculado</th>
-    <th class="r">Cantidad</th><th class="r">Fabricado</th>
-    <th>Fecha inicio</th><th>Fecha fin</th><th>Estado</th><th></th>
-  </tr></thead><tbody>
-  ${list.map(o=>{
-    const sc=ESTADOS_OF[o.estado]||ESTADOS_OF.pendiente;
-    const pct=o.cantidad>0?Math.min(100,Math.round((+o.cantidad_hecha/+o.cantidad)*100)):0;
-    return`<tr>
-      <td class="mono" style="font-weight:500;color:var(--blue)">${o.numero}</td>
-      <td>
-        <div style="font-weight:500">${o.referencia||'—'}</div>
-        <div class="dim mono">${dimStr(o)}</div>
-      </td>
-      <td class="dim">${o.pedido_numero||'<span style="color:var(--text3)">Stock</span>'}</td>
-      <td class="r mono">${fmtN(o.cantidad)}</td>
-      <td class="r">
-        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
-          <input type="number" value="${o.cantidad_hecha||0}" min="0" max="${o.cantidad}"
-            style="width:60px;font-size:12px;padding:3px 5px;border:1px solid var(--border2);border-radius:4px;text-align:right;font-family:'DM Mono',monospace"
-            onchange="actualizarFabricado('${o.id}',this.value)">
-          <span class="dim">/ ${fmtN(o.cantidad)}</span>
-        </div>
-        <div class="prog" style="margin-top:3px"><div class="prog-fill" style="width:${pct}%;background:${pct===100?'var(--green)':'var(--blue)'}"></div></div>
-      </td>
-      <td class="dim">${fmtD(o.fecha_inicio)}</td>
-      <td class="dim">${fmtD(o.fecha_fin)}</td>
-      <td>
-        <select style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--surface)" onchange="cambiarEstadoOF('${o.id}',this.value)">
-          ${Object.entries(ESTADOS_OF).map(([k,v])=>`<option value="${k}" ${o.estado===k?'selected':''}>${v.label}</option>`).join('')}
-        </select>
-      </td>
-      <td>
-        <button class="btn-icon" onclick="openModal('orden','${o.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
-        <button class="btn-icon danger" onclick="deleteOrden('${o.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('')}
-  </tbody></table>`;
-}
-
-async function actualizarFabricado(id, val){
-  try{
-    const updated=await api('PUT','/ordenes/'+id,{...ordenes.find(o=>String(o.id)===String(id)),cantidad_hecha:+val});
-    Object.assign(ordenes.find(o=>String(o.id)===String(id)),updated);
-    await loadNecesidades();
-    log('Fabricado actualizado','ok');
-  }catch(e){log('Error','warn');}
-}
-
-async function cambiarEstadoOF(id, estado){
-  try{
-    const o=ordenes.find(x=>String(x.id)===String(id));
-    const updated=await api('PUT','/ordenes/'+id,{...o,estado});
-    Object.assign(o,updated);
-    // Si completada, añadir entrada de stock automáticamente
-    if(estado==='completada'){
-      const restante=+o.cantidad-(+o.cantidad_hecha||0);
-      if(restante>0&&o.producto_id){
-        await api('POST','/stock/movimiento',{producto_id:o.producto_id,tipo:'entrada',cantidad:+o.cantidad,motivo:'OF completada: '+o.numero,referencia_pedido:o.numero});
-        await loadStock();
-      }
-    }
-    await loadNecesidades();
-    renderOrdenes();
-    log('Estado OF actualizado'+( estado==='completada'?' — stock actualizado':''),'ok');
-  }catch(e){log('Error','warn');}
-}
-
-async function deleteOrden(id){
-  if(!confirm('¿Eliminar esta OF?')) return;
-  await api('DELETE','/ordenes/'+id);
-  ordenes=ordenes.filter(o=>String(o.id)!==String(id));
-  renderOrdenes();
-  log('OF eliminada');
-}
-
-// ── STOCK ─────────────────────────────────────────────────────────────────────
+// ── STOCK ──────────────────────────────────────────────────────────────────────
 function renderStock(){
   populateMovProducto();
-  const el=document.getElementById('stock-list');
-  const gaviones=stock.filter(s=>s.tipo==='gavion'||s.tipo==='colchoneta');
-  const accesorios=stock.filter(s=>s.tipo==='accesorio');
-  let html='<table class="tbl"><thead><tr><th>Referencia</th><th>Descripción</th><th>Dimensiones</th><th class="r">Stock actual</th><th class="r">Ubicación</th></tr></thead><tbody>';
-  [...gaviones,...accesorios].forEach(s=>{
-    const nivel=+s.cantidad>10?'sc-ok':+s.cantidad>0?'sc-warn':'sc-bad';
-    html+=`<tr>
-      <td class="mono" style="font-weight:500">${s.referencia}</td>
-      <td class="dim">${s.descripcion||'—'}</td>
-      <td class="dim mono">${dimStr(s)||'—'}</td>
-      <td class="r"><span class="stock-chip ${nivel}">${fmtN(s.cantidad)} ${s.unidad||'ud'}</span></td>
-      <td class="r dim">${s.ubicacion||'—'}</td>
-    </tr>`;
+  const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
+  const tiposPresentes=[...new Set(stock.map(s=>s.tipo))].sort();
+  let html='';
+  tiposPresentes.forEach(tipo=>{
+    const prods=stock.filter(s=>s.tipo===tipo);
+    html+='<div style="padding:8px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-bottom:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
+    html+='<table class="tbl"><tbody>';
+    prods.forEach(s=>{
+      const nivel=+s.cantidad>10?'sc-ok':+s.cantidad>0?'sc-warn':'sc-bad';
+      html+='<tr>'+
+        '<td class="mono" style="font-weight:500">'+s.referencia+'</td>'+
+        '<td class="dim">'+dimStr(s)+'</td>'+
+        '<td class="r"><span class="stock-chip '+nivel+'">'+fmtN(s.cantidad)+' '+(s.unidad||'ud')+'</span></td>'+
+      '</tr>';
+    });
+    html+='</tbody></table>';
   });
-  html+='</tbody></table>';
-  el.innerHTML=html;
-
-  // Movimientos
-  const movEl=document.getElementById('mov-list');
-  movEl.innerHTML=movimientos.slice(0,30).map(m=>{
+  document.getElementById('stock-list').innerHTML=html||'<div class="empty"><i class="ti ti-package"></i><p>Sin stock</p></div>';
+  document.getElementById('mov-list').innerHTML=movimientos.slice(0,30).map(m=>{
     const isIn=m.tipo==='entrada';
-    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)">
-      <div style="width:7px;height:7px;border-radius:50%;background:${isIn?'var(--green)':m.tipo==='ajuste'?'var(--blue)':'var(--red)'}"></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:500">${m.referencia||'—'}</div>
-        <div class="dim">${m.motivo||m.tipo} · ${fmtD(m.created_at)}</div>
-      </div>
-      <div style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:${isIn?'var(--green)':'var(--red)'}">
-        ${isIn?'+':m.tipo==='salida'?'-':'±'}${fmtN(m.cantidad)}
-      </div>
-    </div>`;
-  }).join('')||`<div class="empty" style="padding:20px"><p>Sin movimientos</p></div>`;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">'+
+      '<div style="width:7px;height:7px;border-radius:50%;background:'+(isIn?'var(--green)':m.tipo==='ajuste'?'var(--blue)':'var(--red)')+'" ></div>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:500">'+m.referencia+'</div><div class="dim">'+(m.motivo||m.tipo)+' · '+fmtD(m.fecha||m.created_at)+'</div></div>'+
+      '<div style="font-family:\'DM Mono\',monospace;font-size:13px;font-weight:500;color:'+(isIn?'var(--green)':'var(--red)')+'">'+(isIn?'+':'-')+fmtN(m.cantidad)+'</div>'+
+    '</div>';
+  }).join('')||'<div class="empty" style="padding:20px"><p>Sin movimientos</p></div>';
 }
 
 function populateMovProducto(){
   const sel=document.getElementById('mov-producto');
   if(!sel) return;
   const cur=sel.value;
-  sel.innerHTML='<option value="">Seleccionar...</option>'+productos.map(p=>`<option value="${p.id}" ${String(p.id)===cur?'selected':''}>${prodLabel(p)}</option>`).join('');
+  sel.innerHTML='<option value="">Seleccionar...</option>'+productos.map(p=>'<option value="'+p.id+'" '+(String(p.id)===cur?'selected':'')+'>'+prodLabel(p)+'</option>').join('');
 }
 
 async function registrarMovimiento(){
@@ -708,7 +836,7 @@ async function registrarMovimiento(){
   if(!prod||!cantidad){log('Selecciona producto y cantidad','warn');return;}
   try{
     await api('POST','/stock/movimiento',{producto_id:+prod,tipo,cantidad,motivo});
-    await loadStock();
+    await loadAll();
     document.getElementById('mov-cantidad').value='';
     document.getElementById('mov-motivo').value='';
     renderStock();
@@ -716,280 +844,151 @@ async function registrarMovimiento(){
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
-async function loadStock(){
-  stock=await api('GET','/stock');
-  movimientos=await api('GET','/stock/movimientos');
-}
-async function loadNecesidades(){
-  necesidades=await api('GET','/necesidades');
-  updateStats();
-}
-
-// ── CATÁLOGO ──────────────────────────────────────────────────────────────────
+// ── CATÁLOGO ───────────────────────────────────────────────────────────────────
 function renderProductos(){
-  const el=document.getElementById('productos-list');
-  const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla suelta',panel:'Paneles / Jaulas',accesorio:'Accesorios',otro:'Otros'};
-  // Get all types present in products (including custom ones)
+  const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
   const tiposPresentes=[...new Set(productos.map(p=>p.tipo))].sort();
   let html='';
   tiposPresentes.forEach(tipo=>{
     const label=TIPO_LABELS[tipo]||(tipo.charAt(0).toUpperCase()+tipo.slice(1));
     const prods=productos.filter(p=>p.tipo===tipo);
     if(!prods.length) return;
-    html+=`<div style="padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)">${label}</div>`;
-    html+=`<table class="tbl"><tbody>`;
+    html+='<div style="padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)">'+label+'</div>';
+    html+='<table class="tbl"><tbody>';
     prods.forEach(p=>{
       const st=stock.find(s=>String(s.producto_id)===String(p.id));
       const stQ=st?+st.cantidad:0;
-      html+=`<tr>
-        <td style="width:140px"><span class="mono" style="font-weight:500">${p.referencia}</span></td>
-        <td>${p.descripcion||'—'}</td>
-        <td class="dim mono">${dimStr(p)||'—'}</td>
-        <td><span class="badge ${stQ>0?'b-green':'b-gray'}">${fmtN(stQ)} ${p.unidad||'ud'}</span></td>
-        <td class="r">
-          <button class="btn-icon" onclick="openModal('producto','${p.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
-          <button class="btn-icon danger" onclick="deleteProducto('${p.id}','${p.referencia}')" title="Eliminar"><i class="ti ti-trash"></i></button>
-        </td>
-      </tr>`;
+      html+='<tr>'+
+        '<td style="width:140px" class="mono" ><span style="font-weight:500">'+p.referencia+'</span></td>'+
+        '<td class="dim">'+( p.descripcion||'—')+'</td>'+
+        '<td class="dim mono">'+(dimStr(p)||'—')+'</td>'+
+        '<td><span class="badge '+(stQ>0?'b-green':'b-gray')+'">'+fmtN(stQ)+' '+(p.unidad||'ud')+'</span></td>'+
+        '<td class="r">'+
+          '<button class="btn-icon" onclick="openModal(\'producto\',\''+p.id+'\')" title="Editar"><i class="ti ti-pencil"></i></button>'+
+          '<button class="btn-icon danger" onclick="deleteProducto(\''+p.id+'\',\''+p.referencia+'\')" title="Eliminar"><i class="ti ti-trash"></i></button>'+
+        '</td>'+
+      '</tr>';
     });
-    html+=`</tbody></table>`;
+    html+='</tbody></table>';
   });
-  el.innerHTML=html||`<div class="empty"><i class="ti ti-grid-dots"></i><p>Sin productos</p></div>`;
+  document.getElementById('productos-list').innerHTML=html||'<div class="empty"><i class="ti ti-grid-dots"></i><p>Sin productos</p></div>';
 }
 
-// ── CLIENTES ──────────────────────────────────────────────────────────────────
+// ── CLIENTES ───────────────────────────────────────────────────────────────────
 function renderClientes(){
   const el=document.getElementById('clientes-list');
-  if(!clientes.length){el.innerHTML=`<div class="empty"><i class="ti ti-users"></i><p>Sin clientes</p></div>`;return;}
-  el.innerHTML=`<table class="tbl"><thead><tr><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th></th></tr></thead><tbody>
-  ${clientes.map(c=>`<tr>
-    <td style="font-weight:500">${c.nombre}</td>
-    <td class="dim">${c.contacto||'—'}</td>
-    <td class="dim">${c.telefono||'—'}</td>
-    <td class="dim">${c.email||'—'}</td>
-    <td class="r">
-      <button class="btn-icon" onclick="openModal('cliente','${c.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
-      <button class="btn-icon danger" onclick="deleteCliente('${c.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>
-    </td>
-  </tr>`).join('')}
-  </tbody></table>`;
+  if(!clientes.length){el.innerHTML='<div class="empty"><i class="ti ti-users"></i><p>Sin clientes</p></div>';return;}
+  el.innerHTML='<table class="tbl"><thead><tr><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th></th></tr></thead><tbody>'+
+  clientes.map(c=>'<tr>'+
+    '<td style="font-weight:500">'+c.nombre+'</td>'+
+    '<td class="dim">'+(c.contacto||'—')+'</td>'+
+    '<td class="dim">'+(c.telefono||'—')+'</td>'+
+    '<td class="dim">'+(c.email||'—')+'</td>'+
+    '<td class="r">'+
+      '<button class="btn-icon" onclick="openModal(\'cliente\',\''+c.id+'\')"><i class="ti ti-pencil"></i></button>'+
+      '<button class="btn-icon danger" onclick="deleteCliente(\''+c.id+'\')"><i class="ti ti-trash"></i></button>'+
+    '</td>'+
+  '</tr>').join('')+'</tbody></table>';
 }
 
-async function deleteCliente(id){
-  if(!confirm('¿Eliminar este cliente?')) return;
-  await api('DELETE','/clientes/'+id);
-  clientes=clientes.filter(c=>String(c.id)!==String(id));
-  renderClientes();
-  log('Cliente eliminado');
-}
-
-async function deletePedido(id){
-  if(!confirm('¿Eliminar este pedido?')) return;
-  await api('DELETE','/pedidos/'+id);
-  pedidos=pedidos.filter(p=>String(p.id)!==String(id));
-  await loadNecesidades();
-  renderPedidos();
-  log('Pedido eliminado');
-}
-
-// ── VER DETALLE PEDIDO ────────────────────────────────────────────────────────
-function verDetallePedido(id){
-  const p=pedidos.find(x=>String(x.id)===String(id));
-  if(!p) return;
-  const sc=ESTADOS_PED[p.estado]||ESTADOS_PED.pendiente;
-  document.getElementById('modal-title').innerHTML=`<i class="ti ti-file-text"></i> Pedido ${p.numero}`;
-  document.getElementById('modal-box').classList.add('wide');
-  document.getElementById('modal-body').innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div><div class="dim">Cliente</div><div style="font-weight:500">${p.cliente_nombre||p.cliente_nombre_rel||'—'}</div></div>
-      <div><div class="dim">Obra / Proyecto</div><div style="font-weight:500">${p.obra||'—'}</div></div>
-      <div><div class="dim">Fecha pedido</div><div>${fmtD(p.fecha_pedido)}</div></div>
-      <div><div class="dim">Fecha entrega</div><div>${fmtD(p.fecha_entrega)}</div></div>
-      <div><div class="dim">Estado</div><div><span class="badge ${sc.badge}">${sc.label}</span></div></div>
-      <div><div class="dim">Tipo</div><div><span class="badge ${p.tipo_fabricacion==='stock'?'b-purple':'b-steel'}">${p.tipo_fabricacion==='stock'?'Desde stock':'Bajo pedido'}</span></div></div>
-    </div>
-    ${p.notas?`<div style="background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text2);margin-bottom:12px">${p.notas}</div>`:''}
-    <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:6px">Líneas del pedido</div>
-    <table class="lineas-table"><thead><tr><th>Referencia</th><th>Dimensiones</th><th class="r">Pedido</th><th class="r">Fabricado</th><th class="r">Entregado</th><th>Progreso</th></tr></thead><tbody>
-    ${(p.lineas||[]).map(l=>{
-      const pct=+l.cantidad>0?Math.min(100,Math.round(+l.cantidad_fabricada/+l.cantidad*100)):0;
-      return`<tr>
-        <td class="mono" style="font-weight:500">${l.referencia||'—'}</td>
-        <td class="dim">${dimStr(l)||'—'}</td>
-        <td class="r mono">${fmtN(l.cantidad)}</td>
-        <td class="r mono" style="color:var(--green)">${fmtN(l.cantidad_fabricada)}</td>
-        <td class="r mono" style="color:var(--blue)">${fmtN(l.cantidad_entregada)}</td>
-        <td><div class="prog"><div class="prog-fill" style="width:${pct}%;background:${pct===100?'var(--green)':'var(--blue)'}"></div></div><div class="dim">${pct}%</div></td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-  document.getElementById('modal-foot').innerHTML=`
-    <button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
-    <button class="btn btn-primary" onclick="closeModal();openModal('pedido','${p.id}')"><i class="ti ti-pencil"></i> Editar</button>`;
-  document.getElementById('overlay').classList.add('open');
-}
-
-// ── MODALES CRUD ──────────────────────────────────────────────────────────────
-function openModal(type, id){
+// ── MODALES ────────────────────────────────────────────────────────────────────
+function openModal(type, id, extraId){
   editId=id; modalType=type;
   const box=document.getElementById('modal-box');
-  box.classList.remove('wide');
+  box.className='modal';
   document.getElementById('overlay').classList.add('open');
-  const title=document.getElementById('modal-title');
-  const body=document.getElementById('modal-body');
-  const foot=document.getElementById('modal-foot');
 
   if(type==='pedido'){
     box.classList.add('wide');
     const p=id?pedidos.find(x=>String(x.id)===String(id)):null;
     const lineas=p?p.lineas||[]:[];
-    title.innerHTML=`<i class="ti ti-file-text"></i> ${id?'Editar pedido':'Nuevo pedido'}`;
-    body.innerHTML=`
-      <div class="frow">
-        <div class="field"><label>Nº Pedido</label><input type="text" id="f-num" value="${p?p.numero:autoNumPedido()}" placeholder="P-2024-001"></div>
-        <div class="field"><label>Cliente</label>
-          <select id="f-cliente">
-            <option value="">Sin cliente / Introducir manual</option>
-            ${clientes.map(c=>`<option value="${c.id}" ${p&&String(p.cliente_id)===String(c.id)?'selected':''}>${c.nombre}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="field"><label>Nombre cliente (si no está en lista)</label>
-        <input type="text" id="f-cliente-nombre" value="${p?p.cliente_nombre||'':''}" placeholder="Nombre del cliente">
-      </div>
-      <div class="frow">
-        <div class="field"><label>Obra / Proyecto</label><input type="text" id="f-obra" value="${p?p.obra||'':''}" placeholder="Nombre de la obra"></div>
-        <div class="field"><label>Tipo fabricación</label>
-          <select id="f-tipo-fab">
-            <option value="bajo_pedido" ${!p||p.tipo_fabricacion==='bajo_pedido'?'selected':''}>Bajo pedido</option>
-            <option value="stock" ${p&&p.tipo_fabricacion==='stock'?'selected':''}>Desde stock</option>
-          </select>
-        </div>
-      </div>
-      <div class="frow">
-        <div class="field"><label>Fecha pedido</label><input type="date" id="f-fecha-ped" value="${p&&p.fecha_pedido?String(p.fecha_pedido).substring(0,10):''}"></div>
-        <div class="field"><label>Fecha entrega</label><input type="date" id="f-fecha-ent" value="${p&&p.fecha_entrega?String(p.fecha_entrega).substring(0,10):''}"></div>
-      </div>
-      <div class="field"><label>Estado</label>
-        <select id="f-estado">
-          ${Object.entries(ESTADOS_PED).map(([k,v])=>`<option value="${k}" ${(p&&p.estado===k)||(k==='pendiente'&&!p)?'selected':''}>${v.label}</option>`).join('')}
-        </select>
-      </div>
-      <div class="field"><label>Notas</label><textarea id="f-notas">${p?p.notas||'':''}</textarea></div>
-      <div class="sep"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)">Líneas del pedido</div>
-        <button class="btn btn-outline btn-sm" onclick="addLineaPedido()"><i class="ti ti-plus"></i> Añadir línea</button>
-      </div>
-      <div id="lineas-container">
-        ${lineas.map((l,i)=>lineaHTML(i,l)).join('')}
-      </div>`;
-    foot.innerHTML=`
-      ${id?`<button class="btn btn-danger btn-sm" onclick="closeModal();deletePedido('${id}')"><i class="ti ti-trash"></i></button>`:''}
-      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="savePedido()"><i class="ti ti-device-floppy"></i> Guardar</button>`;
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-text"></i> '+(id?'Editar pedido':'Nuevo pedido');
+    document.getElementById('modal-body').innerHTML=
+      '<div class="frow"><div class="field"><label>Nº Pedido</label><input type="text" id="f-num" value="'+(p?p.numero:autoNumPedido())+'" placeholder="P-2024-001"></div>'+
+      '<div class="field"><label>Cliente</label><select id="f-cliente"><option value="">Sin cliente</option>'+clientes.map(c=>'<option value="'+c.id+'" '+(p&&String(p.cliente_id)===String(c.id)?'selected':'')+'>'+c.nombre+'</option>').join('')+'</select></div></div>'+
+      '<div class="field"><label>Nombre cliente (si no está en lista)</label><input type="text" id="f-cliente-nombre" value="'+(p?p.cliente_nombre||'':'')+'" placeholder="Nombre del cliente"></div>'+
+      '<div class="frow"><div class="field"><label>Obra / Proyecto</label><input type="text" id="f-obra" value="'+(p?p.obra||'':'')+'" placeholder="Nombre de la obra"></div>'+
+      '<div class="field"><label>Tipo fabricación</label><select id="f-tipo-fab"><option value="bajo_pedido" '+(!p||p.tipo_fabricacion==='bajo_pedido'?'selected':'')+'>Bajo pedido</option><option value="stock" '+(p&&p.tipo_fabricacion==='stock'?'selected':'')+'>Desde stock</option></select></div></div>'+
+      '<div class="frow"><div class="field"><label>Fecha pedido</label><input type="date" id="f-fecha-ped" value="'+(p&&p.fecha_pedido?String(p.fecha_pedido).substring(0,10):'')+'"></div>'+
+      '<div class="field"><label>Fecha entrega</label><input type="date" id="f-fecha-ent" value="'+(p&&p.fecha_entrega?String(p.fecha_entrega).substring(0,10):'')+'"></div></div>'+
+      '<div class="field"><label>Estado</label><select id="f-estado">'+Object.entries(ESTADOS_PED).map(([k,v])=>'<option value="'+k+'" '+((p&&p.estado===k)||(k==='pendiente'&&!p)?'selected':'')+'>'+v.label+'</option>').join('')+'</select></div>'+
+      '<div class="field"><label>Notas</label><textarea id="f-notas">'+(p?p.notas||'':'')+'</textarea></div>'+
+      '<div class="sep"></div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+        '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)">Líneas del pedido</div>'+
+        '<button class="btn btn-outline btn-sm" onclick="addLineaPedido()"><i class="ti ti-plus"></i> Añadir línea</button>'+
+      '</div>'+
+      '<div style="font-size:10px;color:var(--text2);margin-bottom:6px;display:grid;grid-template-columns:1fr 80px;gap:6px"><span>Producto</span><span style="text-align:right">Cantidad</span></div>'+
+      '<div id="lineas-container">'+lineas.map((l,i)=>lineaHTML(i,l)).join('')+'</div>';
+    document.getElementById('modal-foot').innerHTML=
+      (id?'<button class="btn btn-danger btn-sm" onclick="closeModal();deletePedido(\''+id+'\')"><i class="ti ti-trash"></i></button>':'')+
+      '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
+      '<button class="btn btn-primary" onclick="savePedido()"><i class="ti ti-device-floppy"></i> Guardar</button>';
+
+  } else if(type==='entrega'){
+    box.classList.add('narrow');
+    // extraId = linea_pedido_id when coming from pedido
+    const pedidosActivos=pedidos.filter(p=>!['entregado','cancelado'].includes(p.estado));
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-calendar-plus"></i> Programar carga';
+    let lineaOptions='<option value="">Seleccionar...</option>';
+    pedidosActivos.forEach(p=>{
+      (p.lineas||[]).forEach(l=>{
+        lineaOptions+='<option value="'+l.id+'" '+(String(l.id)===String(extraId)?'selected':'')+'>'+p.numero+' — '+l.referencia+' ('+fmtN(l.cantidad)+' ud)</option>';
+      });
+    });
+    document.getElementById('modal-body').innerHTML=
+      '<div class="field"><label>Línea de pedido</label><select id="f-linea">'+lineaOptions+'</select></div>'+
+      '<div class="frow">'+
+        '<div class="field"><label>Fecha de carga</label><input type="date" id="f-fecha-carga" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+        '<div class="field"><label>Cantidad</label><input type="number" id="f-ecant" min="1" placeholder="0"></div>'+
+      '</div>'+
+      '<div class="field"><label>Notas</label><input type="text" id="f-enotas" placeholder="Observaciones..."></div>';
+    document.getElementById('modal-foot').innerHTML=
+      '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
+      '<button class="btn btn-primary" onclick="saveEntrega()"><i class="ti ti-calendar-plus"></i> Programar</button>';
 
   } else if(type==='producto'){
     const p=id?productos.find(x=>String(x.id)===String(id)):null;
-    title.innerHTML=`<i class="ti ti-box"></i> ${id?'Editar producto':'Nuevo producto'}`;
-    body.innerHTML=`
-      <div class="frow">
-        <div class="field"><label>Tipo / Categoría</label>
-          <select id="f-ptipo" onchange="toggleDims()">
-            <option value="gavion" ${!p||p.tipo==='gavion'?'selected':''}>Gavión</option>
-            <option value="colchoneta" ${p&&p.tipo==='colchoneta'?'selected':''}>Colchoneta Reno</option>
-            <option value="malla" ${p&&p.tipo==='malla'?'selected':''}>Malla suelta</option>
-            <option value="panel" ${p&&p.tipo==='panel'?'selected':''}>Panel / Jaula</option>
-            <option value="accesorio" ${p&&p.tipo==='accesorio'?'selected':''}>Accesorio</option>
-            <option value="otro" ${p&&!['gavion','colchoneta','malla','panel','accesorio'].includes(p.tipo)?'selected':''}>Otro</option>
-          </select>
-        </div>
-        <div class="field"><label>Referencia</label><input type="text" id="f-pref" value="${p?p.referencia||'':''}" placeholder="GAV-2x1x1"></div>
-      </div>
-      <div id="dims-row" class="frow3" style="${p&&p.tipo==='accesorio'?'display:none':''}">
-        <div class="field"><label>Largo (m)</label><input type="number" id="f-plargo" value="${p?p.largo||'':''}" placeholder="2.00" step="0.01"></div>
-        <div class="field"><label>Ancho (m)</label><input type="number" id="f-pancho" value="${p?p.ancho||'':''}" placeholder="1.00" step="0.01"></div>
-        <div class="field"><label>Alto (m)</label><input type="number" id="f-palto" value="${p?p.alto||'':''}" placeholder="1.00" step="0.01"></div>
-      </div>
-      <div class="field"><label>Descripción</label><input type="text" id="f-pdesc" value="${p?p.descripcion||'':''}" placeholder="Descripción del producto"></div>
-      <div class="field"><label>Unidad</label>
-        <select id="f-punidad">
-          <option value="ud" ${!p||p.unidad==='ud'?'selected':''}>ud (unidad)</option>
-          <option value="bolsa" ${p&&p.unidad==='bolsa'?'selected':''}>bolsa</option>
-          <option value="rollo" ${p&&p.unidad==='rollo'?'selected':''}>rollo</option>
-          <option value="kg" ${p&&p.unidad==='kg'?'selected':''}>kg</option>
-          <option value="m" ${p&&p.unidad==='m'?'selected':''}>m (metro)</option>
-        </select>
-      </div>`;
-    foot.innerHTML=`
-      ${id?`<button class="btn btn-danger btn-sm" onclick="closeModal();deleteProducto('${id}','')"><i class="ti ti-trash"></i> Eliminar</button>`:''}
-      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveProducto()"><i class="ti ti-device-floppy"></i> Guardar</button>`;
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-box"></i> '+(id?'Editar producto':'Nuevo producto');
+    document.getElementById('modal-body').innerHTML=
+      '<div class="frow"><div class="field"><label>Tipo / Categoría</label>'+
+        '<select id="f-ptipo" onchange="toggleDims()">'+
+          '<option value="gavion" '+(!p||p.tipo==='gavion'?'selected':'')+'>Gavión</option>'+
+          '<option value="colchoneta" '+(p&&p.tipo==='colchoneta'?'selected':'')+'>Colchoneta Reno</option>'+
+          '<option value="malla" '+(p&&p.tipo==='malla'?'selected':'')+'>Malla suelta</option>'+
+          '<option value="panel" '+(p&&p.tipo==='panel'?'selected':'')+'>Panel / Jaula</option>'+
+          '<option value="accesorio" '+(p&&p.tipo==='accesorio'?'selected':'')+'>Accesorio</option>'+
+          '<option value="otro" '+(p&&!['gavion','colchoneta','malla','panel','accesorio'].includes(p.tipo)?'selected':'')+'>Otro</option>'+
+        '</select></div>'+
+      '<div class="field"><label>Referencia</label><input type="text" id="f-pref" value="'+(p?p.referencia||'':'')+'" placeholder="GAV-2x1x1"></div></div>'+
+      '<div id="dims-row" class="frow3" style="'+(p&&(p.tipo==='accesorio'||p.tipo==='otro')?'display:none':'')+'">'+
+        '<div class="field"><label>Largo (m)</label><input type="number" id="f-plargo" value="'+(p?p.largo||'':'')+'" placeholder="2.00" step="0.01"></div>'+
+        '<div class="field"><label>Ancho (m)</label><input type="number" id="f-pancho" value="'+(p?p.ancho||'':'')+'" placeholder="1.00" step="0.01"></div>'+
+        '<div class="field"><label>Alto (m)</label><input type="number" id="f-palto" value="'+(p?p.alto||'':'')+'" placeholder="1.00" step="0.01"></div>'+
+      '</div>'+
+      '<div class="field"><label>Descripción</label><input type="text" id="f-pdesc" value="'+(p?p.descripcion||'':'')+'" placeholder="Descripción"></div>'+
+      '<div class="field"><label>Unidad</label><select id="f-punidad">'+
+        ['ud','bolsa','rollo','kg','m'].map(u=>'<option value="'+u+'" '+(p&&p.unidad===u?'selected':'')+'>'+u+'</option>').join('')+
+      '</select></div>';
+    document.getElementById('modal-foot').innerHTML=
+      (id?'<button class="btn btn-danger btn-sm" onclick="closeModal();deleteProducto(\''+id+'\',\'\')"><i class="ti ti-trash"></i></button>':'')+
+      '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
+      '<button class="btn btn-primary" onclick="saveProducto()"><i class="ti ti-device-floppy"></i> Guardar</button>';
 
   } else if(type==='cliente'){
     const c=id?clientes.find(x=>String(x.id)===String(id)):null;
-    title.innerHTML=`<i class="ti ti-user"></i> ${id?'Editar cliente':'Nuevo cliente'}`;
-    body.innerHTML=`
-      <div class="frow">
-        <div class="field"><label>Nombre empresa</label><input type="text" id="f-cnombre" value="${c?c.nombre:''}" placeholder="Razón social"></div>
-        <div class="field"><label>Persona contacto</label><input type="text" id="f-ccontacto" value="${c?c.contacto||'':''}" placeholder="Nombre"></div>
-      </div>
-      <div class="frow">
-        <div class="field"><label>Teléfono</label><input type="text" id="f-ctelefono" value="${c?c.telefono||'':''}" placeholder="666 000 000"></div>
-        <div class="field"><label>Email</label><input type="email" id="f-cemail" value="${c?c.email||'':''}" placeholder="correo@empresa.com"></div>
-      </div>
-      <div class="field"><label>Dirección</label><input type="text" id="f-cdir" value="${c?c.direccion||'':''}" placeholder="Calle, ciudad..."></div>`;
-    foot.innerHTML=`
-      ${id?`<button class="btn btn-danger btn-sm" onclick="closeModal();deleteCliente('${id}')"><i class="ti ti-trash"></i></button>`:''}
-      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveCliente()"><i class="ti ti-device-floppy"></i> Guardar</button>`;
-
-  } else if(type==='orden'){
-    openModalOF(id?ordenes.find(x=>String(x.id)===String(id)):null);
-    return;
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-user"></i> '+(id?'Editar cliente':'Nuevo cliente');
+    document.getElementById('modal-body').innerHTML=
+      '<div class="frow"><div class="field"><label>Nombre empresa</label><input type="text" id="f-cnombre" value="'+(c?c.nombre:'')+'" placeholder="Razón social"></div>'+
+      '<div class="field"><label>Persona contacto</label><input type="text" id="f-ccontacto" value="'+(c?c.contacto||'':'')+'" placeholder="Nombre"></div></div>'+
+      '<div class="frow"><div class="field"><label>Teléfono</label><input type="text" id="f-ctelefono" value="'+(c?c.telefono||'':'')+'" placeholder="666 000 000"></div>'+
+      '<div class="field"><label>Email</label><input type="email" id="f-cemail" value="'+(c?c.email||'':'')+'" placeholder="correo@empresa.com"></div></div>'+
+      '<div class="field"><label>Dirección</label><input type="text" id="f-cdir" value="'+(c?c.direccion||'':'')+'" placeholder="Calle, ciudad..."></div>';
+    document.getElementById('modal-foot').innerHTML=
+      (id?'<button class="btn btn-danger btn-sm" onclick="closeModal();deleteCliente(\''+id+'\')"><i class="ti ti-trash"></i></button>':'')+
+      '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
+      '<button class="btn btn-primary" onclick="saveCliente()"><i class="ti ti-device-floppy"></i> Guardar</button>';
   }
-}
-
-function openModalOF(data){
-  const o=data&&data.id?data:null;
-  const prefill=data&&!data.id?data:null;
-  editId=o?o.id:null; modalType='orden';
-  document.getElementById('modal-box').classList.remove('wide');
-  document.getElementById('overlay').classList.add('open');
-  document.getElementById('modal-title').innerHTML=`<i class="ti ti-tool"></i> ${o?'Editar OF':'Nueva Orden de Fabricación'}`;
-  document.getElementById('modal-body').innerHTML=`
-    <div class="frow">
-      <div class="field"><label>Nº OF</label><input type="text" id="f-onum" value="${o?o.numero:prefill?prefill.numero:autoNumOF()}" placeholder="OF-001"></div>
-      <div class="field"><label>Producto</label>
-        <select id="f-oprod">
-          <option value="">Seleccionar...</option>
-          ${productos.filter(p=>p.tipo!=='accesorio').map(p=>`<option value="${p.id}" ${(o&&String(o.producto_id)===String(p.id))||(prefill&&String(prefill.producto_id)===String(p.id))?'selected':''}>${prodLabel(p)}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="frow">
-      <div class="field"><label>Cantidad a fabricar</label><input type="number" id="f-ocant" value="${o?o.cantidad:prefill?prefill.cantidad_sugerida:''}" min="1" placeholder="0"></div>
-      <div class="field"><label>Vinculado a pedido</label>
-        <select id="f-opedido">
-          <option value="">Sin pedido (stock)</option>
-          ${pedidos.filter(p=>!['entregado','cancelado'].includes(p.estado)).map(p=>`<option value="${p.id}" ${o&&String(o.pedido_id)===String(p.id)?'selected':''}>${p.numero} — ${p.cliente_nombre||''}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="frow">
-      <div class="field"><label>Fecha inicio</label><input type="date" id="f-ofini" value="${o&&o.fecha_inicio?String(o.fecha_inicio).substring(0,10):''}"></div>
-      <div class="field"><label>Fecha fin prevista</label><input type="date" id="f-offin" value="${o&&o.fecha_fin?String(o.fecha_fin).substring(0,10):''}"></div>
-    </div>
-    <div class="field"><label>Estado</label>
-      <select id="f-oestado">
-        ${Object.entries(ESTADOS_OF).map(([k,v])=>`<option value="${k}" ${o?o.estado===k?'selected':'':k==='pendiente'?'selected':''}>${v.label}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label>Notas</label><textarea id="f-onotas">${o?o.notas||'':''}</textarea></div>`;
-  document.getElementById('modal-foot').innerHTML=`
-    ${editId?`<button class="btn btn-danger btn-sm" onclick="closeModal();deleteOrden('${editId}')"><i class="ti ti-trash"></i></button>`:''}
-    <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
-    <button class="btn btn-primary" onclick="saveOrden()"><i class="ti ti-device-floppy"></i> Guardar</button>`;
 }
 
 function toggleDims(){
@@ -998,59 +997,44 @@ function toggleDims(){
   if(dr) dr.style.display=(tipo==='accesorio'||tipo==='otro')?'none':'';
 }
 
-function lineaHTML(i, l){
-  return`<div class="linea-row" id="linea-${i}" style="display:grid;grid-template-columns:1fr 90px 90px 90px 32px;gap:6px;margin-bottom:6px;align-items:center">
-    <select class="linea-prod" data-i="${i}" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)">
-      <option value="">Seleccionar producto...</option>
-      ${productos.map(p=>`<option value="${p.id}" ${l&&String(l.producto_id)===String(p.id)?'selected':''}>${prodLabel(p)}</option>`).join('')}
-    </select>
-    <input type="number" class="linea-cant" data-i="${i}" placeholder="Cant." value="${l?l.cantidad:''}" min="1" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);font-family:'DM Mono',monospace;text-align:right">
-    <input type="number" class="linea-fab" data-i="${i}" placeholder="Fab." value="${l?l.cantidad_fabricada||0:0}" min="0" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);font-family:'DM Mono',monospace;text-align:right">
-    <input type="number" class="linea-ent" data-i="${i}" placeholder="Entr." value="${l?l.cantidad_entregada||0:0}" min="0" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);font-family:'DM Mono',monospace;text-align:right">
-    <button onclick="removeLinea(${i})" style="background:none;border:1px solid var(--border2);border-radius:4px;padding:5px 6px;cursor:pointer;color:var(--text2)"><i class="ti ti-x" style="font-size:12px"></i></button>
-  </div>`;
+function lineaHTML(i,l){
+  return '<div id="linea-'+i+'" style="display:grid;grid-template-columns:1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
+    '<select class="linea-prod" data-i="'+i+'" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)">'+
+      '<option value="">Seleccionar producto...</option>'+
+      productos.map(p=>'<option value="'+p.id+'" '+(l&&String(l.producto_id)===String(p.id)?'selected':'')+'>'+prodLabel(p)+'</option>').join('')+
+    '</select>'+
+    '<input type="number" class="linea-cant" data-i="'+i+'" placeholder="Cant." value="'+(l?l.cantidad:'')+'" min="1" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);font-family:\'DM Mono\',monospace;text-align:right">'+
+    '<button onclick="document.getElementById(\'linea-'+i+'\').remove()" style="background:none;border:1px solid var(--border2);border-radius:4px;padding:5px 6px;cursor:pointer;color:var(--text2)"><i class="ti ti-x" style="font-size:12px"></i></button>'+
+  '</div>';
 }
 
-let lineaCount=0;
 function addLineaPedido(){
-  const container=document.getElementById('lineas-container');
-  if(!container) return;
-  container.insertAdjacentHTML('beforeend',lineaHTML(Date.now(),null));
-}
-function removeLinea(i){
-  const el=document.getElementById('linea-'+i);
-  if(el) el.remove();
+  const c=document.getElementById('lineas-container');
+  if(!c) return;
+  c.insertAdjacentHTML('beforeend',lineaHTML(Date.now(),null));
 }
 
 function getLineas(){
-  const rows=document.querySelectorAll('[class^="linea-row"],[id^="linea-"]');
   const lineas=[];
   document.querySelectorAll('#lineas-container > div').forEach(row=>{
     const prod=row.querySelector('.linea-prod')?.value;
     const cant=parseFloat(row.querySelector('.linea-cant')?.value)||0;
-    const fab=parseFloat(row.querySelector('.linea-fab')?.value)||0;
-    const ent=parseFloat(row.querySelector('.linea-ent')?.value)||0;
-    if(prod&&cant>0) lineas.push({producto_id:+prod,cantidad:cant,cantidad_fabricada:fab,cantidad_entregada:ent});
+    if(prod&&cant>0) lineas.push({producto_id:+prod,cantidad:cant});
   });
   return lineas;
 }
 
 function autoNumPedido(){
   const n=pedidos.length+1;
-  const y=new Date().getFullYear();
-  return `P-${y}-${String(n).padStart(3,'0')}`;
-}
-function autoNumOF(){
-  const n=ordenes.length+1;
-  return `OF-${String(n).padStart(4,'0')}`;
+  return 'P-'+new Date().getFullYear()+'-'+String(n).padStart(3,'0');
 }
 
 function closeModal(){
   document.getElementById('overlay').classList.remove('open');
-  editId=null; modalType=null;
+  editId=null;modalType=null;
 }
 
-// ── SAVES ─────────────────────────────────────────────────────────────────────
+// ── SAVES ──────────────────────────────────────────────────────────────────────
 async function savePedido(){
   const num=document.getElementById('f-num').value.trim();
   if(!num){log('Introduce el número de pedido','warn');return;}
@@ -1058,10 +1042,8 @@ async function savePedido(){
   if(!lineas.length){log('Añade al menos una línea de producto','warn');return;}
   const cliSel=document.getElementById('f-cliente').value;
   const data={
-    numero:num,
-    cliente_id:cliSel||null,
-    cliente_nombre:document.getElementById('f-cliente-nombre').value.trim()||
-      (cliSel?clientes.find(c=>String(c.id)===cliSel)?.nombre:''),
+    numero:num,cliente_id:cliSel||null,
+    cliente_nombre:document.getElementById('f-cliente-nombre').value.trim()||(cliSel?clientes.find(c=>String(c.id)===cliSel)?.nombre:''),
     obra:document.getElementById('f-obra').value.trim(),
     tipo_fabricacion:document.getElementById('f-tipo-fab').value,
     fecha_pedido:document.getElementById('f-fecha-ped').value||null,
@@ -1072,32 +1054,40 @@ async function savePedido(){
   };
   try{
     if(editId){
-      const updated=await api('PUT','/pedidos/'+editId,data);
-      const idx=pedidos.findIndex(x=>String(x.id)===String(editId));
-      pedidos[idx]={...updated,lineas};
+      await api('PUT','/pedidos/'+editId,data);
     }else{
-      const newP=await api('POST','/pedidos',data);
-      newP.lineas=lineas;
-      pedidos.unshift(newP);
+      await api('POST','/pedidos',data);
     }
-    await loadNecesidades();
-    closeModal();renderPedidos();renderDash();
+    await loadAll();
+    closeModal();
     log('Pedido guardado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function saveEntrega(){
+  const linea=document.getElementById('f-linea').value;
+  const fecha=document.getElementById('f-fecha-carga').value;
+  const cant=parseFloat(document.getElementById('f-ecant').value)||0;
+  if(!linea||!fecha||!cant){log('Rellena todos los campos','warn');return;}
+  try{
+    await api('POST','/entregas',{linea_pedido_id:+linea,fecha_carga:fecha,cantidad:cant,notas:document.getElementById('f-enotas').value});
+    await loadAll();
+    closeModal();
+    log('Carga programada','ok');
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
 async function saveProducto(){
   const tipo=document.getElementById('f-ptipo').value;
-  const data={
-    tipo,
-    referencia:document.getElementById('f-pref').value.trim(),
+  const ref=document.getElementById('f-pref').value.trim();
+  if(!ref){log('Introduce la referencia','warn');return;}
+  const data={tipo,referencia:ref,
     largo:parseFloat(document.getElementById('f-plargo')?.value)||null,
     ancho:parseFloat(document.getElementById('f-pancho')?.value)||null,
     alto:parseFloat(document.getElementById('f-palto')?.value)||null,
     descripcion:document.getElementById('f-pdesc').value.trim(),
     unidad:document.getElementById('f-punidad').value
   };
-  if(!data.referencia){log('Introduce la referencia','warn');return;}
   try{
     if(editId){
       const updated=await api('PUT','/productos/'+editId,data);
@@ -1110,19 +1100,6 @@ async function saveProducto(){
     closeModal();renderProductos();renderStock();
     log('Producto guardado','ok');
   }catch(e){log('Error: '+e.message,'warn');}
-}
-
-async function deleteProducto(id, ref){
-  const nombre=ref||productos.find(p=>String(p.id)===String(id))?.referencia||'este producto';
-  if(!confirm('¿Eliminar '+nombre+'? Se eliminará también su stock asociado.')) return;
-  try{
-    await api('PUT','/productos/'+id,{...productos.find(p=>String(p.id)===String(id)),activo:false});
-    productos=productos.filter(p=>String(p.id)!==String(id));
-    stock=stock.filter(s=>String(s.producto_id)!==String(id));
-    renderProductos();renderStock();
-    await loadNecesidades();
-    log(nombre+' eliminado','ok');
-  }catch(e){log('Error al eliminar: '+e.message,'warn');}
 }
 
 async function saveCliente(){
@@ -1141,29 +1118,44 @@ async function saveCliente(){
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
-async function saveOrden(){
-  const num=document.getElementById('f-onum').value.trim();
-  const prod=document.getElementById('f-oprod').value;
-  const cant=parseFloat(document.getElementById('f-ocant').value)||0;
-  if(!num||!prod||!cant){log('Rellena número, producto y cantidad','warn');return;}
-  const data={numero:num,producto_id:+prod,pedido_id:document.getElementById('f-opedido').value||null,cantidad:cant,cantidad_hecha:editId?+ordenes.find(x=>String(x.id)===String(editId))?.cantidad_hecha||0:0,estado:document.getElementById('f-oestado').value,fecha_inicio:document.getElementById('f-ofini').value||null,fecha_fin:document.getElementById('f-offin').value||null,notas:document.getElementById('f-onotas').value.trim()};
+// ── DELETES ────────────────────────────────────────────────────────────────────
+async function deletePedido(id){
+  if(!confirm('¿Eliminar este pedido?')) return;
   try{
-    if(editId){
-      const updated=await api('PUT','/ordenes/'+editId,data);
-      Object.assign(ordenes.find(x=>String(x.id)===String(editId)),updated);
-    }else{
-      ordenes.unshift(await api('POST','/ordenes',data));
-    }
-    await loadNecesidades();
-    closeModal();renderOrdenes();renderDash();
-    log('OF guardada','ok');
+    await api('DELETE','/pedidos/'+id);
+    pedidos=pedidos.filter(p=>String(p.id)!==String(id));
+    await loadAll();
+    log('Pedido eliminado');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function deleteProducto(id,ref){
+  const nombre=ref||productos.find(p=>String(p.id)===String(id))?.referencia||'este producto';
+  if(!confirm('¿Eliminar '+nombre+'?')) return;
+  try{
+    await api('PUT','/productos/'+id,{...productos.find(p=>String(p.id)===String(id)),activo:false});
+    productos=productos.filter(p=>String(p.id)!==String(id));
+    stock=stock.filter(s=>String(s.producto_id)!==String(id));
+    renderProductos();renderStock();
+    await loadAll();
+    log(nombre+' eliminado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function deleteCliente(id){
+  if(!confirm('¿Eliminar este cliente?')) return;
+  try{
+    await api('DELETE','/clientes/'+id);
+    clientes=clientes.filter(c=>String(c.id)!==String(id));
+    renderClientes();
+    log('Cliente eliminado');
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
 function log(msg,type=''){
   const el=document.getElementById('sb-msg');
   const icon=type==='ok'?'ti-circle-check':type==='warn'?'ti-alert-triangle':'ti-info-circle';
-  el.innerHTML=`<i class="ti ${icon}"></i> ${msg}`;
+  el.innerHTML='<i class="ti '+icon+'"></i> '+msg;
   el.className='sb-msg'+(type?' '+type:'');
 }
 
@@ -1172,3 +1164,4 @@ loadAll();
 </script>
 </body>
 </html>
+
