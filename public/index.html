@@ -169,6 +169,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   <div class="st"><span class="st-v" id="st-proxima">—</span><span class="st-l">próxima carga</span></div>
   <div class="st-sep"></div>
   <div class="st"><span class="st-v" id="st-hoy">—</span><span class="st-l">cargas hoy</span></div>
+  <div class="st-sep"></div>
+  <div class="st"><span class="st-v" id="st-pend-ent" style="color:#fde68a">—</span><span class="st-l">entregas programadas</span></div>
 </div>
 <div class="tabs-bar">
   <div class="tab active" id="tab-dash" onclick="switchTab('dash')"><i class="ti ti-layout-dashboard"></i> Panel</div>
@@ -408,11 +410,13 @@ function updateStats(){
   const cargasHoy=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,10)===hoy&&e.estado==='pendiente').length;
   const proximas=entregas.filter(e=>e.estado==='pendiente'&&e.fecha_carga&&String(e.fecha_carga).substring(0,10)>=hoy).sort((a,b)=>a.fecha_carga>b.fecha_carga?1:-1);
   const proxFecha=proximas.length?fmtD(proximas[0].fecha_carga):'—';
+  const pendientesTotal=entregas.filter(e=>e.estado==='pendiente').length;
   document.getElementById('st-pedidos').textContent=activos.length;
   document.getElementById('st-fabricar').textContent=fmtN(aFabricar);
   document.getElementById('st-stock').textContent=fmtN(stockTotal);
   document.getElementById('st-proxima').textContent=proxFecha;
   document.getElementById('st-hoy').textContent=cargasHoy;
+  document.getElementById('st-pend-ent').textContent=pendientesTotal;
 }
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────────
@@ -444,7 +448,10 @@ function renderDash(){
       '<td><div style="font-weight:500">'+e.referencia+'</div><div class="dim">'+dimStr(e)+'</div></td>'+
       '<td class="r mono">'+fmtN(e.cantidad)+'</td>'+
       '<td class="c"><span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span></td>'+
-      '<td>'+(e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i> Confirmar</button>':'')+'</td>'+
+      '<td style="display:flex;gap:5px;align-items:center">'+
+        (e.estado==='pendiente'?'<input type="date" value="'+String(e.fecha_carga).substring(0,10)+'" title="Cambiar fecha" style="font-size:11px;padding:2px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)" onchange="cambiarFechaEntrega('+e.id+',this.value)">':'<span class="dim">'+fmtD(e.fecha_carga)+'</span>')+
+        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i> Confirmar</button>':'')+
+      '</td>'+
     '</tr>').join('')+'</tbody></table>';
   }
 
@@ -643,8 +650,11 @@ function renderCal(){
         '<div style="font-size:12px;font-weight:500;flex:1">'+e.referencia+' <span class="dim">'+dimStr(e)+'</span></div>'+
         '<div class="dim" style="flex:1">'+e.pedido_numero+' — '+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div>'+
         '<div class="entrega-qty">'+fmtN(e.cantidad)+' ud</div>'+
+        (e.estado==='pendiente'
+          ?'<input type="date" value="'+String(e.fecha_carga).substring(0,10)+'" title="Cambiar fecha" style="font-size:11px;padding:2px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)" onchange="cambiarFechaEntrega('+e.id+',this.value)">'
+          :'<span class="dim" style="font-size:11px">'+fmtD(e.fecha_carga)+'</span>')+
         '<span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span>'+
-        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i></button>':'<button class="btn-icon" title="Ya confirmada" disabled><i class="ti ti-check"></i></button>')+
+        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i> Confirmar</button>':'<button class="btn-icon" title="Ya confirmada" disabled style="opacity:.4"><i class="ti ti-check"></i></button>')+
         '<button class="btn-icon danger" onclick="deleteEntrega('+e.id+')" title="Eliminar"><i class="ti ti-trash"></i></button>'+
       '</div>').join('')+
     '</div>';
@@ -680,6 +690,16 @@ async function confirmarEntrega(id){
     await api('PATCH','/entregas/'+id+'/confirmar',{});
     await loadAll();
     log('Entrega confirmada — stock actualizado','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function cambiarFechaEntrega(id, nuevaFecha){
+  try{
+    await api('PATCH','/entregas/'+id+'/fecha',{fecha_carga:nuevaFecha});
+    const e=entregas.find(x=>x.id===id||String(x.id)===String(id));
+    if(e) e.fecha_carga=nuevaFecha;
+    renderCal();renderDash();
+    log('Fecha de carga actualizada','ok');
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
@@ -778,7 +798,12 @@ function renderPedidos(){
           '</tr>';
         }).join('')+
         '</tbody></table>'+
-        (entregasPend.length?'<div style="margin-top:8px;font-size:11px;color:var(--text2)">'+entregasPend.length+' cargas pendientes programadas</div>':'')+
+        (entregasPend.length||totalEntregado>0?
+          '<div style="margin-top:8px;display:flex;gap:12px;font-size:11px">'+
+            (entregasPend.length?'<span style="color:var(--amber)"><i class="ti ti-clock" style="font-size:11px"></i> '+entregasPend.length+' carga'+( entregasPend.length>1?'s':'')+' pendiente'+( entregasPend.length>1?'s':'')+' ('+fmtN(entregasPend.reduce((s,e)=>s+(+e.cantidad||0),0))+' ud)</span>':'')+
+            (totalEntregado>0?'<span style="color:var(--green)"><i class="ti ti-check" style="font-size:11px"></i> '+fmtN(totalEntregado)+' ud ya entregadas</span>':'')+
+          '</div>'
+        :'')+
       '</div>'+
     '</div>';
   }).join('');
