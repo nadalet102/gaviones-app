@@ -692,15 +692,20 @@ function renderCal(){
   const cl=document.getElementById('cal-list');
   if(!mesCargas.length){cl.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Sin cargas este mes</p></div>';return;}
 
-  // Group by fecha + pedido → one row per "carga" (pedido on a date)
+  // Group ONLY by carga_grupo_id. Lines without it get their own group (legacy data).
   const grupos={};
-  mesCargas.forEach(e=>{
-    const key=String(e.fecha_carga).substring(0,10)+'__'+e.pedido_numero;
+  mesCargas.forEach(function(e){
+    // Use carga_grupo_id if set; otherwise each line is its own isolated group
+    var key=e.carga_grupo_id ? e.carga_grupo_id : 'SOLO_'+e.id;
     if(!grupos[key]) grupos[key]={
+      grupo_id:key,
       fecha:String(e.fecha_carga).substring(0,10),
       pedido_numero:e.pedido_numero,
       cliente_nombre:e.cliente_nombre,
       obra:e.obra,
+      transportista:e.transportista,
+      mat_camion:e.mat_camion,
+      mat_remolque:e.mat_remolque,
       lineas:[],
     };
     grupos[key].lineas.push(e);
@@ -743,11 +748,11 @@ function renderCal(){
           ?'<button class="btn btn-green btn-sm" onclick="confirmarGrupo(['+idsPendientes.join(',')+'])"><i class="ti ti-check"></i> Confirmar</button>'
           :'')+
         (todasConfirmadas
-          ?'<button class="btn btn-outline btn-sm" style="color:var(--amber);border-color:var(--amber)" onclick="anularGrupo(['+g.lineas.map(e=>e.id).join(',')+'])"><i class="ti ti-arrow-back-up"></i> Anular</button>'
+          ?'<button class="btn btn-outline btn-sm" style="color:var(--amber);border-color:var(--amber)" onclick="anularGrupo(['+g.lineas.map(function(e){return e.id;}).join(',')+'])"><i class="ti ti-arrow-back-up"></i> Anular</button>'
           :'')+
-        '<button class="btn-icon" data-fecha="'+g.fecha+'" data-ped="'+g.pedido_numero+'" onclick="verDetalleGrupo(this.dataset.fecha,this.dataset.ped)" title="Ver detalle"><i class="ti ti-eye"></i></button>'+
-        '<button class="btn-icon" data-pf="'+g.fecha+'" data-pp="'+g.pedido_numero+'" onclick="imprimirCargaGrupo(this.dataset.pf,this.dataset.pp)" title="Imprimir esta carga"><i class="ti ti-printer"></i></button>'+
-        (algunaPendiente?'<button class="btn-icon" data-ef="'+g.fecha+'" data-ep="'+g.pedido_numero+'" onclick="editarGrupo(this.dataset.ef,this.dataset.ep)" title="Editar carga"><i class="ti ti-pencil"></i></button>':'')+ 
+        '<button class="btn-icon" data-gid="'+g.grupo_id+'" onclick="verDetalleGrupo(this.dataset.gid)" title="Ver detalle / Editar"><i class="ti ti-eye"></i></button>'+
+        '<button class="btn-icon" data-gid="'+g.grupo_id+'" onclick="imprimirCargaGrupoById(this.dataset.gid)" title="Imprimir esta carga"><i class="ti ti-printer"></i></button>'+
+        (algunaPendiente?'<button class="btn-icon" data-gid="'+g.grupo_id+'" onclick="editarGrupo(this.dataset.gid)" title="Editar carga"><i class="ti ti-pencil"></i></button>':'')+ 
         '<button class="btn-icon danger" data-ids="'+g.lineas.map(e=>e.id).join(',')+'" onclick="deleteGrupoById(this.dataset.ids)" title="Eliminar carga"><i class="ti ti-trash"></i></button>'+
       '</div>'+
     '</div>';
@@ -781,9 +786,14 @@ function showDayCargas(fecha){
   document.getElementById('overlay').classList.add('open');
 }
 
-function editarGrupo(fecha, pedidoNum){
+function editarGrupo(grupoId){
   // Show ALL lineas (pending + confirmed) so user can see full picture and edit pending ones
-  const todasLineas=entregas.filter(e=>String(e.fecha_carga).substring(0,10)===fecha&&e.pedido_numero===pedidoNum);
+  // Find by grupo_id, fallback to legacy fecha+pedido key
+  var todasLineas=entregas.filter(function(e){
+    if(e.carga_grupo_id) return e.carga_grupo_id===grupoId;
+    // Legacy: each line was its own group keyed as SOLO_{id}
+    return ('SOLO_'+e.id)===grupoId;
+  });
   const lineasPend=todasLineas.filter(e=>e.estado==='pendiente');
   const lineasConf=todasLineas.filter(e=>e.estado==='confirmada');
   if(!todasLineas.length){log('No hay líneas en esta carga','warn');return;}
@@ -800,6 +810,8 @@ function editarGrupo(fecha, pedidoNum){
   const matR=ref.mat_remolque||'';
   const hayPendientes=lineasPend.length>0;
 
+  var fecha=todasLineas.length?String(todasLineas[0].fecha_carga).substring(0,10):'';
+  var pedidoNum=todasLineas.length?todasLineas[0].pedido_numero:'';
   document.getElementById('modal-title').innerHTML=
     '<i class="ti ti-box"></i> '+pedidoNum+
     (ref.cliente_nombre?' — '+ref.cliente_nombre:'')+
@@ -864,7 +876,7 @@ function editarGrupo(fecha, pedidoNum){
   bodyHTML+='</tbody></table>';
   document.getElementById('modal-body').innerHTML=bodyHTML;
 
-  var footHTML='<button class="btn btn-outline btn-sm" data-pf="'+fecha+'" data-pp="'+pedidoNum+'" onclick="imprimirCargaGrupo(this.dataset.pf,this.dataset.pp)"><i class="ti ti-printer"></i> Imprimir todo</button>';
+  var footHTML='<button class="btn btn-outline btn-sm" data-gid="'+grupoId+'" onclick="imprimirCargaGrupoById(this.dataset.gid)"><i class="ti ti-printer"></i> Imprimir todo</button>';
   if(hayPendientes){
     footHTML+='<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
               '<button class="btn btn-primary" onclick="guardarEdicionGrupo()"><i class="ti ti-device-floppy"></i> Guardar cambios</button>';
@@ -890,7 +902,8 @@ async function guardarEdicionGrupo(){
       if(!e) continue;
       const updated=await api('PUT','/entregas/'+id,{
         fecha_carga:fecha, cantidad:cant, estado:e.estado,
-        transportista:trans, mat_camion:matC, mat_remolque:matR, notas
+        transportista:trans, mat_camion:matC, mat_remolque:matR, notas,
+        carga_grupo_id:e.carga_grupo_id
       });
       Object.assign(e,updated);
     }
@@ -977,8 +990,19 @@ function imprimirEntregaUnica(entregaId){
 }
 
 
-function imprimirCargaGrupo(fecha, pedidoNum){
-  var lineas=entregas.filter(function(e){return String(e.fecha_carga).substring(0,10)===fecha&&e.pedido_numero===pedidoNum;});
+function imprimirCargaGrupoById(grupoId){
+  var lineas=entregas.filter(function(e){
+    if(e.carga_grupo_id) return e.carga_grupo_id===grupoId;
+    return ('SOLO_'+e.id)===grupoId;
+  });
+  if(!lineas.length){log('No hay lineas en esta carga','warn');return;}
+  var fecha=String(lineas[0].fecha_carga).substring(0,10);
+  var pedidoNum=lineas[0].pedido_numero;
+  imprimirCargaGrupo(fecha, pedidoNum, lineas);
+}
+
+function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
+  var lineas=lineasParam||entregas.filter(function(e){return String(e.fecha_carga).substring(0,10)===fecha&&e.pedido_numero===pedidoNum;});
   if(!lineas.length){log('No hay lineas en esta carga','warn');return;}
   var ref=lineas[0];
   var totalUds=lineas.reduce(function(s,e){return s+(+e.cantidad||0);},0);
@@ -1163,9 +1187,8 @@ async function deleteGrupo(ids){
   await deleteGrupoById(ids.join(','));
 }
 
-function verDetalleGrupo(fecha, pedidoNum){
-  // Open full edit+view modal for this specific group
-  editarGrupo(fecha, pedidoNum);
+function verDetalleGrupo(grupoId){
+  editarGrupo(grupoId);
 }
 
 async function confirmarEntrega(id){
@@ -1665,28 +1688,39 @@ function actualizarTotalEntrega(){
 }
 
 async function saveEntrega(){
-  const fecha=document.getElementById('f-fecha-carga').value;
-  const notas=document.getElementById('f-enotas').value;
+  var fecha=document.getElementById('f-fecha-carga').value;
+  var notas=document.getElementById('f-enotas').value;
   if(!fecha){log('Selecciona la fecha de carga','warn');return;}
 
-  // Collect all lines with quantity > 0
-  const lineasACargar=[];
+  var lineasACargar=[];
   document.querySelectorAll('[data-linea]').forEach(function(inp){
-    const cant=parseInt(inp.value)||0;
+    var cant=parseInt(inp.value)||0;
     if(cant>0) lineasACargar.push({linea_pedido_id:+inp.dataset.linea, cantidad:cant});
   });
-
   if(!lineasACargar.length){log('Introduce al menos una cantidad para cargar','warn');return;}
+
+  var trans=document.getElementById('f-trans')?.value.trim()||null;
+  var matC=document.getElementById('f-matc')?.value.trim()||null;
+  var matR=document.getElementById('f-matr')?.value.trim()||null;
+  // Unique ID that groups all lines of this specific carga together
+  var grupoId='G'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,5).toUpperCase();
+
   try{
-    const trans=document.getElementById('f-trans')?.value.trim()||null;
-    const matC=document.getElementById('f-matc')?.value.trim()||null;
-    const matR=document.getElementById('f-matr')?.value.trim()||null;
-    for(const item of lineasACargar){
-      await api('POST','/entregas',{linea_pedido_id:item.linea_pedido_id,fecha_carga:fecha,cantidad:item.cantidad,notas:notas,transportista:trans,mat_camion:matC,mat_remolque:matR});
+    for(var i=0;i<lineasACargar.length;i++){
+      await api('POST','/entregas',{
+        linea_pedido_id:lineasACargar[i].linea_pedido_id,
+        fecha_carga:fecha,
+        cantidad:lineasACargar[i].cantidad,
+        notas:notas,
+        transportista:trans,
+        mat_camion:matC,
+        mat_remolque:matR,
+        carga_grupo_id:grupoId
+      });
     }
     await loadAll();
     closeModal();
-    log(lineasACargar.length+' línea'+(lineasACargar.length>1?'s':'')+' programada'+(lineasACargar.length>1?'s':'')+' para '+fmtD(fecha),'ok');
+    log(lineasACargar.length+' linea(s) programada(s) — ID: '+grupoId,'ok');
   }catch(e){log('Error: '+e.message,'warn');}
 }
 
@@ -1883,3 +1917,4 @@ loadAll();
 </script>
 </body>
 </html>
+
