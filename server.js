@@ -364,7 +364,7 @@ app.patch('/api/entregas/:id/confirmar', async (req, res) => {
       `SELECT e.*,l.producto_id,l.pedido_id,pe.numero as pedido_numero
        FROM entregas_parciales e
        JOIN lineas_pedido l ON l.id=e.linea_pedido_id
-       JOIN pedidos_gav pe ON pe.id=l.pedido_id
+       JOIN pedidos pe ON pe.id=l.pedido_id
        WHERE e.id=$1`,[req.params.id]
     )).rows[0];
     if(!e) throw new Error('Entrega no encontrada');
@@ -385,7 +385,7 @@ app.patch('/api/entregas/:id/confirmar', async (req, res) => {
     const {total_pedido, total_entregado} = check.rows[0];
     let pedidoAutoEntregado = false;
     if(+total_pedido > 0 && +total_entregado >= +total_pedido) {
-      await client.query(`UPDATE pedidos_gav SET estado='entregado' WHERE id=$1 AND estado NOT IN ('cancelado','entregado')`,[pedidoId]);
+      await client.query(`UPDATE pedidos SET estado='entregado' WHERE id=$1 AND estado NOT IN ('cancelado','entregado')`,[pedidoId]);
       pedidoAutoEntregado = true;
     }
 
@@ -834,6 +834,26 @@ app.post('/api/importar-productos', async (req, res) => {
   } catch(e) {
     res.status(500).json({error: e.message});
   }
+});
+
+// ── CATEGORÍAS CARGA ──────────────────────────────────────────────────────────
+app.get('/api/categorias', async (req, res) => {
+  try { res.json((await pool.query('SELECT * FROM categorias_carga ORDER BY nombre')).rows); }
+  catch(e) { res.status(500).json({error:e.message}); }
+});
+app.post('/api/categorias', async (req, res) => {
+  const {nombre, color} = req.body;
+  try { res.json((await pool.query('INSERT INTO categorias_carga (nombre,color) VALUES ($1,$2) RETURNING *',[nombre,color||'#334155'])).rows[0]); }
+  catch(e) { res.status(500).json({error:e.message}); }
+});
+app.put('/api/categorias/:id', async (req, res) => {
+  const {nombre, color} = req.body;
+  try { res.json((await pool.query('UPDATE categorias_carga SET nombre=$1,color=$2 WHERE id=$3 RETURNING *',[nombre,color,req.params.id])).rows[0]); }
+  catch(e) { res.status(500).json({error:e.message}); }
+});
+app.delete('/api/categorias/:id', async (req, res) => {
+  try { await pool.query('DELETE FROM categorias_carga WHERE id=$1',[req.params.id]); res.json({ok:true}); }
+  catch(e) { res.status(500).json({error:e.message}); }
 });
 
 app.get('*', (req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
