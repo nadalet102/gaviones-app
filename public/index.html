@@ -1332,10 +1332,7 @@ async function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
   var lineas=lineasParam||entregas.filter(function(e){return String(e.fecha_carga).substring(0,10)===fecha&&e.pedido_numero===pedidoNum;});
   if(!lineas.length){log('No hay lineas en esta carga','warn');return;}
   // Load QR lib for maps links
-  var hasQR=lineas.some(function(e){
-    var ped=pedidos.find(function(p){return p.numero===e.pedido_numero;});
-    return ped&&ped.maps_url;
-  });
+  var hasQR=lineas.some(function(e){ return e.maps_url; });
   if(hasQR) await ensureQR();
   var ref=lineas[0];
   var totalUds=lineas.reduce(function(s,e){return s+(+e.cantidad||0);},0);
@@ -1385,11 +1382,17 @@ async function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
 
   lineas.forEach(function(e,i){
     var isConf=e.estado==='confirmada';
+    var qrHtml='<td class="chk-cell" style="color:#d1d5db;font-size:10px">—</td>';
+    if(window.QRCode&&e.maps_url){
+      var qrUri=makeQRDataUri(e.maps_url,90);
+      if(qrUri) qrHtml='<td class="chk-cell"><img src="'+qrUri+'" width="80" height="80" style="display:block;margin:0 auto"></td>';
+    }
     inner+='<tr>'+
       '<td style="padding:10px 14px;text-align:center;font-size:12px;color:#6b7280;font-weight:600">'+(i+1)+'</td>'+
       '<td class="ref-cell"><div class="ref-big">'+e.referencia+'</div></td>'+
       '<td class="ref-cell"><div class="ref-dim" style="font-size:12px">'+(dimStr(e)||'—')+'</div></td>'+
       '<td class="qty-cell" style="font-size:26px">'+fmtN(e.cantidad)+'</td>'+
+      qrHtml+
       '<td class="chk-cell"><div class="chk-box'+(isConf?' done':'')+'"></div></td>'+
     '</tr>';
   });
@@ -1979,7 +1982,7 @@ function toggleDims(){
 }
 
 function lineaHTML(i,l){
-  return '<div id="linea-'+i+'" style="display:grid;grid-template-columns:1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
+  return '<div id="linea-'+i+'" data-lid="'+(l&&l.id?l.id:'')+'" style="display:grid;grid-template-columns:1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
     '<select class="linea-prod" data-i="'+i+'" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)">'+
       '<option value="">Seleccionar producto...</option>'+
       productos.map(p=>'<option value="'+p.id+'" '+(l&&String(l.producto_id)===String(p.id)?'selected':'')+'>'+prodLabel(p)+'</option>').join('')+
@@ -2000,7 +2003,8 @@ function getLineas(){
   document.querySelectorAll('#lineas-container > div').forEach(row=>{
     const prod=row.querySelector('.linea-prod')?.value;
     const cant=parseFloat(row.querySelector('.linea-cant')?.value)||0;
-    if(prod&&cant>0) lineas.push({producto_id:+prod,cantidad:cant});
+    const lid=row.dataset.lid;
+    if(prod&&cant>0) lineas.push({id:lid?+lid:undefined,producto_id:+prod,cantidad:cant});
   });
   return lineas;
 }
