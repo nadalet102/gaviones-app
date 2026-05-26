@@ -306,9 +306,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <!-- CATÁLOGO -->
 <div class="view" id="view-productos">
 <div class="container">
-  <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center">
     <div style="font-size:13px;color:var(--text2)">Catálogo de productos y dimensiones</div>
-    <button class="btn btn-primary" onclick="openModal('producto',null)"><i class="ti ti-plus"></i> Nuevo producto</button>
+    <div style="display:flex;gap:8px">
+      <input type="file" id="excel-import-input" accept=".xlsx,.xls" style="display:none" onchange="procesarExcelProductos(this)">
+      <button class="btn btn-outline" onclick="triggerExcelImport()" style="border-color:var(--green);color:var(--green)"><i class="ti ti-file-spreadsheet"></i> Importar Excel BC</button>
+      <button class="btn btn-primary" onclick="openModal('producto',null)"><i class="ti ti-plus"></i> Nuevo producto</button>
+    </div>
   </div>
   <div class="card"><div id="productos-list"></div></div>
 </div>
