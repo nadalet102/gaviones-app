@@ -272,7 +272,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <div class="container">
   <div class="grid2">
     <div class="card">
-      <div class="card-hdr"><div class="card-title"><i class="ti ti-package"></i> Stock actual</div></div>
+      <div class="card-hdr">
+        <div class="card-title"><i class="ti ti-package"></i> Stock actual</div>
+      </div>
       <div id="stock-list"></div>
     </div>
     <div>
@@ -1560,17 +1562,23 @@ function verPedido(id){
 function renderStock(){
   populateMovProducto();
   const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
-  const tiposPresentes=[...new Set(stock.map(s=>s.tipo))].sort();
+  var stockQ=(document.getElementById('stock-search')?.value||'').toLowerCase().trim();
+  var stockFiltrado=stockQ?stock.filter(function(s){
+    return (s.referencia||'').toLowerCase().includes(stockQ)||(s.descripcion||'').toLowerCase().includes(stockQ);
+  }):stock;
+  const tiposPresentes=[...new Set(stockFiltrado.map(s=>s.tipo))].sort();
   var sortArrow=sortDir==='desc'?' ↓':' ↑';
-  let html='<div class="sort-btns" style="padding:8px 16px">'+
-    '<span style="font-size:11px;color:var(--text2)">Ordenar por:</span>'+
+  var stockQVal=document.getElementById('stock-search')?.value||'';
+  let html='<div class="sort-btns" style="padding:8px 16px;display:flex;align-items:center;flex-wrap:wrap;gap:6px">'+
+    '<span style="font-size:11px;color:var(--text2)">Ordenar:</span>'+
     '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
+    '<input type="text" id="stock-search" value="'+stockQVal+'" placeholder="Buscar..." oninput="renderStock()" style="margin-left:auto;font-size:12px;padding:3px 9px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:150px">'+
   '</div>';
   tiposPresentes.forEach(tipo=>{
-    const prods=sortedProductos(stock.filter(s=>s.tipo===tipo));
+    const prods=sortedProductos(stockFiltrado.filter(s=>s.tipo===tipo));
     html+='<div style="padding:8px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-bottom:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
     html+='<table class="tbl"><tbody>';
     prods.forEach(s=>{
@@ -1599,6 +1607,53 @@ function populateMovProducto(){
   if(!sel) return;
   const cur=sel.value;
   sel.innerHTML='<option value="">Seleccionar...</option>'+productos.map(p=>'<option value="'+p.id+'" '+(String(p.id)===cur?'selected':'')+'>'+prodLabel(p)+'</option>').join('');
+}
+
+function filtrarMovProducto(){
+  var q=(document.getElementById('mov-prod-search')?.value||'').toLowerCase().trim();
+  var lista=document.getElementById('mov-prod-lista');
+  if(!lista) return;
+  if(!q){lista.style.display='none';return;}
+  var filtered=productos.filter(function(p){
+    return (p.referencia||'').toLowerCase().includes(q)||(p.descripcion||'').toLowerCase().includes(q);
+  });
+  if(!filtered.length){lista.style.display='none';return;}
+  lista.innerHTML=filtered.map(function(p){
+    var ref=p.referencia||'';
+    var desc=p.descripcion||'';
+    var dim=dimStr(p)||'';
+    return '<div data-pid="'+p.id+'" onclick="seleccionarMovProd(this)" '+
+      'style="padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'+
+      '<div>'+
+        '<span style="font-weight:600;font-family:monospace;color:var(--blue-d)">'+ref+'</span>'+
+        (desc?'<span style="color:var(--text2);margin-left:8px;font-size:11px">'+desc+'</span>':'')+
+      '</div>'+
+      (dim?'<span style="font-family:monospace;font-size:11px;color:var(--text2);flex-shrink:0;margin-left:8px">'+dim+'</span>':'')+
+    '</div>';
+  }).join('');
+  lista.style.display='block';
+}
+
+function seleccionarMovProd(el){
+  var id=el.dataset.pid;
+  var ref=el.querySelector('span[style*="font-weight"]')?.textContent||'';
+  var dim=el.querySelector('span[style*="flex-shrink"]')?.textContent||'';
+  document.getElementById('mov-producto').value=id;
+  document.getElementById('mov-prod-search').value='';
+  document.getElementById('mov-prod-lista').style.display='none';
+  var sel=document.getElementById('mov-prod-sel');
+  var label=document.getElementById('mov-prod-sel-label');
+  if(sel&&label){
+    label.innerHTML='<strong>'+ref+'</strong>'+(dim?' <span style="color:var(--text2);margin-left:6px">'+dim+'</span>':'');
+    sel.style.display='flex';
+  }
+}
+
+function limpiarMovProd(){
+  document.getElementById('mov-producto').value='';
+  document.getElementById('mov-prod-search').value='';
+  var sel=document.getElementById('mov-prod-sel');
+  if(sel) sel.style.display='none';
 }
 
 async function registrarMovimiento(){
