@@ -555,47 +555,91 @@ async function loadParteHoy(){
 function renderParte(parte){
   const el=document.getElementById('parte-container');
   const cerrado=parte.estado==='cerrado';
-  const total=(parte.lineas||[]).reduce((s,l)=>s+(+l.cantidad||0),0);
+  const total=(parte.lineas||[]).reduce(function(s,l){return s+(+l.cantidad||0);},0);
   const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
-  const tiposPresentes=[...new Set((parte.lineas||[]).map(l=>l.tipo))];
+  const tiposPresentes=[...new Set((parte.lineas||[]).map(function(l){return l.tipo;}))];
 
-  let html='<div class="card">'+
+  // Recomendaciones: productos con pedidos pendientes y sin stock suficiente
+  const recomendados=necesidades.filter(function(n){
+    return +n.necesidad_neta>0 && !parte.lineas.find(function(l){return String(l.producto_id)===String(n.producto_id);});
+  });
+
+  let html='<div>';
+
+  // Main parte card
+  html+='<div class="card">'+
     '<div class="card-hdr">'+
-      '<div class="card-title"><i class="ti ti-clipboard-list"></i> Parte de producción — '+fmtD(parte.fecha)+'</div>'+
+      '<div class="card-title"><i class="ti ti-clipboard-list"></i> Parte — '+fmtD(parte.fecha)+'</div>'+
       '<div style="display:flex;align-items:center;gap:8px">'+
         '<span class="badge '+(cerrado?'b-green':'b-amber')+'">'+(cerrado?'Cerrado':'Abierto')+'</span>'+
-        (cerrado?'':'<button class="btn btn-green" onclick="cerrarParte('+parte.id+')"><i class="ti ti-lock"></i> Cerrar parte y actualizar stock</button>')+
+        (cerrado?'':'<button class="btn btn-green" onclick="cerrarParte('+parte.id+')"><i class="ti ti-lock"></i> Cerrar y actualizar stock</button>')+
       '</div>'+
     '</div>';
 
   if(cerrado){
-    html+='<div class="info-box" style="margin:12px 16px"><i class="ti ti-check-circle" style="color:var(--green)"></i><div>Parte cerrado — el stock fue actualizado con esta producción.</div></div>';
-  }else{
-    html+='<div style="padding:10px 16px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> Introduce las unidades fabricadas hoy por tipo. Al cerrar, se suman al stock automáticamente.</div>';
+    html+='<div style="background:var(--green-l);border-radius:var(--radius-sm);padding:10px 14px;margin:12px 16px;font-size:12px;color:var(--green);display:flex;align-items:center;gap:8px"><i class="ti ti-check-circle" style="font-size:16px"></i>Parte cerrado — stock actualizado.</div>';
+  } else {
+    // Add product selector
+    const prododsEnParte=new Set((parte.lineas||[]).map(function(l){return String(l.producto_id);}));
+    const prodsDisponibles=productos.filter(function(p){return p.tipo!=='accesorio'&&!prododsEnParte.has(String(p.id));});
+    html+='<div style="padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)">'+
+      '<select id="sel-add-prod" style="flex:1;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text)">'+
+        '<option value="">+ Añadir producto al parte...</option>'+
+        prodsDisponibles.map(function(p){return'<option value="'+p.id+'">'+p.referencia+(dimStr(p)?' — '+dimStr(p):'')+'</option>';}).join('')+
+      '</select>'+
+      '<button class="btn btn-primary btn-sm" onclick="addProductoAParte('+parte.id+')"><i class="ti ti-plus"></i> Añadir</button>'+
+    '</div>';
   }
 
   var sortArrow=sortDir==='desc'?' ↓':' ↑';
-  html+='<div class="sort-btns" style="padding:8px 16px;border-top:1px solid var(--border)">'+
-    '<span style="font-size:11px;color:var(--text2)">Ordenar por:</span>'+
+  html+='<div class="sort-btns">'+
+    '<span style="font-size:11px;color:var(--text2)">Ordenar:</span>'+
     '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
   '</div>';
-  tiposPresentes.forEach(tipo=>{
+
+  if(!(parte.lineas||[]).length){
+    html+='<div style="padding:30px;text-align:center;color:var(--text2)"><i class="ti ti-playlist-add" style="font-size:28px;opacity:.3;display:block;margin-bottom:8px"></i>Añade productos con el selector de arriba</div>';
+  }
+
+  tiposPresentes.forEach(function(tipo){
     if(tipo==='accesorio') return;
-    const lineasTipo=sortedProductos((parte.lineas||[]).filter(l=>l.tipo===tipo));
-    html+='<div style="padding:8px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-top:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
+    const lineasTipo=sortedProductos((parte.lineas||[]).filter(function(l){return l.tipo===tipo;}));
+    if(!lineasTipo.length) return;
+    html+='<div style="padding:7px 16px 3px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-top:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
     html+='<div class="parte-grid">';
-    lineasTipo.forEach(l=>{
+    lineasTipo.forEach(function(l){
       const val=+l.cantidad||0;
-      html+='<div class="parte-item">'+
+      const nec=necesidades.find(function(n){return String(n.producto_id)===String(l.producto_id);});
+      const necNeta=nec?+nec.necesidad_neta:0;
+      // Card border/background based on urgency
+      var cardBorder='var(--border)';
+      var cardBg='var(--surface2)';
+      var urgLabel='';
+      if(!cerrado && nec){
+        if(necNeta>0){
+          cardBorder='var(--red)';
+          cardBg='var(--red-l)';
+          urgLabel='<div style="font-size:9px;font-weight:700;color:var(--red);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em"><i class="ti ti-alert-triangle" style="font-size:9px"></i> Fabricar '+fmtN(necNeta)+' ud</div>';
+        } else if(+nec.programado_pendiente>0){
+          cardBorder='var(--amber)';
+          cardBg='var(--amber-l)';
+          urgLabel='<div style="font-size:9px;font-weight:600;color:var(--amber);margin-bottom:3px"><i class="ti ti-clock" style="font-size:9px"></i> Carga programada</div>';
+        }
+      }
+      html+='<div class="parte-item" style="position:relative;border-color:'+cardBorder+';background:'+cardBg+'">'+
+        (val>0&&!cerrado?'<div style="position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--green)"></div>':'')+
+        urgLabel+
         '<div class="parte-ref">'+l.referencia+'</div>'+
         '<div class="parte-dim">'+dimStr(l)+'</div>'+
+        (nec&&+nec.stock_actual>0?'<div style="font-size:9px;color:var(--green);margin-bottom:3px">Stock actual: '+fmtN(nec.stock_actual)+'</div>':'')+
         '<input type="number" class="parte-input'+(val>0?' has-value':'')+'" '+
           'value="'+(val||'')+'" placeholder="0" min="0" '+
           (cerrado?'disabled':'')+
           ' onchange="updateParteLinea('+parte.id+','+l.producto_id+',this.value,this)">'+
+        (!cerrado?'<button onclick="quitarDeParteLinea('+parte.id+','+l.producto_id+')" style="position:absolute;bottom:4px;right:4px;background:none;border:none;cursor:pointer;font-size:10px;color:var(--text3);padding:2px" title="Quitar"><i class="ti ti-x"></i></button>':'')+
       '</div>';
     });
     html+='</div>';
@@ -605,10 +649,10 @@ function renderParte(parte){
     '<div style="font-size:13px;color:var(--text2)">Total fabricado hoy: <strong class="mono">'+fmtN(total)+' uds</strong></div>'+
   '</div></div>';
 
-  // Historial partes anteriores
-  html+='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de producción</div></div>';
-  html+='<div style="padding:8px 16px;color:var(--text2);font-size:12px">Haz clic en un día para ver el detalle</div>';
-  html+='<table class="tbl"><thead><tr><th>Fecha</th><th class="r">Total fabricado</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody id="historial-partes"></tbody></table></div>';
+
+  // Historial
+  html+='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de producción</div></div>'+
+    '<table class="tbl"><thead><tr><th>Fecha</th><th class="r">Total fabricado</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody id="historial-partes"></tbody></table></div>';
 
   el.innerHTML=html;
   loadHistorialPartes();
@@ -632,6 +676,28 @@ async function loadHistorialPartes(){
       '</tr>';
     }).join('');
   }catch(e){}
+}
+
+async function addProductoAParte(parteId){
+  var sel=document.getElementById('sel-add-prod');
+  if(!sel||!sel.value){log('Selecciona un producto','warn');return;}
+  await addProductoAParteById(parteId,+sel.value);
+}
+
+async function addProductoAParteById(parteId, productoId){
+  try{
+    await api('POST','/partes/'+parteId+'/add-producto',{producto_id:productoId});
+    parteHoy=await api('GET','/partes/hoy');
+    renderParte(parteHoy);
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function quitarDeParteLinea(parteId, productoId){
+  try{
+    await api('DELETE','/partes/'+parteId+'/linea/'+productoId);
+    parteHoy=await api('GET','/partes/hoy');
+    renderParte(parteHoy);
+  }catch(e){log('Error: '+e.message,'warn');}
 }
 
 async function updateParteLinea(parteId, productoId, valor, inputEl){
