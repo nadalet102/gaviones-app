@@ -1369,6 +1369,31 @@ async function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
     '<div style="background:#f8fafc;padding:12px 14px;text-align:center"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:4px">Fecha</div><div style="font-size:20px;font-weight:700;font-family:monospace;color:#0d4f7a">'+fmtD(fecha)+'</div></div>'+
   '</div>';
 
+  // QR block above table — centered, one per unique pedido with maps_url
+  var qrBlock='';
+  var pedidosConQR=[];
+  lineas.forEach(function(e){
+    if(e.maps_url&&!pedidosConQR.find(function(x){return x.url===e.maps_url;})){
+      pedidosConQR.push({url:e.maps_url,pedido:e.pedido_numero});
+    }
+  });
+  if(window.QRCode&&pedidosConQR.length){
+    qrBlock='<div style="text-align:center;margin-bottom:20px;padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc">';
+    qrBlock+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#6b7280;margin-bottom:12px">Dirección de descarga</div>';
+    qrBlock+='<div style="display:flex;justify-content:center;gap:24px">';
+    pedidosConQR.forEach(function(x){
+      var qrUri=makeQRDataUri(x.url,110);
+      if(qrUri){
+        qrBlock+='<div style="text-align:center">';
+        qrBlock+='<img src="'+qrUri+'" width="100" height="100" style="display:block;margin:0 auto">';
+        if(pedidosConQR.length>1) qrBlock+='<div style="font-size:10px;color:#6b7280;margin-top:4px;font-family:monospace">'+x.pedido+'</div>';
+        qrBlock+='</div>';
+      }
+    });
+    qrBlock+='</div></div>';
+    inner+=qrBlock;
+  }
+
   // Checklist table
   inner+='<table class="chk-table">'+
     '<thead><tr>'+
@@ -1376,23 +1401,16 @@ async function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
       '<th>Referencia</th>'+
       '<th>Dimensiones</th>'+
       '<th class="r">Uds.</th>'+
-      '<th class="c">Maps</th>'+
       '<th class="c">Cargado ✓</th>'+
     '</tr></thead><tbody>';
 
   lineas.forEach(function(e,i){
     var isConf=e.estado==='confirmada';
-    var qrHtml='<td class="chk-cell" style="color:#d1d5db;font-size:10px">—</td>';
-    if(window.QRCode&&e.maps_url){
-      var qrUri=makeQRDataUri(e.maps_url,90);
-      if(qrUri) qrHtml='<td class="chk-cell"><img src="'+qrUri+'" width="80" height="80" style="display:block;margin:0 auto"></td>';
-    }
     inner+='<tr>'+
       '<td style="padding:10px 14px;text-align:center;font-size:12px;color:#6b7280;font-weight:600">'+(i+1)+'</td>'+
       '<td class="ref-cell"><div class="ref-big">'+e.referencia+'</div></td>'+
       '<td class="ref-cell"><div class="ref-dim" style="font-size:12px">'+(dimStr(e)||'—')+'</div></td>'+
       '<td class="qty-cell" style="font-size:26px">'+fmtN(e.cantidad)+'</td>'+
-      qrHtml+
       '<td class="chk-cell"><div class="chk-box'+(isConf?' done':'')+'"></div></td>'+
     '</tr>';
   });
