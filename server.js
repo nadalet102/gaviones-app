@@ -252,7 +252,7 @@ app.get('/api/pedidos-gav', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 app.post('/api/pedidos-gav', async (req, res) => {
-  const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas} = req.body;
+  const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas,maps_url} = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -275,13 +275,13 @@ app.post('/api/pedidos-gav', async (req, res) => {
   finally { client.release(); }
 });
 app.put('/api/pedidos-gav/:id', async (req, res) => {
-  const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas} = req.body;
+  const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas,maps_url} = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const r = await client.query(
-      `UPDATE pedidos SET numero=$1,cliente_id=$2,cliente_nombre=$3,fecha_pedido=$4,fecha_entrega=$5,estado=$6,tipo_fabricacion=$7,obra=$8,notas=$9 WHERE id=$10 RETURNING *`,
-      [numero,cliente_id||null,cliente_nombre,fecha_pedido||null,fecha_entrega||null,estado,tipo_fabricacion,obra,notas,req.params.id]
+      `UPDATE pedidos SET numero=$1,cliente_id=$2,cliente_nombre=$3,fecha_pedido=$4,fecha_entrega=$5,estado=$6,tipo_fabricacion=$7,obra=$8,notas=$9,maps_url=$10 WHERE id=$11 RETURNING *`,
+      [numero,cliente_id||null,cliente_nombre,fecha_pedido||null,fecha_entrega||null,estado,tipo_fabricacion,obra,notas||null,maps_url||null,req.params.id]
     );
     if(lineas) {
       // Keep existing entregas — only delete lineas without entregas
@@ -327,7 +327,7 @@ app.get('/api/entregas', async (req, res) => {
       SELECT e.*,
         l.cantidad as linea_cantidad, l.pedido_id,
         pr.referencia, pr.descripcion, pr.largo, pr.ancho, pr.alto, pr.unidad,
-        pe.numero as pedido_numero, pe.cliente_nombre, pe.obra
+        pe.numero as pedido_numero, pe.cliente_nombre, pe.obra, pe.maps_url
       FROM entregas_parciales e
       JOIN lineas_pedido l ON l.id=e.linea_pedido_id
       JOIN productos pr ON pr.id=l.producto_id
