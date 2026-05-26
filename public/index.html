@@ -279,7 +279,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       <div class="card">
         <div class="card-hdr"><div class="card-title"><i class="ti ti-transfer"></i> Movimiento manual</div></div>
         <div class="card-body">
-          <div class="field"><label>Producto</label><select id="mov-producto"><option value="">Seleccionar...</option></select></div>
+          <div class="field"><label>Producto</label>
+            <input type="text" id="mov-prod-search" placeholder="Buscar referencia o descripción..." oninput="filtrarMovProducto()" autocomplete="off"
+              style="font-size:13px;width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text)">
+            <div id="mov-prod-lista" style="display:none;max-height:160px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);margin-top:3px"></div>
+            <input type="hidden" id="mov-producto" value="">
+            <div id="mov-prod-sel" style="display:none;margin-top:4px;background:var(--blue-l);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;display:flex;align-items:center;justify-content:space-between">
+              <span id="mov-prod-sel-label"></span>
+              <button onclick="limpiarMovProd()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text2)"><i class="ti ti-x"></i></button>
+            </div>
+          </div>
           <div class="frow">
             <div class="field"><label>Tipo</label>
               <select id="mov-tipo">
@@ -624,6 +633,11 @@ function renderParte(parte){
 
   if(!(parte.lineas||[]).length){
     html+='<div style="padding:30px;text-align:center;color:var(--text2)"><i class="ti ti-playlist-add" style="font-size:28px;opacity:.3;display:block;margin-bottom:8px"></i>Añade productos con el selector de arriba</div>';
+  } else if(!cerrado) {
+    html+='<div style="padding:8px 16px;border-bottom:1px solid var(--border)">'+
+      '<input type="text" id="parte-filter-search" placeholder="Filtrar por referencia..." oninput="filtrarParteTarjetas()" '+
+        'style="font-size:12px;padding:5px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:240px">'+
+    '</div>';
   }
 
   tiposPresentes.forEach(function(tipo){
@@ -651,17 +665,19 @@ function renderParte(parte){
           urgLabel='<div style="font-size:9px;font-weight:600;color:var(--amber);margin-bottom:3px"><i class="ti ti-clock" style="font-size:9px"></i> Carga programada</div>';
         }
       }
-      html+='<div class="parte-item" style="position:relative;border-color:'+cardBorder+';background:'+cardBg+'">'+
-        (val>0&&!cerrado?'<div style="position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--green)"></div>':'')+
+      html+='<div class="parte-item parte-card-'+l.producto_id+'" style="position:relative;border-color:'+cardBorder+';background:'+cardBg+'">'+
         urgLabel+
-        '<div class="parte-ref">'+l.referencia+'</div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1px">'+
+          '<div class="parte-ref">'+l.referencia+'</div>'+
+          (!cerrado?'<button onclick="quitarDeParteLinea('+parte.id+','+l.producto_id+')" style="background:rgba(0,0,0,.06);border:none;cursor:pointer;font-size:10px;color:var(--text2);padding:1px 4px;border-radius:3px;line-height:1.4;flex-shrink:0;margin-left:4px" title="Quitar del parte"><i class="ti ti-x"></i></button>':'')+
+        '</div>'+
         '<div class="parte-dim">'+dimStr(l)+'</div>'+
-        (nec&&+nec.stock_actual>0?'<div style="font-size:9px;color:var(--green);margin-bottom:3px">Stock actual: '+fmtN(nec.stock_actual)+'</div>':'')+
+        (nec&&+nec.stock_actual>0?'<div style="font-size:9px;color:var(--green);margin-bottom:3px">Stock: '+fmtN(nec.stock_actual)+'</div>':'')+
         '<input type="number" class="parte-input'+(val>0?' has-value':'')+'" '+
           'value="'+(val||'')+'" placeholder="0" min="0" '+
           (cerrado?'disabled':'')+
           ' onchange="updateParteLinea('+parte.id+','+l.producto_id+',this.value,this)">'+
-        (!cerrado?'<button onclick="quitarDeParteLinea('+parte.id+','+l.producto_id+')" style="position:absolute;bottom:4px;right:4px;background:none;border:none;cursor:pointer;font-size:10px;color:var(--text3);padding:2px" title="Quitar"><i class="ti ti-x"></i></button>':'')+
+        (val>0&&!cerrado?'<div style="position:absolute;bottom:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--green)"></div>':'')+
       '</div>';
     });
     html+='</div>';
@@ -737,6 +753,22 @@ function limpiarSelProdParte(){
   document.getElementById('parte-prod-search').value='';
   var selEl=document.getElementById('parte-prod-seleccionado');
   if(selEl) selEl.style.display='none';
+}
+
+function filtrarParteTarjetas(){
+  var q=(document.getElementById('parte-filter-search')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('[class^="parte-card-"]').forEach(function(card){
+    if(!q){card.style.display='';return;}
+    var ref=card.querySelector('.parte-ref')?.textContent||'';
+    var dim=card.querySelector('.parte-dim')?.textContent||'';
+    card.style.display=(ref.toLowerCase().includes(q)||dim.toLowerCase().includes(q))?'':'none';
+  });
+  // Hide/show section headers if all cards hidden
+  document.querySelectorAll('.parte-grid').forEach(function(grid){
+    var visible=[...grid.children].some(function(c){return c.style.display!=='none';});
+    var prev=grid.previousElementSibling;
+    if(prev&&prev.style.textTransform==='uppercase') prev.style.display=visible?'':'none';
+  });
 }
 
 async function addProductoAParte(parteId){
