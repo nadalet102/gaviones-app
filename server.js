@@ -86,6 +86,7 @@ async function initDB() {
     );
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS transportista TEXT;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS carga_grupo_id TEXT;
+    ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS maps_url TEXT;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_camion TEXT;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_remolque TEXT;
     CREATE TABLE IF NOT EXISTS partes_produccion (
