@@ -403,8 +403,12 @@ const DOWS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const fmtN = n => Math.round(n||0).toLocaleString('es-ES');
 
 function sortedProductos(list){
-  return [...list].sort((a,b)=>{
-    const av=parseFloat(a[sortField])||0, bv=parseFloat(b[sortField])||0;
+  return [...list].sort(function(a,b){
+    if(sortField==='referencia'||sortField==='descripcion'){
+      var av=String(a[sortField]||''), bv=String(b[sortField]||'');
+      return sortDir==='asc'?av.localeCompare(bv):bv.localeCompare(av);
+    }
+    var av=parseFloat(a[sortField])||0, bv=parseFloat(b[sortField])||0;
     return sortDir==='asc'?av-bv:bv-av;
   });
 }
@@ -674,6 +678,7 @@ function renderParte(parte){
           (!cerrado?'<button onclick="quitarDeParteLinea('+parte.id+','+l.producto_id+')" style="background:rgba(0,0,0,.06);border:none;cursor:pointer;font-size:10px;color:var(--text2);padding:1px 4px;border-radius:3px;line-height:1.4;flex-shrink:0;margin-left:4px" title="Quitar del parte"><i class="ti ti-x"></i></button>':'')+
         '</div>'+
         '<div class="parte-dim">'+dimStr(l)+'</div>'+
+        (l.descripcion?'<div style="font-size:9px;color:var(--text2);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.descripcion+'</div>':'')+
         (nec&&+nec.stock_actual>0?'<div style="font-size:9px;color:var(--green);margin-bottom:3px">Stock: '+fmtN(nec.stock_actual)+'</div>':'')+
         '<input type="number" class="parte-input'+(val>0?' has-value':'')+'" '+
           'value="'+(val||'')+'" placeholder="0" min="0" '+
@@ -1457,6 +1462,8 @@ function renderNecesidades(){
     '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
     '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='stock_actual'?' active':'')+'" data-f="stock_actual" onclick="setSortField(this.dataset.f)">Stock'+(sortField==='stock_actual'?sortArrow:'')+'</button>'+
+    '<button class="sort-btn'+(sortField==='necesidad_neta'?' active':'')+'" data-f="necesidad_neta" onclick="setSortField(this.dataset.f)">Necesidad'+(sortField==='necesidad_neta'?sortArrow:'')+'</button>'+
   '</div>';
   const sorted=sortedProductos(necesidades);
   el.innerHTML=sortBar+'<table class="tbl"><thead><tr>'+
