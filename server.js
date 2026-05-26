@@ -2,6 +2,7 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
+const XLSX = require('xlsx');
 let PDFParser = null;
 try { PDFParser = require('pdf2json'); } catch(e) { console.warn('pdf2json not available:', e.message); }
 
@@ -731,6 +732,79 @@ app.post('/api/importar-pdf-DISABLED', async (req, res) => {
     const data = JSON.parse(result.body);
     const txt = data.content.map(c => c.text||'').join('').replace(/```json|```/g,'').trim();
     res.json(JSON.parse(txt));
+  } catch(e) {
+    res.status(500).json({error: e.message});
+  }
+});
+
+// ── IMPORTAR PRODUCTOS DESDE EXCEL BC ─────────────────────────────────────────
+app.post('/api/importar-productos', async (req, res) => {
+  const { base64 } = req.body;
+  if(!base64) return res.status(400).json({error:'No se recibio el archivo'});
+  try {
+    const buf = Buffer.from(base64, 'base64');
+    const wb = XLSX.read(buf, {type:'buffer'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+
+    // Skip header row
+    const productos = [];
+    for(let i=1; i<rows.length; i++){
+      const row = rows[i];
+      if(!row||!row[0]) continue;
+      const referencia = String(row[0]).trim();
+      const descripcion = String(row[1]||'').trim();
+      const unidad = String(row[9]||'ud').trim().toLowerCase()||'ud';
+
+      // Extract dimensions from description e.g. "100x30x50cm" or "200x100x100"
+      const dimMatch = descripcion.match(/(\d+(?:[.,]\d+)?)[xX×](\d+(?:[.,]\d+)?)[xX×](\d+(?:[.,]\d+)?)\s*cm/i)
+                    || descripcion.match(/(\d+(?:[.,]\d+)?)[xX×](\d+(?:[.,]\d+)?)[xX×](\d+(?:[.,]\d+)?)/);
+      let largo=null, ancho=null, alto=null;
+      if(dimMatch){
+        largo = parseFloat(dimMatch[1].replace(',','.'))/100;
+        ancho = parseFloat(dimMatch[2].replace(',','.'))/100;
+        alto  = parseFloat(dimMatch[3].replace(',','.'))/100;
+      }
+
+      // Determine tipo from referencia or grupo
+      const grupo = String(row[2]||'').toUpperCase();
+      let tipo = 'gavion';
+      if(referencia.startsWith('COL')||referencia.startsWith('REN')) tipo='colchoneta';
+      else if(referencia.startsWith('PROT')||referencia.startsWith('MAL')) tipo='malla';
+      else if(referencia.startsWith('PORT')||referencia.startsWith('ACCE')) tipo='accesorio';
+      else if(grupo.includes('COLCHON')||grupo.includes('RENO')) tipo='colchoneta';
+      else if(grupo.includes('ACCESO')) tipo='accesorio';
+
+      // Normalize unit
+      let unidadNorm = 'ud';
+      if(unidad==='uds'||unidad==='ud'||unidad==='unidades') unidadNorm='ud';
+      else if(unidad==='kg') unidadNorm='kg';
+      else if(unidad==='m2'||unidad==='m²') unidadNorm='m2';
+      else if(unidad==='m') unidadNorm='m';
+
+      productos.push({referencia, descripcion, tipo, largo, ancho, alto, unidad:unidadNorm});
+    }
+
+    // Check existing products to avoid duplicates
+    const existing = (await pool.query('SELECT referencia FROM productos')).rows.map(r=>r.referencia);
+    const nuevos = productos.filter(p=>!existing.includes(p.referencia));
+    const duplicados = productos.filter(p=>existing.includes(p.referencia));
+
+    // Insert new ones
+    for(const p of nuevos){
+      const r = await pool.query(
+        `INSERT INTO productos (tipo,referencia,largo,ancho,alto,descripcion,unidad) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [p.tipo,p.referencia,p.largo,p.ancho,p.alto,p.descripcion,p.unidad]
+      );
+      await pool.query('INSERT INTO stock (producto_id,cantidad) VALUES ($1,0)',[r.rows[0].id]);
+    }
+
+    res.json({
+      total: productos.length,
+      importados: nuevos.length,
+      duplicados: duplicados.length,
+      refs_duplicadas: duplicados.map(p=>p.referencia)
+    });
   } catch(e) {
     res.status(500).json({error: e.message});
   }
