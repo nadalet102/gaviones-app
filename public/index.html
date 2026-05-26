@@ -696,11 +696,97 @@ function renderParte(parte){
 
 
   // Historial
-  html+='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de producción</div></div>'+
+  html+='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de producción</div>'+
+    '<button class="btn btn-outline btn-sm" onclick="exportarHistorialPartes()" style="color:var(--green);border-color:var(--green)"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>'+
+    '</div>'+
     '<table class="tbl"><thead><tr><th>Fecha</th><th class="r">Total fabricado</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody id="historial-partes"></tbody></table></div>';
 
   el.innerHTML=html;
   loadHistorialPartes();
+}
+
+async function exportarHistorialPartes(){
+  try{
+    const partes=await api('GET','/partes');
+    if(!partes.length){log('Sin datos para exportar','warn');return;}
+
+    // Build rows: one row per product line per day
+    const rows=[];
+    partes.forEach(function(p){
+      var lineasConCant=(p.lineas||[]).filter(function(l){return +l.cantidad>0;});
+      if(!lineasConCant.length){
+        rows.push({
+          Fecha:fmtD(p.fecha),
+          Estado:p.estado==='cerrado'?'Cerrado':'Abierto',
+          Referencia:'—',
+          Descripcion:'—',
+          Dimensiones:'—',
+          Cantidad:0
+        });
+      } else {
+        lineasConCant.forEach(function(l){
+          rows.push({
+            Fecha:fmtD(p.fecha),
+            Estado:p.estado==='cerrado'?'Cerrado':'Abierto',
+            Referencia:l.referencia||'',
+            Descripcion:l.descripcion||'',
+            Dimensiones:dimStr(l)||'',
+            Cantidad:+l.cantidad||0
+          });
+        });
+      }
+    });
+
+    // Add summary row per day at the end
+    const resumen=[];
+    partes.forEach(function(p){
+      var total=(p.lineas||[]).reduce(function(s,l){return s+(+l.cantidad||0);},0);
+      resumen.push({
+        Fecha:fmtD(p.fecha),
+        Estado:p.estado==='cerrado'?'Cerrado':'Abierto',
+        Referencia:'TOTAL DÍA',
+        Descripcion:'',
+        Dimensiones:'',
+        Cantidad:total
+      });
+    });
+
+    // Load SheetJS from CDN and generate
+    if(!window.XLSX){
+      await new Promise(function(res,rej){
+        var s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    var wb=XLSX.utils.book_new();
+
+    // Sheet 1: detail
+    var ws1=XLSX.utils.json_to_sheet(rows);
+    ws1['!cols']=[{wch:12},{wch:10},{wch:14},{wch:35},{wch:14},{wch:10}];
+    XLSX.utils.book_append_sheet(wb,ws1,'Detalle');
+
+    // Sheet 2: resumen diario
+    var ws2=XLSX.utils.json_to_sheet(resumen);
+    ws2['!cols']=[{wch:12},{wch:10},{wch:14},{wch:10},{wch:10},{wch:10}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Resumen diario');
+
+    // Sheet 3: totals by reference
+    var byRef={};
+    rows.forEach(function(r){
+      if(r.Referencia==='—') return;
+      if(!byRef[r.Referencia]) byRef[r.Referencia]={Referencia:r.Referencia,Descripcion:r.Descripcion,Dimensiones:r.Dimensiones,Total:0};
+      byRef[r.Referencia].Total+=r.Cantidad;
+    });
+    var ws3=XLSX.utils.json_to_sheet(Object.values(byRef).sort(function(a,b){return b.Total-a.Total;}));
+    ws3['!cols']=[{wch:14},{wch:35},{wch:14},{wch:10}];
+    XLSX.utils.book_append_sheet(wb,ws3,'Por referencia');
+
+    var fecha=new Date().toISOString().substring(0,10);
+    XLSX.writeFile(wb,'produccion_'+fecha+'.xlsx');
+    log('Excel exportado','ok');
+  }catch(e){log('Error exportando: '+e.message,'warn');}
 }
 
 async function loadHistorialPartes(){
@@ -1106,6 +1192,30 @@ function imprimirEntregaUnica(entregaId){
   imprimirEntregaUnicaObj(e);
 }
 
+// ── QR GENERATOR ────────────────────────────────────────────────────────────
+function makeQRDataUri(text,size){
+  try{
+    var div=document.createElement('div');
+    div.style.cssText='position:fixed;left:-9999px;top:-9999px';
+    document.body.appendChild(div);
+    new QRCode(div,{text:text,width:size,height:size,correctLevel:QRCode.CorrectLevel.M});
+    var canvas=div.querySelector('canvas');
+    var img=div.querySelector('img');
+    var uri=canvas?canvas.toDataURL('image/png'):(img?img.src:'');
+    document.body.removeChild(div);
+    return uri;
+  }catch(e){return '';}
+}
+async function ensureQR(){
+  if(window.QRCode)return;
+  await new Promise(function(res,rej){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload=res;s.onerror=rej;
+    document.head.appendChild(s);
+  });
+}
+
 function imprimirEntregaUnicaObj(e){
   var conf=e.estado==='confirmada';
   var inner='';
@@ -1218,9 +1328,15 @@ function imprimirCargaGrupoById(grupoId){
   imprimirCargaGrupo(fecha, pedidoNum, lineas);
 }
 
-function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
+async function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
   var lineas=lineasParam||entregas.filter(function(e){return String(e.fecha_carga).substring(0,10)===fecha&&e.pedido_numero===pedidoNum;});
   if(!lineas.length){log('No hay lineas en esta carga','warn');return;}
+  // Load QR lib for maps links
+  var hasQR=lineas.some(function(e){
+    var ped=pedidos.find(function(p){return p.numero===e.pedido_numero;});
+    return ped&&ped.maps_url;
+  });
+  if(hasQR) await ensureQR();
   var ref=lineas[0];
   var totalUds=lineas.reduce(function(s,e){return s+(+e.cantidad||0);},0);
   var conf=lineas.every(function(e){return e.estado==='confirmada';});
@@ -1263,6 +1379,7 @@ function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
       '<th>Referencia</th>'+
       '<th>Dimensiones</th>'+
       '<th class="r">Uds.</th>'+
+      '<th class="c">Maps</th>'+
       '<th class="c">Cargado ✓</th>'+
     '</tr></thead><tbody>';
 
@@ -1756,6 +1873,8 @@ function openModal(type, id, extraId){
       '<div class="field"><label>Fecha entrega</label><input type="date" id="f-fecha-ent" value="'+(p&&p.fecha_entrega?String(p.fecha_entrega).substring(0,10):'')+'"></div></div>'+
       '<div class="field"><label>Estado</label><select id="f-estado">'+Object.entries(ESTADOS_PED).map(([k,v])=>'<option value="'+k+'" '+((p&&p.estado===k)||(k==='pendiente'&&!p)?'selected':'')+'>'+v.label+'</option>').join('')+'</select></div>'+
       '<div class="field"><label>Notas</label><textarea id="f-notas">'+(p?p.notas||'':'')+'</textarea></div>'+
+      '<div class="field"><label>Link Google Maps <span style="font-size:10px;color:var(--text2);font-weight:400">(opcional — QR en impresión)</span></label>'+
+        '<input type="url" id="f-maps-url" value="'+(p?p.maps_url||'':'')+'" placeholder="https://maps.app.goo.gl/..."></div>'+
       '<div class="sep"></div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
         '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)">Líneas del pedido</div>'+
@@ -1912,6 +2031,7 @@ async function savePedido(){
     fecha_entrega:document.getElementById('f-fecha-ent').value||null,
     estado:document.getElementById('f-estado').value,
     notas:document.getElementById('f-notas').value.trim(),
+    maps_url:document.getElementById('f-maps-url')?.value.trim()||null,
     lineas
   };
   try{
@@ -2479,6 +2599,96 @@ function mostrarToast(msg, tipo){
   document.head.appendChild(style);
   document.body.appendChild(t);
   setTimeout(function(){if(t.parentNode){t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(function(){t.remove();},300);}},4000);
+}
+
+// ── CATEGORÍAS ────────────────────────────────────────────────────────────────
+function renderBCCategorias(){
+  var el=document.getElementById('bc-cats-list');
+  if(!el) return;
+  // Update categoria filter dropdown
+  var catSel=document.getElementById('filter-bc-cat');
+  if(catSel){
+    var curVal=catSel.value;
+    catSel.innerHTML='<option value="">Todas las categorías</option>'+
+      categorias.map(function(cat){return'<option value="'+cat.id+'" '+(curVal===String(cat.id)?'selected':'')+'>'+cat.nombre+'</option>';}).join('');
+  }
+  if(!categorias.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-tag"></i><p>Sin categorías. Crea la primera.</p></div>';
+    return;
+  }
+  el.innerHTML='<div class="card">'+categorias.map(function(cat){
+    var nCargas=cargas.filter(function(c){return String(c.categoria_id)===String(cat.id);}).length;
+    var nPeds=pedidosBC.filter(function(p){return String(p.categoria_id)===String(cat.id);}).length;
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">'+
+      '<div style="width:14px;height:14px;border-radius:50%;background:'+cat.color+';flex-shrink:0"></div>'+
+      '<div style="flex:1"><div style="font-weight:500">'+cat.nombre+'</div>'+
+        '<div class="dim">'+nCargas+' carga'+(nCargas!==1?'s':'')+' · '+nPeds+' pedido'+(nPeds!==1?'s BC':'BC')+'</div>'+
+      '</div>'+
+      '<button class="btn btn-outline btn-sm" onclick="bcOpenModalCategoria('+cat.id+')"><i class="ti ti-pencil"></i></button>'+
+      '<button class="btn-icon danger" onclick="deleteBCCategoria('+cat.id+')"><i class="ti ti-trash"></i></button>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+function bcOpenModalCategoria(id){
+  var cat=id?categorias.find(function(c){return String(c.id)===String(id);}):null;
+  var box=document.getElementById('modal-box');
+  box.className='modal narrow';
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-tag"></i> '+(id?'Editar categoría':'Nueva categoría');
+  document.getElementById('modal-body').innerHTML=
+    '<div class="field"><label>Nombre</label><input type="text" id="cat-nombre" value="'+(cat?cat.nombre:'')+'" placeholder="Ej: Urgente, Zona Norte..."></div>'+
+    '<div class="field"><label>Color</label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
+    ['#334155','#1d6fa4','#2d7a3a','#8a5200','#b91c1c','#5b21b6','#0891b2','#be185d','#065f46','#92400e'].map(function(c){
+      return '<div data-color="'+c+'" onclick="selectCatColor(this)" style="width:28px;height:28px;border-radius:50%;background:'+c+';cursor:pointer;border:3px solid '+(cat&&cat.color===c?'#fff':'transparent')+';box-shadow:'+(cat&&cat.color===c?'0 0 0 2px '+c:'none')+'"></div>';
+    }).join('')+
+    '</div>'+
+    '<input type="hidden" id="cat-color" value="'+(cat?cat.color:'#334155')+'">'+
+    '</div>';
+  document.getElementById('modal-foot').innerHTML=
+    (id?'<button class="btn btn-danger btn-sm" onclick="deleteBCCategoria('+id+');closeModal()"><i class="ti ti-trash"></i></button>':'')+
+    '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="saveBCCategoria('+(id||'null')+')"><i class="ti ti-device-floppy"></i> Guardar</button>';
+  document.getElementById('overlay').classList.add('open');
+}
+
+function selectCatColor(el){
+  document.querySelectorAll('[data-color]').forEach(function(d){
+    d.style.border='3px solid transparent';d.style.boxShadow='none';
+  });
+  el.style.border='3px solid #fff';
+  el.style.boxShadow='0 0 0 2px '+el.dataset.color;
+  document.getElementById('cat-color').value=el.dataset.color;
+}
+
+async function saveBCCategoria(id){
+  var nombre=document.getElementById('cat-nombre').value.trim();
+  var color=document.getElementById('cat-color').value||'#334155';
+  if(!nombre){log('Introduce un nombre','warn');return;}
+  try{
+    if(id&&id!=='null'){
+      var u=await api('PUT','/categorias/'+id,{nombre,color});
+      Object.assign(categorias.find(function(c){return String(c.id)===String(id);}),u);
+    } else {
+      categorias.push(await api('POST','/categorias',{nombre,color}));
+    }
+    closeModal();
+    renderBCCategorias();
+    renderBCCargas();
+    log('Categoría guardada','ok');
+  }catch(e){log('Error: '+e.message,'warn');}
+}
+
+async function deleteBCCategoria(id){
+  if(!confirm('Eliminar esta categoría? Las cargas y pedidos asociados quedarán sin categoría.')) return;
+  try{
+    await api('DELETE','/categorias/'+id);
+    categorias=categorias.filter(function(c){return String(c.id)!==String(id);});
+    cargas.forEach(function(c){if(String(c.categoria_id)===String(id))c.categoria_id=null;});
+    pedidosBC.forEach(function(p){if(String(p.categoria_id)===String(id))p.categoria_id=null;});
+    renderBCCategorias();renderBCCargas();renderBCList();
+    log('Categoría eliminada');
+  }catch(e){log('Error','warn');}
 }
 
 function log(msg,type=''){
