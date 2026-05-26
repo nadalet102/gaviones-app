@@ -480,6 +480,32 @@ app.patch('/api/partes/:id/linea', async (req, res) => {
     res.json(r.rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
 });
+app.post('/api/partes/:id/add-producto', async (req, res) => {
+  const { producto_id } = req.body;
+  try {
+    const exists = await pool.query(
+      'SELECT id FROM partes_lineas WHERE parte_id=$1 AND producto_id=$2',
+      [req.params.id, producto_id]
+    );
+    if(exists.rows.length) return res.json({ok:true, already:true});
+    await pool.query(
+      'INSERT INTO partes_lineas (parte_id,producto_id,cantidad) VALUES ($1,$2,0)',
+      [req.params.id, producto_id]
+    );
+    res.json({ok:true, already:false});
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+app.delete('/api/partes/:id/linea/:producto_id', async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM partes_lineas WHERE parte_id=$1 AND producto_id=$2',
+      [req.params.id, req.params.producto_id]
+    );
+    res.json({ok:true});
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
 app.post('/api/partes/:id/cerrar', async (req, res) => {
   const client = await pool.connect();
   try {
