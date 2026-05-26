@@ -586,12 +586,30 @@ function renderParte(parte){
     // Add product selector
     const prododsEnParte=new Set((parte.lineas||[]).map(function(l){return String(l.producto_id);}));
     const prodsDisponibles=productos.filter(function(p){return p.tipo!=='accesorio'&&!prododsEnParte.has(String(p.id));});
-    html+='<div style="padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)">'+
-      '<select id="sel-add-prod" style="flex:1;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text)">'+
-        '<option value="">+ Añadir producto al parte...</option>'+
-        prodsDisponibles.map(function(p){return'<option value="'+p.id+'">'+p.referencia+(dimStr(p)?' — '+dimStr(p):'')+'</option>';}).join('')+
-      '</select>'+
-      '<button class="btn btn-primary btn-sm" onclick="addProductoAParte('+parte.id+')"><i class="ti ti-plus"></i> Añadir</button>'+
+    html+='<div style="padding:10px 16px;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:6px">Añadir producto</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:6px">'+
+        '<input type="text" id="parte-prod-search" placeholder="Buscar por referencia o descripción..." oninput="filtrarProdsParaAnadir()" autocomplete="off" '+
+          'style="flex:1;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">'+
+        '<button class="btn btn-primary btn-sm" onclick="addProductoAParte('+parte.id+')"><i class="ti ti-plus"></i> Añadir</button>'+
+      '</div>'+
+      '<div id="parte-prod-lista" style="display:none;max-height:180px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface)">'+
+        prodsDisponibles.map(function(p){
+          return '<div class="parte-prod-opcion" data-id="'+p.id+'" onclick="seleccionarProdParte(this)" '+
+            'style="padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'+
+            '<div>'+
+              '<span style="font-weight:600;font-family:monospace;color:var(--blue-d)">'+p.referencia+'</span>'+
+              (p.descripcion?'<span class="dim" style="margin-left:8px">'+p.descripcion+'</span>':'')+
+            '</div>'+
+            (dimStr(p)?'<span class="dim" style="font-family:monospace;font-size:11px;flex-shrink:0;margin-left:8px">'+dimStr(p)+'</span>':'')+
+          '</div>';
+        }).join('')+
+      '</div>'+
+      '<input type="hidden" id="sel-add-prod" value="">'+
+      '<div id="parte-prod-seleccionado" style="display:none;margin-top:6px;background:var(--blue-l);border-radius:var(--radius-sm);padding:6px 10px;font-size:12px;display:flex;align-items:center;justify-content:space-between">'+
+        '<span id="parte-prod-sel-label"></span>'+
+        '<button onclick="limpiarSelProdParte()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text2)"><i class="ti ti-x"></i></button>'+
+      '</div>'+
     '</div>';
   }
 
@@ -680,6 +698,45 @@ async function loadHistorialPartes(){
       '</tr>';
     }).join('');
   }catch(e){}
+}
+
+function filtrarProdsParaAnadir(){
+  var q=(document.getElementById('parte-prod-search')?.value||'').toLowerCase().trim();
+  var lista=document.getElementById('parte-prod-lista');
+  if(!lista) return;
+  if(!q){lista.style.display='none';return;}
+  lista.style.display='block';
+  var opciones=lista.querySelectorAll('.parte-prod-opcion');
+  var visible=0;
+  opciones.forEach(function(op){
+    var txt=op.textContent.toLowerCase();
+    var show=txt.includes(q);
+    op.style.display=show?'flex':'none';
+    if(show) visible++;
+  });
+  lista.style.display=visible?'block':'none';
+}
+
+function seleccionarProdParte(el){
+  var id=el.dataset.id;
+  var label=el.querySelector('span[style*="font-weight"]')?.textContent||'';
+  var dim=el.querySelector('span.dim:last-child')?.textContent||'';
+  document.getElementById('sel-add-prod').value=id;
+  document.getElementById('parte-prod-search').value='';
+  document.getElementById('parte-prod-lista').style.display='none';
+  var selEl=document.getElementById('parte-prod-seleccionado');
+  var selLabel=document.getElementById('parte-prod-sel-label');
+  if(selEl&&selLabel){
+    selLabel.innerHTML='<strong>'+label+'</strong>'+(dim?' <span style="color:var(--text2);margin-left:6px">'+dim+'</span>':'');
+    selEl.style.display='flex';
+  }
+}
+
+function limpiarSelProdParte(){
+  document.getElementById('sel-add-prod').value='';
+  document.getElementById('parte-prod-search').value='';
+  var selEl=document.getElementById('parte-prod-seleccionado');
+  if(selEl) selEl.style.display='none';
 }
 
 async function addProductoAParte(parteId){
@@ -1369,7 +1426,7 @@ function renderNecesidades(){
   '</div>';
   const sorted=sortedProductos(necesidades);
   el.innerHTML=sortBar+'<table class="tbl"><thead><tr>'+
-    '<th>Referencia</th><th>Dimensiones</th>'+
+    '<th>Referencia</th><th>Descripción</th><th>Dimensiones</th>'+
     '<th class="r">Total pedido</th>'+
     '<th class="r">Ya entregado</th>'+
     '<th class="r">Pendiente entregar</th>'+
@@ -1381,6 +1438,7 @@ function renderNecesidades(){
     const rowBg=neta>0?'background:var(--red-l)':+n.stock_actual>0?'background:var(--green-l)':'';
     return '<tr style="'+rowBg+'">'+
       '<td class="mono" style="font-weight:500">'+n.referencia+'</td>'+
+      '<td class="dim">'+(n.descripcion||'—')+'</td>'+
       '<td class="dim">'+dimStr(n)+'</td>'+
       '<td class="r mono">'+fmtN(n.pedido_total)+'</td>'+
       '<td class="r mono" style="color:var(--green)">'+fmtN(n.entregado_total)+'</td>'+
