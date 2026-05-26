@@ -2199,6 +2199,48 @@ async function procesarPDFEnModal(input){
   }
 }
 
+function triggerExcelImport(){
+  var inp=document.getElementById('excel-import-input');
+  if(inp){inp.value='';inp.click();}
+}
+
+async function procesarExcelProductos(input){
+  var file=input.files[0];
+  if(!file) return;
+  log('Leyendo Excel...','');
+
+  var base64=await new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(){res(r.result.split(',')[1]);};
+    r.onerror=function(){rej(new Error('Error leyendo archivo'));};
+    r.readAsDataURL(file);
+  });
+
+  try{
+    var response=await fetch('/api/importar-productos',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({base64:base64})
+    });
+    var data=await response.json();
+    if(!response.ok) throw new Error(data.error||'Error del servidor');
+
+    await loadAll();
+    renderProductos();
+
+    var msg='Importados '+data.importados+' productos de '+data.total+' totales';
+    if(data.duplicados>0) msg+=' ('+data.duplicados+' ya existían, no duplicados)';
+    log(msg,'ok');
+    mostrarToast(msg,'green');
+
+    if(data.refs_duplicadas&&data.refs_duplicadas.length>0){
+      console.log('Ya existían:', data.refs_duplicadas.join(', '));
+    }
+  }catch(e){
+    log('Error importando Excel: '+e.message,'warn');
+  }
+}
+
 function mostrarToast(msg, tipo){
   var existing=document.getElementById('toast-notif');
   if(existing) existing.remove();
