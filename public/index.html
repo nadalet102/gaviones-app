@@ -913,12 +913,16 @@ async function cerrarParte(id){
 }
 
 // ── CALENDARIO ─────────────────────────────────────────────────────────────────
-// Agrupa una lista de entregas por carga (carga_grupo_id). Las líneas legacy
-// sin grupo se quedan como su propia carga (SOLO_{id}). Mantiene el orden.
+// Clave de carga = pedido + fecha. Todas las líneas del mismo pedido el mismo
+// día se tratan como UNA sola carga, sin importar cómo se añadieran.
+function claveCarga(e){ return String(e.fecha_carga).substring(0,10)+'__'+e.pedido_numero; }
+function lineasDeCarga(grupoId){ return entregas.filter(function(e){ return claveCarga(e)===grupoId; }); }
+
+// Agrupa una lista de entregas por carga (pedido + fecha). Mantiene el orden.
 function agruparCargas(lista){
   var grupos={}, orden=[];
   lista.forEach(function(e){
-    var key=e.carga_grupo_id ? e.carga_grupo_id : 'SOLO_'+e.id;
+    var key=claveCarga(e);
     if(!grupos[key]){
       grupos[key]={
         grupo_id:key,
@@ -974,26 +978,8 @@ function renderCal(){
   const cl=document.getElementById('cal-list');
   if(!mesCargas.length){cl.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Sin cargas este mes</p></div>';return;}
 
-  // Group ONLY by carga_grupo_id. Lines without it get their own group (legacy data).
-  const grupos={};
-  mesCargas.forEach(function(e){
-    // Use carga_grupo_id if set; otherwise each line is its own isolated group
-    var key=e.carga_grupo_id ? e.carga_grupo_id : 'SOLO_'+e.id;
-    if(!grupos[key]) grupos[key]={
-      grupo_id:key,
-      fecha:String(e.fecha_carga).substring(0,10),
-      pedido_numero:e.pedido_numero,
-      cliente_nombre:e.cliente_nombre,
-      obra:e.obra,
-      transportista:e.transportista,
-      mat_camion:e.mat_camion,
-      mat_remolque:e.mat_remolque,
-      lineas:[],
-    };
-    grupos[key].lineas.push(e);
-  });
-
-  const gruposOrdenados=Object.values(grupos).sort((a,b)=>a.fecha>b.fecha?1:-1);
+  // Agrupa por pedido + fecha (misma lógica que el resto del calendario)
+  const gruposOrdenados=agruparCargas(mesCargas).sort((a,b)=>a.fecha>b.fecha?1:-1);
   document.getElementById('cal-count').textContent=gruposOrdenados.length;
 
   cl.innerHTML=gruposOrdenados.map(g=>{
@@ -1080,11 +1066,8 @@ function showDayCargas(fecha){
 function editarGrupo(grupoId){
   // Show ALL lineas (pending + confirmed) so user can see full picture and edit pending ones
   // Find by grupo_id, fallback to legacy fecha+pedido key
-  var todasLineas=entregas.filter(function(e){
-    if(e.carga_grupo_id) return e.carga_grupo_id===grupoId;
-    // Legacy: each line was its own group keyed as SOLO_{id}
-    return ('SOLO_'+e.id)===grupoId;
-  });
+  // Todas las líneas de esta carga (mismo pedido + misma fecha)
+  var todasLineas=lineasDeCarga(grupoId);
   const lineasPend=todasLineas.filter(e=>e.estado==='pendiente');
   const lineasConf=todasLineas.filter(e=>e.estado==='confirmada');
   if(!todasLineas.length){log('No hay líneas en esta carga','warn');return;}
@@ -1336,10 +1319,7 @@ function imprimirCargaGrupoDesdeModal(grupoId){
   var matR=document.getElementById('eg-matr')?.value.trim()||null;
   var fecha=document.getElementById('eg-fecha')?.value||null;
   var notas=document.getElementById('eg-notas')?.value.trim()||null;
-  var lineas=entregas.filter(function(e){
-    if(e.carga_grupo_id) return e.carga_grupo_id===grupoId;
-    return ('SOLO_'+e.id)===grupoId;
-  });
+  var lineas=lineasDeCarga(grupoId);
   if(!lineas.length){log('No hay lineas','warn');return;}
   // Override transport fields from the form
   var lineasConDatos=lineas.map(function(e){
@@ -1357,10 +1337,7 @@ function imprimirCargaGrupoDesdeModal(grupoId){
 }
 
 function imprimirCargaGrupoById(grupoId){
-  var lineas=entregas.filter(function(e){
-    if(e.carga_grupo_id) return e.carga_grupo_id===grupoId;
-    return ('SOLO_'+e.id)===grupoId;
-  });
+  var lineas=lineasDeCarga(grupoId);
   if(!lineas.length){log('No hay lineas en esta carga','warn');return;}
   var fecha=String(lineas[0].fecha_carga).substring(0,10);
   var pedidoNum=lineas[0].pedido_numero;
