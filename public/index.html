@@ -913,6 +913,31 @@ async function cerrarParte(id){
 }
 
 // ── CALENDARIO ─────────────────────────────────────────────────────────────────
+// Agrupa una lista de entregas por carga (carga_grupo_id). Las líneas legacy
+// sin grupo se quedan como su propia carga (SOLO_{id}). Mantiene el orden.
+function agruparCargas(lista){
+  var grupos={}, orden=[];
+  lista.forEach(function(e){
+    var key=e.carga_grupo_id ? e.carga_grupo_id : 'SOLO_'+e.id;
+    if(!grupos[key]){
+      grupos[key]={
+        grupo_id:key,
+        fecha:String(e.fecha_carga).substring(0,10),
+        pedido_numero:e.pedido_numero,
+        cliente_nombre:e.cliente_nombre,
+        obra:e.obra,
+        transportista:e.transportista,
+        mat_camion:e.mat_camion,
+        mat_remolque:e.mat_remolque,
+        lineas:[]
+      };
+      orden.push(key);
+    }
+    grupos[key].lineas.push(e);
+  });
+  return orden.map(function(k){return grupos[k];});
+}
+
 function renderCal(){
   document.getElementById('cal-title').textContent=MESES[calM]+' '+calY;
   const first=new Date(calY,calM,1);
@@ -930,11 +955,16 @@ function renderCal(){
     const hasCargas=dayEntregas.length>0;
     html+='<div class="cal-day'+(isToday?' today':'')+(hasCargas?' has-cargas':'')+'"'+(hasCargas?' onclick="showDayCargas(\''+ds+'\')"':'')+'>'+
       '<div class="cal-dn">'+d+'</div>'+
-      dayEntregas.slice(0,3).map(e=>{
-        const col=e.estado==='confirmada'?'background:#e6f5ea;color:#2d7a3a':'background:#fff3e0;color:#8a5200';
-        return '<span class="cal-chip" style="'+col+'">'+e.referencia+' ('+fmtN(e.cantidad)+')</span>';
-      }).join('')+
-      (dayEntregas.length>3?'<span class="cal-chip" style="background:var(--surface2);color:var(--text2)">+'+( dayEntregas.length-3)+' más</span>':'')+
+      (function(){
+        var gruposDia=agruparCargas(dayEntregas);
+        return gruposDia.slice(0,3).map(function(g){
+          var todasConf=g.lineas.every(function(e){return e.estado==='confirmada';});
+          var totG=g.lineas.reduce(function(s,e){return s+(+e.cantidad||0);},0);
+          var col=todasConf?'background:#e6f5ea;color:#2d7a3a':'background:#fff3e0;color:#8a5200';
+          return '<span class="cal-chip" style="'+col+'">'+g.pedido_numero+' ('+fmtN(totG)+')</span>';
+        }).join('')+
+        (gruposDia.length>3?'<span class="cal-chip" style="background:var(--surface2);color:var(--text2)">+'+(gruposDia.length-3)+' más</span>':'');
+      })()+
     '</div>';
   }
   document.getElementById('cal-grid').innerHTML=html;
@@ -1019,21 +1049,30 @@ function calMove(d){
 
 function showDayCargas(fecha){
   const dayEntregas=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,10)===fecha);
+  const gruposDia=agruparCargas(dayEntregas);
   const box=document.getElementById('modal-box');
   box.className='modal';
   document.getElementById('modal-title').innerHTML='<i class="ti ti-calendar"></i> Cargas del '+fmtD(fecha);
   document.getElementById('modal-body').innerHTML=
-    '<table class="tbl"><thead><tr><th>Producto</th><th>Pedido</th><th class="r">Uds.</th><th>Estado</th><th></th></tr></thead><tbody>'+
-    dayEntregas.map(e=>'<tr>'+
-      '<td><div style="font-weight:500">'+e.referencia+'</div><div class="dim">'+dimStr(e)+'</div></td>'+
-      '<td><div style="font-weight:500">'+e.pedido_numero+'</div><div class="dim">'+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div></td>'+
-      '<td class="r mono">'+fmtN(e.cantidad)+'</td>'+
-      '<td><span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span></td>'+
-      '<td style="display:flex;gap:4px;align-items:center">'+
-        '<button class="btn-icon" data-eid="'+e.id+'" onclick="imprimirEntregaUnica(this.dataset.eid)" title="Imprimir esta linea"><i class="ti ti-printer"></i></button>'+
-        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+');closeModal()"><i class="ti ti-check"></i> Confirmar</button>':'')+
-      '</td>'+
-    '</tr>').join('')+'</tbody></table>';
+    '<table class="tbl"><thead><tr><th>Pedido</th><th>Referencias</th><th class="r">Uds.</th><th>Estado</th><th></th></tr></thead><tbody>'+
+    gruposDia.map(function(g){
+      var totG=g.lineas.reduce(function(s,e){return s+(+e.cantidad||0);},0);
+      var todasConf=g.lineas.every(function(e){return e.estado==='confirmada';});
+      var algunaPend=g.lineas.some(function(e){return e.estado==='pendiente';});
+      var idsPend=g.lineas.filter(function(e){return e.estado==='pendiente';}).map(function(e){return e.id;});
+      var n=g.lineas.length;
+      return '<tr>'+
+        '<td><div style="font-weight:500">'+g.pedido_numero+'</div><div class="dim">'+(g.cliente_nombre||'')+(g.obra?' · '+g.obra:'')+'</div></td>'+
+        '<td><span class="dim">'+n+' '+(n===1?'referencia':'referencias')+'</span></td>'+
+        '<td class="r mono">'+fmtN(totG)+'</td>'+
+        '<td><span class="badge '+(todasConf?'b-green':'b-amber')+'">'+(todasConf?'Confirmada':'Pendiente')+'</span></td>'+
+        '<td style="display:flex;gap:4px;align-items:center">'+
+          '<button class="btn-icon" data-gid="'+g.grupo_id+'" onclick="verDetalleGrupo(this.dataset.gid)" title="Ver detalle / líneas"><i class="ti ti-eye"></i></button>'+
+          '<button class="btn-icon" data-gid="'+g.grupo_id+'" onclick="imprimirCargaGrupoById(this.dataset.gid)" title="Imprimir esta carga"><i class="ti ti-printer"></i></button>'+
+          (algunaPend?'<button class="btn btn-green btn-sm" onclick="confirmarGrupo(['+idsPend.join(',')+']);closeModal()"><i class="ti ti-check"></i> Confirmar</button>':'')+
+        '</td>'+
+      '</tr>';
+    }).join('')+'</tbody></table>';
   document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
   document.getElementById('overlay').classList.add('open');
 }
