@@ -46,6 +46,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .tab.active{color:var(--blue);border-bottom-color:var(--blue)}
 .tab.highlight{color:var(--green)}
 .tab.highlight.active{color:var(--green);border-bottom-color:var(--green)}
+.tab-group{display:flex;align-items:stretch;position:relative;padding-left:16px;margin-left:8px}
+.tab-group::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);height:18px;width:1px;background:var(--border)}
+.tab-group-label{display:flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);opacity:.55;padding-right:6px;white-space:nowrap;user-select:none}
 .view{display:none}.view.active{display:block}
 .container{max-width:1280px;margin:0 auto;padding:16px 20px}
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:12px}
@@ -178,14 +181,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 </div>
 <div class="tabs-bar">
   <div class="tab active" id="tab-dash" onclick="switchTab('dash')"><i class="ti ti-layout-dashboard"></i> Panel</div>
-  <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
-  <div class="tab" id="tab-cal" onclick="switchTab('cal')"><i class="ti ti-calendar"></i> Calendario cargas</div>
-  <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-alert-triangle"></i> Necesidades</div>
-  <div class="tab" id="tab-pedidos" onclick="switchTab('pedidos')"><i class="ti ti-file-text"></i> Pedidos</div>
-  <div class="tab" id="tab-stock" onclick="switchTab('stock')"><i class="ti ti-package"></i> Stock</div>
-  <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
-  <div class="tab" id="tab-clientes" onclick="switchTab('clientes')"><i class="ti ti-users"></i> Clientes</div>
-  <div class="tab" id="tab-hist" onclick="switchTab('hist')"><i class="ti ti-history"></i> Historial</div>
+
+  <div class="tab-group">
+    <span class="tab-group-label">Ventas</span>
+    <div class="tab" id="tab-pedidos" onclick="switchTab('pedidos')"><i class="ti ti-file-text"></i> Pedidos</div>
+    <div class="tab" id="tab-clientes" onclick="switchTab('clientes')"><i class="ti ti-users"></i> Clientes</div>
+  </div>
+
+  <div class="tab-group">
+    <span class="tab-group-label">Producción</span>
+    <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-alert-triangle"></i> Necesidades</div>
+    <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
+    <div class="tab" id="tab-stock" onclick="switchTab('stock')"><i class="ti ti-package"></i> Stock</div>
+    <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
+  </div>
+
+  <div class="tab-group">
+    <span class="tab-group-label">Expedición</span>
+    <div class="tab" id="tab-cal" onclick="switchTab('cal')"><i class="ti ti-calendar"></i> Cargas</div>
+    <div class="tab" id="tab-hist" onclick="switchTab('hist')"><i class="ti ti-history"></i> Historial</div>
+  </div>
 </div>
 
 <!-- PANEL -->
