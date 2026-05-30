@@ -40,15 +40,25 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .st-v{font-size:15px;font-weight:500;color:#fff;font-family:'DM Mono',monospace}
 .st-l{font-size:10px;color:#93c5fd}
 .st-sep{width:1px;height:16px;background:rgba(255,255,255,.2)}
-.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 20px;overflow-x:auto}
+.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 20px;overflow:visible;position:relative}
 .tab{padding:12px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:all .12s}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--blue);border-bottom-color:var(--blue)}
 .tab.highlight{color:var(--green)}
 .tab.highlight.active{color:var(--green);border-bottom-color:var(--green)}
-.tab-group{display:flex;align-items:stretch;position:relative;padding-left:16px;margin-left:8px}
-.tab-group::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);height:18px;width:1px;background:var(--border)}
-.tab-group-label{display:flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);opacity:.55;padding-right:6px;white-space:nowrap;user-select:none}
+.area{position:relative;display:flex;align-items:stretch}
+.area-btn{padding:12px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;background:none;border:none;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;white-space:nowrap;font-family:inherit;transition:all .12s}
+.area-btn:hover{color:var(--text)}
+.area.active-area>.area-btn{color:var(--blue);border-bottom-color:var(--blue)}
+.area-btn .chev{font-size:13px;transition:transform .15s}
+.area.open .area-btn{color:var(--text)}
+.area.open .area-btn .chev{transform:rotate(180deg)}
+.area-menu{position:absolute;top:100%;left:0;min-width:190px;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;box-shadow:0 8px 22px rgba(0,0,0,.13);display:none;flex-direction:column;z-index:60;padding:5px}
+.area.open .area-menu{display:flex}
+.area-menu .tab{border-bottom:none;border-radius:7px;padding:9px 11px;width:100%}
+.area-menu .tab:hover{background:var(--surface2);color:var(--text)}
+.area-menu .tab.active{background:var(--blue-l);color:var(--blue)}
+.area-menu .tab.highlight.active{background:var(--green-l);color:var(--green)}
 .view{display:none}.view.active{display:block}
 .container{max-width:1280px;margin:0 auto;padding:16px 20px}
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:12px}
@@ -182,24 +192,30 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <div class="tabs-bar">
   <div class="tab active" id="tab-dash" onclick="switchTab('dash')"><i class="ti ti-layout-dashboard"></i> Panel</div>
 
-  <div class="tab-group">
-    <span class="tab-group-label">Ventas</span>
-    <div class="tab" id="tab-pedidos" onclick="switchTab('pedidos')"><i class="ti ti-file-text"></i> Pedidos</div>
-    <div class="tab" id="tab-clientes" onclick="switchTab('clientes')"><i class="ti ti-users"></i> Clientes</div>
+  <div class="area" id="area-ventas">
+    <button class="area-btn" onclick="toggleArea('ventas')"><i class="ti ti-shopping-cart"></i> Ventas <i class="ti ti-chevron-down chev"></i></button>
+    <div class="area-menu">
+      <div class="tab" id="tab-pedidos" onclick="switchTab('pedidos')"><i class="ti ti-file-text"></i> Pedidos</div>
+      <div class="tab" id="tab-clientes" onclick="switchTab('clientes')"><i class="ti ti-users"></i> Clientes</div>
+    </div>
   </div>
 
-  <div class="tab-group">
-    <span class="tab-group-label">Producción</span>
-    <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-alert-triangle"></i> Necesidades</div>
-    <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
-    <div class="tab" id="tab-stock" onclick="switchTab('stock')"><i class="ti ti-package"></i> Stock</div>
-    <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
+  <div class="area" id="area-produccion">
+    <button class="area-btn" onclick="toggleArea('produccion')"><i class="ti ti-building-factory-2"></i> Producción <i class="ti ti-chevron-down chev"></i></button>
+    <div class="area-menu">
+      <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-alert-triangle"></i> Necesidades</div>
+      <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
+      <div class="tab" id="tab-stock" onclick="switchTab('stock')"><i class="ti ti-package"></i> Stock</div>
+      <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
+    </div>
   </div>
 
-  <div class="tab-group">
-    <span class="tab-group-label">Expedición</span>
-    <div class="tab" id="tab-cal" onclick="switchTab('cal')"><i class="ti ti-calendar"></i> Cargas</div>
-    <div class="tab" id="tab-hist" onclick="switchTab('hist')"><i class="ti ti-history"></i> Historial</div>
+  <div class="area" id="area-expedicion">
+    <button class="area-btn" onclick="toggleArea('expedicion')"><i class="ti ti-truck"></i> Expedición <i class="ti ti-chevron-down chev"></i></button>
+    <div class="area-menu">
+      <div class="tab" id="tab-cal" onclick="switchTab('cal')"><i class="ti ti-calendar"></i> Cargas</div>
+      <div class="tab" id="tab-hist" onclick="switchTab('hist')"><i class="ti ti-history"></i> Historial</div>
+    </div>
   </div>
 </div>
 
@@ -475,6 +491,8 @@ function renderAll(t){
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.id==='tab-'+t));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+t));
+  cerrarAreas();
+  updateAreaActive();
   if(t==='dash') renderDash();
   else if(t==='parte') loadParteHoy();
   else if(t==='cal') renderCal();
@@ -485,6 +503,28 @@ function switchTab(t){
   else if(t==='clientes') renderClientes();
   else if(t==='hist') loadHistorial();
 }
+
+// ── Áreas desplegables de la barra ──────────────────────────────────────────
+function toggleArea(name){
+  var el=document.getElementById('area-'+name);
+  if(!el) return;
+  var abrir=!el.classList.contains('open');
+  cerrarAreas();
+  if(abrir) el.classList.add('open');
+}
+function cerrarAreas(){
+  document.querySelectorAll('.area.open').forEach(function(a){a.classList.remove('open');});
+}
+// Resalta el área que contiene la vista activa
+function updateAreaActive(){
+  document.querySelectorAll('.area').forEach(function(a){
+    a.classList.toggle('active-area', !!a.querySelector('.tab.active'));
+  });
+}
+// Cerrar el desplegable al pulsar fuera de cualquier área
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.area')) cerrarAreas();
+});
 
 // ── STATS ──────────────────────────────────────────────────────────────────────
 function updateStats(){
