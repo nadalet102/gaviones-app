@@ -203,9 +203,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   <div class="area" id="area-produccion">
     <button class="area-btn" onclick="toggleArea('produccion')"><i class="ti ti-building-factory-2"></i> Producción <i class="ti ti-chevron-down chev"></i></button>
     <div class="area-menu">
-      <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-alert-triangle"></i> Necesidades</div>
+      <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-package"></i> Stock y necesidades</div>
       <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
-      <div class="tab" id="tab-stock" onclick="switchTab('stock')"><i class="ti ti-package"></i> Stock</div>
       <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
     </div>
   </div>
@@ -272,41 +271,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <!-- NECESIDADES -->
 <div class="view" id="view-nec">
 <div class="container">
-  <div class="info-box"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div><strong>Necesidad neta</strong> = Total pedido − Ya entregado − Stock disponible. En rojo: hay que fabricar. El stock actual cubre lo verde.</div></div>
-  <div class="card"><div id="nec-table"></div></div>
-</div>
-</div>
-
-<!-- PEDIDOS -->
-<div class="view" id="view-pedidos">
-<div class="container">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input type="text" id="ped-search" placeholder="Buscar..." oninput="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:200px">
-      <select id="ped-estado" onchange="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
-        <option value="">Todos</option>
-        <option value="pendiente">Pendiente</option>
-        <option value="en_produccion">En producción</option>
-        <option value="listo">Listo</option>
-        <option value="entregado">Entregado</option>
-        <option value="cancelado">Cancelado</option>
-      </select>
-    </div>
-    <button class="btn btn-primary" onclick="openModal('pedido',null)"><i class="ti ti-plus"></i> Nuevo pedido</button>
-  </div>
-  <div id="pedidos-list"></div>
-</div>
-</div>
-
-<!-- STOCK -->
-<div class="view" id="view-stock">
-<div class="container">
+  <div class="info-box"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div><strong>Necesidad neta</strong> = Total pedido − Ya entregado − Stock disponible. En rojo: hay que fabricar. El stock actual cubre lo verde. Apunta entradas de fabricación y ajustes en el panel de la derecha.</div></div>
   <div class="grid2">
     <div class="card">
-      <div class="card-hdr">
-        <div class="card-title"><i class="ti ti-package"></i> Stock actual</div>
-      </div>
-      <div id="stock-list"></div>
+      <div class="card-hdr"><div class="card-title"><i class="ti ti-package"></i> Stock y necesidades</div></div>
+      <div id="nec-table"></div>
     </div>
     <div>
       <div class="card">
@@ -342,6 +311,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       </div>
     </div>
   </div>
+</div>
+</div>
+
+<!-- PEDIDOS -->
+<div class="view" id="view-pedidos">
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" id="ped-search" placeholder="Buscar..." oninput="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:200px">
+      <select id="ped-estado" onchange="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+        <option value="">Todos</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="en_produccion">En producción</option>
+        <option value="listo">Listo</option>
+        <option value="entregado">Entregado</option>
+        <option value="cancelado">Cancelado</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="openModal('pedido',null)"><i class="ti ti-plus"></i> Nuevo pedido</button>
+  </div>
+  <div id="pedidos-list"></div>
 </div>
 </div>
 
@@ -1661,21 +1651,35 @@ async function deleteEntrega(id){
 }
 
 // ── NECESIDADES ────────────────────────────────────────────────────────────────
+// Vista unificada: Stock + Necesidades. La consulta /necesidades ya trae todos
+// los productos activos con su stock, así que es la única fuente de la tabla.
 function renderNecesidades(){
+  renderMovPanel(); // registro de movimientos + formulario (columna derecha)
   const el=document.getElementById('nec-table');
+  if(!el) return;
   if(!necesidades.length){el.innerHTML='<div class="empty"><i class="ti ti-package"></i><p>Sin datos</p></div>';return;}
+  const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
+  var q=(document.getElementById('nec-search')?.value||'').toLowerCase().trim();
+  var tipoF=document.getElementById('nec-tipo')?.value||'';
+  var tiposPresentes=[...new Set(necesidades.map(n=>n.tipo))].sort();
+  var lista=necesidades.filter(function(n){
+    if(tipoF && n.tipo!==tipoF) return false;
+    if(q && !((n.referencia||'').toLowerCase().includes(q)||(n.descripcion||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
   var sortArrow=sortDir==='desc'?' ↓':' ↑';
-  var sortBar='<div class="sort-btns" style="padding:8px 16px;border-bottom:1px solid var(--border)">'+
-    '<span style="font-size:11px;color:var(--text2)">Ordenar por:</span>'+
-    '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='stock_actual'?' active':'')+'" data-f="stock_actual" onclick="setSortField(this.dataset.f)">Stock'+(sortField==='stock_actual'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='necesidad_neta'?' active':'')+'" data-f="necesidad_neta" onclick="setSortField(this.dataset.f)">Necesidad'+(sortField==='necesidad_neta'?sortArrow:'')+'</button>'+
+  function sb(f,label){return '<button class="sort-btn'+(sortField===f?' active':'')+'" data-f="'+f+'" onclick="setSortField(this.dataset.f)">'+label+(sortField===f?sortArrow:'')+'</button>';}
+  var bar='<div class="sort-btns" style="padding:8px 16px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--border)">'+
+    '<span style="font-size:11px;color:var(--text2)">Ordenar:</span>'+
+    sb('largo','Largo')+sb('ancho','Ancho')+sb('alto','Alto')+sb('referencia','Ref.')+sb('stock_actual','Stock')+sb('necesidad_neta','Necesidad')+
+    '<select id="nec-tipo" onchange="renderNecesidades()" style="margin-left:auto;font-size:12px;padding:3px 8px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">'+
+      '<option value="">Todos los tipos</option>'+
+      tiposPresentes.map(t=>'<option value="'+t+'"'+(tipoF===t?' selected':'')+'>'+(TIPO_LABELS[t]||t)+'</option>').join('')+
+    '</select>'+
+    '<input type="text" id="nec-search" value="'+q+'" placeholder="Buscar..." oninput="renderNecesidades()" style="font-size:12px;padding:3px 9px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:150px">'+
   '</div>';
-  const sorted=sortedProductos(necesidades);
-  el.innerHTML=sortBar+'<table class="tbl"><thead><tr>'+
+  const sorted=sortedProductos(lista);
+  el.innerHTML=bar+'<table class="tbl"><thead><tr>'+
     '<th>Referencia</th><th>Descripción</th><th>Dimensiones</th>'+
     '<th class="r">Total pedido</th>'+
     '<th class="r">Ya entregado</th>'+
@@ -1683,7 +1687,7 @@ function renderNecesidades(){
     '<th class="r">Stock disponible</th>'+
     '<th class="r">Necesidad neta</th>'+
   '</tr></thead><tbody>'+
-  sorted.map(n=>{
+  (sorted.length?sorted.map(n=>{
     const neta=+n.necesidad_neta||0;
     const rowBg=neta>0?'background:var(--red-l)':+n.stock_actual>0?'background:var(--green-l)':'';
     return '<tr style="'+rowBg+'">'+
@@ -1696,7 +1700,21 @@ function renderNecesidades(){
       '<td class="r"><span class="stock-chip sc-'+(+n.stock_actual>10?'ok':+n.stock_actual>0?'warn':'bad')+'">'+fmtN(n.stock_actual)+'</span></td>'+
       '<td class="r">'+( neta>0?'<span class="badge b-red"><i class="ti ti-alert-triangle" style="font-size:10px"></i> FABRICAR '+fmtN(neta)+'</span>':'<span class="badge b-green"><i class="ti ti-check" style="font-size:10px"></i> OK</span>')+'</td>'+
     '</tr>';
-  }).join('')+'</tbody></table>';
+  }).join(''):'<tr><td colspan="8" class="dim" style="text-align:center;padding:20px">Sin resultados</td></tr>')+'</tbody></table>';
+}
+
+// Panel de movimientos (lista + selector de producto del formulario)
+function renderMovPanel(){
+  if(!document.getElementById('mov-list')) return;
+  populateMovProducto();
+  document.getElementById('mov-list').innerHTML=movimientos.slice(0,30).map(m=>{
+    const isIn=m.tipo==='entrada';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">'+
+      '<div style="width:7px;height:7px;border-radius:50%;background:'+(isIn?'var(--green)':m.tipo==='ajuste'?'var(--blue)':'var(--red)')+'" ></div>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:500">'+m.referencia+'</div><div class="dim">'+(m.motivo||m.tipo)+' · '+fmtD(m.fecha||m.created_at)+'</div></div>'+
+      '<div style="font-family:monospace;font-size:13px;font-weight:500;color:'+(isIn?'var(--green)':'var(--red)')+'">'+(isIn?'+':'-')+fmtN(m.cantidad)+'</div>'+
+    '</div>';
+  }).join('')||'<div class="empty" style="padding:20px"><p>Sin movimientos</p></div>';
 }
 
 // ── PEDIDOS ────────────────────────────────────────────────────────────────────
@@ -1774,49 +1792,8 @@ function verPedido(id){
   openModal('pedido_ver',id);
 }
 
-// ── STOCK ──────────────────────────────────────────────────────────────────────
-function renderStock(){
-  populateMovProducto();
-  const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
-  var stockQ=(document.getElementById('stock-search')?.value||'').toLowerCase().trim();
-  var stockFiltrado=stockQ?stock.filter(function(s){
-    return (s.referencia||'').toLowerCase().includes(stockQ)||(s.descripcion||'').toLowerCase().includes(stockQ);
-  }):stock;
-  const tiposPresentes=[...new Set(stockFiltrado.map(s=>s.tipo))].sort();
-  var sortArrow=sortDir==='desc'?' ↓':' ↑';
-  var stockQVal=document.getElementById('stock-search')?.value||'';
-  let html='<div class="sort-btns" style="padding:8px 16px;display:flex;align-items:center;flex-wrap:wrap;gap:6px">'+
-    '<span style="font-size:11px;color:var(--text2)">Ordenar:</span>'+
-    '<button class="sort-btn'+(sortField==='largo'?' active':'')+'" data-f="largo" onclick="setSortField(this.dataset.f)">Largo'+(sortField==='largo'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='ancho'?' active':'')+'" data-f="ancho" onclick="setSortField(this.dataset.f)">Ancho'+(sortField==='ancho'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='alto'?' active':'')+'" data-f="alto" onclick="setSortField(this.dataset.f)">Alto'+(sortField==='alto'?sortArrow:'')+'</button>'+
-    '<button class="sort-btn'+(sortField==='referencia'?' active':'')+'" data-f="referencia" onclick="setSortField(this.dataset.f)">Ref.'+(sortField==='referencia'?sortArrow:'')+'</button>'+
-    '<input type="text" id="stock-search" value="'+stockQVal+'" placeholder="Buscar..." oninput="renderStock()" style="margin-left:auto;font-size:12px;padding:3px 9px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:150px">'+
-  '</div>';
-  tiposPresentes.forEach(tipo=>{
-    const prods=sortedProductos(stockFiltrado.filter(s=>s.tipo===tipo));
-    html+='<div style="padding:8px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-bottom:1px solid var(--border)">'+(TIPO_LABELS[tipo]||tipo)+'</div>';
-    html+='<table class="tbl"><tbody>';
-    prods.forEach(s=>{
-      const nivel=+s.cantidad>10?'sc-ok':+s.cantidad>0?'sc-warn':'sc-bad';
-      html+='<tr>'+
-        '<td class="mono" style="font-weight:500">'+s.referencia+'</td>'+
-        '<td class="dim">'+dimStr(s)+'</td>'+
-        '<td class="r"><span class="stock-chip '+nivel+'">'+fmtN(s.cantidad)+' '+(s.unidad||'ud')+'</span></td>'+
-      '</tr>';
-    });
-    html+='</tbody></table>';
-  });
-  document.getElementById('stock-list').innerHTML=html||'<div class="empty"><i class="ti ti-package"></i><p>Sin stock</p></div>';
-  document.getElementById('mov-list').innerHTML=movimientos.slice(0,30).map(m=>{
-    const isIn=m.tipo==='entrada';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">'+
-      '<div style="width:7px;height:7px;border-radius:50%;background:'+(isIn?'var(--green)':m.tipo==='ajuste'?'var(--blue)':'var(--red)')+'" ></div>'+
-      '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:500">'+m.referencia+'</div><div class="dim">'+(m.motivo||m.tipo)+' · '+fmtD(m.fecha||m.created_at)+'</div></div>'+
-      '<div style="font-family:monospace;font-size:13px;font-weight:500;color:'+(isIn?'var(--green)':'var(--red)')+'">'+(isIn?'+':'-')+fmtN(m.cantidad)+'</div>'+
-    '</div>';
-  }).join('')||'<div class="empty" style="padding:20px"><p>Sin movimientos</p></div>';
-}
+// ── STOCK (unificado en la vista de Necesidades) ─────────────────────────────
+function renderStock(){ renderNecesidades(); }
 
 function populateMovProducto(){
   const sel=document.getElementById('mov-producto');
