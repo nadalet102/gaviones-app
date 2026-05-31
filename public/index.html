@@ -406,6 +406,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 // ── DATA ───────────────────────────────────────────────────────────────────────
 let productos=[], stock=[], clientes=[], pedidos=[], necesidades=[], movimientos=[], entregas=[], parteHoy=null;
 let editId=null, modalType=null;
+let pedidoLogActual=[]; // log de actualizaciones del pedido en edición
 let sortField='largo', sortDir='desc';
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
 
@@ -1928,9 +1929,11 @@ function openModal(type, id, extraId){
     box.classList.add('wide');
     const p=id?pedidos.find(x=>String(x.id)===String(id)):null;
     const lineas=p?p.lineas||[]:[];
-    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-text"></i> '+(id?'Editar pedido':'Nuevo pedido')+(!id?' <button class="btn btn-outline btn-sm" onclick="triggerPDFImportEnModal()" style="margin-left:8px;font-size:11px"><i class="ti ti-file-import"></i> Importar PDF BC</button>':'');
+    pedidoLogActual=(p&&Array.isArray(p.update_log))?p.update_log.slice():[];
+    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-text"></i> '+(id?'Editar pedido':'Nuevo pedido')+(!id?' <button class="btn btn-outline btn-sm" onclick="triggerPDFImportEnModal()" style="margin-left:8px;font-size:11px"><i class="ti ti-file-import"></i> Importar PDF BC</button>':' <button class="btn btn-outline btn-sm" onclick="triggerActualizarPDF()" style="margin-left:8px;font-size:11px"><i class="ti ti-refresh"></i> Actualizar desde PDF</button>');
     document.getElementById('modal-body').innerHTML=
-      (!id?'<input type="file" id="pdf-modal-input" accept=".pdf" style="display:none" onchange="procesarPDFEnModal(this)">':'')+
+      (!id?'<input type="file" id="pdf-modal-input" accept=".pdf" style="display:none" onchange="procesarPDFEnModal(this)">':'<input type="file" id="pdf-update-input" accept=".pdf" style="display:none" onchange="procesarActualizacionPDF(this)">')+
+      (id?'<div id="pedido-log-panel" style="margin-bottom:14px"></div>':'')+
       '<div class="frow"><div class="field"><label>Nº Pedido</label><input type="text" id="f-num" value="'+(p?p.numero:autoNumPedido())+'" placeholder="P-2024-001"></div>'+
       '<div class="field"><label>Cliente</label><select id="f-cliente"><option value="">Sin cliente</option>'+clientes.map(c=>'<option value="'+c.id+'" '+(p&&String(p.cliente_id)===String(c.id)?'selected':'')+'>'+c.nombre+'</option>').join('')+'</select></div></div>'+
       '<div class="field"><label>Nombre cliente (si no está en lista)</label><input type="text" id="f-cliente-nombre" value="'+(p?p.cliente_nombre||'':'')+'" placeholder="Nombre del cliente"></div>'+
@@ -1953,6 +1956,7 @@ function openModal(type, id, extraId){
       (id?'<button class="btn btn-danger btn-sm" onclick="closeModal();deletePedido(\''+id+'\')"><i class="ti ti-trash"></i></button>':'')+
       '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
       '<button class="btn btn-primary" onclick="savePedido()"><i class="ti ti-device-floppy"></i> Guardar</button>';
+    if(id) renderPedidoLog();
 
   } else if(type==='entrega'){
     box.classList.add('wide');
@@ -2100,6 +2104,7 @@ async function savePedido(){
     estado:document.getElementById('f-estado').value,
     notas:document.getElementById('f-notas').value.trim(),
     maps_url:document.getElementById('f-maps-url')?.value.trim()||null,
+    update_log:pedidoLogActual,
     lineas
   };
   try{
@@ -2112,6 +2117,114 @@ async function savePedido(){
     closeModal();
     log('Pedido guardado','ok');
   }catch(e){log('Error: '+e.message,'warn');}
+}
+
+// ── ACTUALIZAR PEDIDO DESDE PDF ──────────────────────────────────────────────
+function triggerActualizarPDF(){
+  const inp=document.getElementById('pdf-update-input');
+  if(inp) inp.click();
+}
+
+async function procesarActualizacionPDF(input){
+  const file=input.files[0];
+  if(!file) return;
+  log('Leyendo PDF...','');
+  let base64;
+  try{
+    base64=await new Promise(function(res,rej){
+      const r=new FileReader();
+      r.onload=function(){res(r.result.split(',')[1]);};
+      r.onerror=function(){rej(new Error('Error leyendo archivo'));};
+      r.readAsDataURL(file);
+    });
+  }catch(e){log('Error: '+e.message,'warn');input.value='';return;}
+  try{
+    const resp=await fetch('/api/importar-pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64:base64,media_type:'application/pdf'})});
+    const raw=await resp.text();
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    let pdf; try{pdf=JSON.parse(raw);}catch(pe){throw new Error('Respuesta no válida');}
+    aplicarActualizacionPedido(pdf);
+  }catch(e){
+    log('No se pudo leer el PDF: '+e.message,'warn');
+  }
+  input.value='';
+}
+
+// Compara las líneas del PDF con las del formulario y actualiza cantidades,
+// añade referencias nuevas y avisa de las que ya no aparecen (no las borra).
+function aplicarActualizacionPedido(pdf){
+  const pdfLineas=(pdf&&pdf.lineas)||[];
+  if(!pdfLineas.length){log('El PDF no contiene líneas reconocibles','warn');return;}
+  const cambios=[];
+  const pdfRefs=new Set();
+  pdfLineas.forEach(function(pl){
+    const ref=pl.referencia;
+    pdfRefs.add(ref);
+    const prod=productos.find(function(p){return p.referencia===ref;});
+    if(!prod){ cambios.push({t:'warn',txt:ref+' no está en el catálogo (línea ignorada)'}); return; }
+    const nuevaCant=Math.round(+pl.cantidad||0);
+    if(nuevaCant<=0) return;
+    const rows=[...document.querySelectorAll('#lineas-container > div')];
+    const row=rows.find(function(r){return r.querySelector('.linea-prod')?.value===String(prod.id);});
+    if(row){
+      const inp=row.querySelector('.linea-cant');
+      const anterior=parseFloat(inp.value)||0;
+      if(anterior!==nuevaCant){
+        inp.value=nuevaCant;
+        cambios.push({t:'mod',txt:ref+': '+fmtN(anterior)+' → '+fmtN(nuevaCant)+' ud'});
+      }
+    }else{
+      const c=document.getElementById('lineas-container');
+      c.insertAdjacentHTML('beforeend',lineaHTML('pdf'+Date.now()+Math.floor(Math.random()*1000),{producto_id:prod.id,cantidad:nuevaCant}));
+      cambios.push({t:'add',txt:'+ '+ref+' ('+fmtN(nuevaCant)+' ud) nueva'});
+    }
+  });
+  // Líneas actuales que ya no aparecen en el PDF: solo aviso, no se borran
+  [...document.querySelectorAll('#lineas-container > div')].forEach(function(r){
+    const pid=r.querySelector('.linea-prod')?.value;
+    if(!pid) return;
+    const prod=productos.find(function(p){return String(p.id)===pid;});
+    if(prod&&!pdfRefs.has(prod.referencia)){
+      cambios.push({t:'warn',txt:prod.referencia+' ya no aparece en el PDF (revísala)'});
+    }
+  });
+  if(!cambios.length){log('El PDF coincide con las líneas actuales, sin cambios','ok');return;}
+  pedidoLogActual.unshift({fecha:new Date().toISOString(),numero:pdf.numero||null,cambios:cambios});
+  renderPedidoLog();
+  const nMod=cambios.filter(function(c){return c.t!=='warn';}).length;
+  const nWarn=cambios.filter(function(c){return c.t==='warn';}).length;
+  log('Actualizado desde PDF: '+nMod+' cambio'+(nMod===1?'':'s')+(nWarn?', '+nWarn+' aviso'+(nWarn===1?'':'s'):'')+'. Revisa y pulsa Guardar.','ok');
+}
+
+function renderPedidoLog(){
+  const el=document.getElementById('pedido-log-panel');
+  if(!el) return;
+  if(!pedidoLogActual.length){
+    el.innerHTML='<div style="font-size:11px;color:var(--text2);background:var(--surface2);border-radius:var(--radius-sm);padding:8px 12px"><i class="ti ti-history"></i> Sin actualizaciones registradas. Usa «Actualizar desde PDF» para sincronizar las líneas con un PDF nuevo.</div>';
+    return;
+  }
+  const colT={mod:'var(--blue)',add:'var(--green)',warn:'var(--amber)'};
+  let html='<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">'+
+    '<div style="background:var(--surface2);padding:7px 12px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-history"></i> Historial de actualizaciones ('+pedidoLogActual.length+')</div>'+
+    '<div style="max-height:170px;overflow-y:auto">';
+  pedidoLogActual.forEach(function(e){
+    html+='<div style="padding:8px 12px;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:11px;color:var(--text2);margin-bottom:4px"><i class="ti ti-calendar" style="font-size:11px"></i> '+fmtFechaHora(e.fecha)+'</div>'+
+      (e.cambios||[]).map(function(c){
+        return '<div style="font-size:12px;color:'+(colT[c.t]||'var(--text)')+'">'+(c.t==='warn'?'<i class="ti ti-alert-triangle" style="font-size:11px"></i> ':'')+c.txt+'</div>';
+      }).join('')+
+    '</div>';
+  });
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+
+function fmtFechaHora(iso){
+  if(!iso) return '';
+  try{
+    const d=new Date(iso);
+    return d.toLocaleDateString('es-ES')+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return String(iso).substring(0,16); }
 }
 
 function renderLineasEntrega(){
