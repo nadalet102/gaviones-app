@@ -271,44 +271,42 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <!-- NECESIDADES -->
 <div class="view" id="view-nec">
 <div class="container">
-  <div class="info-box"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div><strong>Necesidad neta</strong> = Total pedido − Ya entregado − Stock disponible. En rojo: hay que fabricar. El stock actual cubre lo verde. Apunta entradas de fabricación y ajustes en el panel de la derecha.</div></div>
-  <div class="grid2">
+  <div class="info-box"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div><strong>Necesidad neta</strong> = Total pedido − Ya entregado − Stock disponible. En rojo: hay que fabricar. El stock actual cubre lo verde. Apunta entradas de fabricación y ajustes en el panel de abajo.</div></div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><i class="ti ti-package"></i> Stock y necesidades</div></div>
+    <div id="nec-table" style="overflow-x:auto"></div>
+  </div>
+  <div class="grid2" style="margin-top:14px">
     <div class="card">
-      <div class="card-hdr"><div class="card-title"><i class="ti ti-package"></i> Stock y necesidades</div></div>
-      <div id="nec-table"></div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="card-hdr"><div class="card-title"><i class="ti ti-transfer"></i> Movimiento manual</div></div>
-        <div class="card-body">
-          <div class="field"><label>Producto</label>
-            <input type="text" id="mov-prod-search" placeholder="Buscar referencia o descripción..." oninput="filtrarMovProducto()" autocomplete="off"
-              style="font-size:13px;width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text)">
-            <div id="mov-prod-lista" style="display:none;max-height:160px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);margin-top:3px"></div>
-            <input type="hidden" id="mov-producto" value="">
-            <div id="mov-prod-sel" style="display:none;margin-top:4px;background:var(--blue-l);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;display:flex;align-items:center;justify-content:space-between">
-              <span id="mov-prod-sel-label"></span>
-              <button onclick="limpiarMovProd()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text2)"><i class="ti ti-x"></i></button>
-            </div>
+      <div class="card-hdr"><div class="card-title"><i class="ti ti-transfer"></i> Movimiento manual</div></div>
+      <div class="card-body">
+        <div class="field"><label>Producto</label>
+          <input type="text" id="mov-prod-search" placeholder="Buscar referencia o descripción..." oninput="filtrarMovProducto()" autocomplete="off"
+            style="font-size:13px;width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text)">
+          <div id="mov-prod-lista" style="display:none;max-height:160px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);margin-top:3px"></div>
+          <input type="hidden" id="mov-producto" value="">
+          <div id="mov-prod-sel" style="display:none;margin-top:4px;background:var(--blue-l);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;display:flex;align-items:center;justify-content:space-between">
+            <span id="mov-prod-sel-label"></span>
+            <button onclick="limpiarMovProd()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text2)"><i class="ti ti-x"></i></button>
           </div>
-          <div class="frow">
-            <div class="field"><label>Tipo</label>
-              <select id="mov-tipo">
-                <option value="entrada">Entrada</option>
-                <option value="salida">Salida</option>
-                <option value="ajuste">Ajuste inventario</option>
-              </select>
-            </div>
-            <div class="field"><label>Cantidad</label><input type="number" id="mov-cantidad" min="1" placeholder="0"></div>
-          </div>
-          <div class="field"><label>Motivo</label><input type="text" id="mov-motivo" placeholder="Motivo del movimiento..."></div>
-          <button class="btn btn-green" style="width:100%" onclick="registrarMovimiento()"><i class="ti ti-check"></i> Registrar</button>
         </div>
+        <div class="frow">
+          <div class="field"><label>Tipo</label>
+            <select id="mov-tipo">
+              <option value="entrada">Entrada</option>
+              <option value="salida">Salida</option>
+              <option value="ajuste">Ajuste inventario</option>
+            </select>
+          </div>
+          <div class="field"><label>Cantidad</label><input type="number" id="mov-cantidad" min="1" placeholder="0"></div>
+        </div>
+        <div class="field"><label>Motivo</label><input type="text" id="mov-motivo" placeholder="Motivo del movimiento..."></div>
+        <button class="btn btn-green" style="width:100%" onclick="registrarMovimiento()"><i class="ti ti-check"></i> Registrar</button>
       </div>
-      <div class="card">
-        <div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Últimos movimientos</div></div>
-        <div id="mov-list" style="max-height:300px;overflow-y:auto"></div>
-      </div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Últimos movimientos</div></div>
+      <div id="mov-list" style="max-height:340px;overflow-y:auto"></div>
     </div>
   </div>
 </div>
@@ -1681,11 +1679,11 @@ function renderNecesidades(){
   const sorted=sortedProductos(lista);
   el.innerHTML=bar+'<table class="tbl"><thead><tr>'+
     '<th>Referencia</th><th>Descripción</th><th>Dimensiones</th>'+
-    '<th class="r">Total pedido</th>'+
-    '<th class="r">Ya entregado</th>'+
-    '<th class="r">Pendiente entregar</th>'+
-    '<th class="r">Stock disponible</th>'+
-    '<th class="r">Necesidad neta</th>'+
+    '<th class="r">Pedido</th>'+
+    '<th class="r">Entregado</th>'+
+    '<th class="r">Pendiente</th>'+
+    '<th class="r">Stock</th>'+
+    '<th class="r">Necesidad</th>'+
   '</tr></thead><tbody>'+
   (sorted.length?sorted.map(n=>{
     const neta=+n.necesidad_neta||0;
