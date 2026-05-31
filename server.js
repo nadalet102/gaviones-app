@@ -87,6 +87,7 @@ async function initDB() {
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS transportista TEXT;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS carga_grupo_id TEXT;
     ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS maps_url TEXT;
+    ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS update_log JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_camion TEXT;
     ALTER TABLE entregas_parciales ADD COLUMN IF NOT EXISTS mat_remolque TEXT;
     CREATE TABLE IF NOT EXISTS partes_produccion (
@@ -275,13 +276,13 @@ app.post('/api/pedidos-gav', async (req, res) => {
   finally { client.release(); }
 });
 app.put('/api/pedidos-gav/:id', async (req, res) => {
-  const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas,maps_url} = req.body;
+  const {numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas,lineas,maps_url,update_log} = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const r = await client.query(
-      `UPDATE pedidos SET numero=$1,cliente_id=$2,cliente_nombre=$3,fecha_pedido=$4,fecha_entrega=$5,estado=$6,tipo_fabricacion=$7,obra=$8,notas=$9,maps_url=$10 WHERE id=$11 RETURNING *`,
-      [numero,cliente_id||null,cliente_nombre,fecha_pedido||null,fecha_entrega||null,estado,tipo_fabricacion,obra,notas||null,maps_url||null,req.params.id]
+      `UPDATE pedidos SET numero=$1,cliente_id=$2,cliente_nombre=$3,fecha_pedido=$4,fecha_entrega=$5,estado=$6,tipo_fabricacion=$7,obra=$8,notas=$9,maps_url=$10,update_log=COALESCE($11,update_log) WHERE id=$12 RETURNING *`,
+      [numero,cliente_id||null,cliente_nombre,fecha_pedido||null,fecha_entrega||null,estado,tipo_fabricacion,obra,notas||null,maps_url||null,update_log?JSON.stringify(update_log):null,req.params.id]
     );
     if(lineas) {
       // Keep existing entregas — only delete lineas without entregas
