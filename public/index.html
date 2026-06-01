@@ -416,6 +416,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
         <option value="entregado">Entregado</option>
         <option value="cancelado">Cancelado</option>
       </select>
+      <select id="ped-prod" onchange="renderPedidos()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+        <option value="">Toda producción</option>
+        <option value="vibrado">Vibrado</option>
+        <option value="premontado">Premontado</option>
+        <option value="mixto">Mixto</option>
+      </select>
     </div>
     <button class="btn btn-primary" onclick="openModal('pedido',null)"><i class="ti ti-plus"></i> Nuevo pedido</button>
   </div>
@@ -1838,9 +1844,11 @@ function badgePedidoProd(p){
 function renderPedidos(){
   const search=(document.getElementById('ped-search')?.value||'').toLowerCase();
   const estadoF=document.getElementById('ped-estado')?.value||'';
+  const prodF=document.getElementById('ped-prod')?.value||'';
   let list=pedidos;
   if(search) list=list.filter(p=>(p.numero||'').toLowerCase().includes(search)||(p.cliente_nombre||'').toLowerCase().includes(search)||(p.obra||'').toLowerCase().includes(search));
   if(estadoF) list=list.filter(p=>p.estado===estadoF);
+  if(prodF) list=list.filter(p=>pedidoTipoProduccion(p)===prodF);
   const el=document.getElementById('pedidos-list');
   if(!list.length){el.innerHTML='<div class="card"><div class="empty"><i class="ti ti-file-text"></i><p>No hay pedidos</p></div></div>';return;}
   el.innerHTML=list.map(p=>{
