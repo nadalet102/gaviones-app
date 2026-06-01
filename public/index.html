@@ -2743,13 +2743,11 @@ async function crearPedidoDesdeImport(){
   if(!pedido){log('No hay pedido pendiente de importar','warn');return;}
   log('Creando pedido...','');
 
-  // Match references — also try partial match (GVIBRF024 vs GVIBRF024)
+  // Match references; crea en el catálogo las que no existan (no se pierde ninguna línea)
   var lineasFinal=[];
   for(var i=0;i<(pedido.lineas||[]).length;i++){
     var l=pedido.lineas[i];
-    // Exact match first, then case-insensitive
-    var prod=productos.find(function(p){return p.referencia===l.referencia;})
-          || productos.find(function(p){return p.referencia&&p.referencia.toUpperCase()===l.referencia.toUpperCase();});
+    var prod=await asegurarProducto(l);
     if(prod){
       lineasFinal.push({producto_id:prod.id, cantidad:l.cantidad});
     }
@@ -2788,6 +2786,27 @@ function triggerPDFImportEnModal(){
   if(inp){inp.value='';inp.click();}
 }
 
+// Extrae medidas de una descripción tipo "100x30x50cm" (cm → m)
+function parseDimsDesc(desc){
+  var m=(desc||'').match(/(\d+(?:[.,]\d+)?)[xX×](\d+(?:[.,]\d+)?)[xX×](\d+(?:[.,]\d+)?)/);
+  if(!m) return {largo:null,ancho:null,alto:null};
+  var f=function(s){return parseFloat(s.replace(',','.'))/100;};
+  return {largo:f(m[1]),ancho:f(m[2]),alto:f(m[3])};
+}
+// Devuelve el producto del catálogo para una línea del PDF; si no existe, lo crea.
+async function asegurarProducto(l){
+  if(!l||!l.referencia) return null;
+  var prod=productos.find(function(p){return p.referencia===l.referencia;})
+        || productos.find(function(p){return p.referencia&&p.referencia.toUpperCase()===String(l.referencia).toUpperCase();});
+  if(prod) return prod;
+  var d=parseDimsDesc(l.descripcion);
+  try{
+    var nuevo=await api('POST','/productos',{tipo:'gavion',referencia:l.referencia,descripcion:l.descripcion||l.referencia,largo:d.largo,ancho:d.ancho,alto:d.alto,unidad:'ud'});
+    if(nuevo&&nuevo.id){ productos.push(nuevo); return nuevo; }
+  }catch(e){ /* si falla la creación, devolvemos null y la línea se omite */ }
+  return null;
+}
+
 async function procesarPDFEnModal(input){
   var file=input.files[0];
   if(!file) return;
@@ -2820,23 +2839,26 @@ async function procesarPDFEnModal(input){
     if(pedido.obra) document.getElementById('f-obra').value=pedido.obra;
     if(pedido.fecha_pedido) document.getElementById('f-fecha-ped').value=pedido.fecha_pedido;
 
-    // Fill lines
+    // Fill lines (creando en el catálogo las referencias que no existan)
     if(pedido.lineas&&pedido.lineas.length){
       var container=document.getElementById('lineas-container');
       if(container){
         container.innerHTML='';
-        var sinCatalogo=0;
-        pedido.lineas.forEach(function(l,i){
-          var prod=productos.find(function(p){return p.referencia===l.referencia;});
+        var creados=0, omitidos=0, idx=0;
+        for(const l of pedido.lineas){
+          var existia=!!(productos.find(function(p){return p.referencia===l.referencia;})
+                       || productos.find(function(p){return p.referencia&&p.referencia.toUpperCase()===String(l.referencia||'').toUpperCase();}));
+          var prod=await asegurarProducto(l);
           if(prod){
-            var html=lineaHTML(Date.now()+i,{producto_id:prod.id,cantidad:l.cantidad});
-            container.insertAdjacentHTML('beforeend',html);
-          } else {
-            sinCatalogo++;
-          }
-        });
-        if(sinCatalogo>0) log(sinCatalogo+' referencia(s) del PDF no estan en el catalogo y no se han importado','warn');
-        else log('PDF importado: '+pedido.lineas.length+' lineas','ok');
+            if(!existia) creados++;
+            container.insertAdjacentHTML('beforeend', lineaHTML(Date.now()+idx,{producto_id:prod.id,cantidad:l.cantidad}));
+          } else { omitidos++; }
+          idx++;
+        }
+        var msg='PDF importado: '+(pedido.lineas.length-omitidos)+' línea(s)';
+        if(creados>0) msg+=' · '+creados+' producto(s) nuevo(s) creado(s) en catálogo';
+        if(omitidos>0) msg+=' · '+omitidos+' sin referencia, omitida(s)';
+        log(msg, omitidos>0?'warn':'ok');
       }
     }
 
