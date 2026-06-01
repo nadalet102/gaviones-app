@@ -64,6 +64,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .mesa-tab:hover{background:#eab308;color:#1a1a1a}
 .mesa-tab.active{background:#eab308;color:#1a1a1a;border-bottom:none!important}
 .mesa-wrap{max-width:1000px;margin:0 auto;padding:18px}
+.mesa-wrap.full{max-width:none}
+.mesa-grid.arts{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
 .mesa-bc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:15px;font-weight:600;color:var(--text2)}
 .mesa-bc .crumb{cursor:pointer;color:var(--blue)}
 .mesa-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
@@ -2976,6 +2978,7 @@ function mesaProductosCatAncho(cat,cm){
 function renderMesa(){
   var el=document.getElementById('mesa-content');
   if(!el) return;
+  el.classList.toggle('full', mesaPaso==='nuevo-art');
   if(mesaPaso==='inicio'){
     el.innerHTML='<div class="mesa-grid">'+
       '<button class="mesa-btn b-nuevo" onclick="mesaIr(\'nuevo-cat\')"><i class="ti ti-plus"></i> NUEVO<small>Elegir gavión a producir</small></button>'+
@@ -3005,7 +3008,7 @@ function renderMesa(){
     var cat2=MESA_CATS.find(function(c){return c.id===mesaCat;});
     var arts=mesaProductosCatAncho(cat2,mesaAncho);
     el.innerHTML=mesaCrumbs()+
-      (arts.length?'<div class="mesa-grid cols1">'+arts.map(function(p){
+      (arts.length?'<div class="mesa-grid arts">'+arts.map(function(p){
         return '<button class="mesa-btn b-art" onclick="mesaAbrirCantidad('+p.id+')"><span class="ref">'+(p.referencia||'(sin ref)')+'</span><span class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</span></button>';
       }).join('')+'</div>'
       :'<div class="mesa-empty"><i class="ti ti-package-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No hay artículos de '+cat2.nombre+' con ancho '+mesaAncho+' cm.</div>');
