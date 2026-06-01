@@ -80,6 +80,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .mesa-btn.b-nuevo{background:linear-gradient(135deg,#2563eb,#1d4ed8)}
 .mesa-btn.b-repetir{background:linear-gradient(135deg,#f59e0b,#d97706)}
 .mesa-btn.b-cat{background:linear-gradient(135deg,#475569,#334155);font-size:20px;min-height:110px}
+.mesa-btn.cat-rojo{background:linear-gradient(135deg,#ef4444,#b91c1c)}
+.mesa-btn.cat-gris{background:linear-gradient(135deg,#9ca3af,#4b5563)}
+.mesa-btn.cat-blanco{background:#ffffff;color:#1f2937;border:2px solid #cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.mesa-btn.cat-forna{background:linear-gradient(135deg,#bb9a6a,#8a6d3f)}
 .mesa-btn.b-ancho{background:linear-gradient(135deg,#0891b2,#0e7490);font-size:30px}
 .mesa-btn.b-art{background:var(--surface);color:var(--text);border:2px solid var(--border2);box-shadow:none;font-size:18px;align-items:flex-start;text-align:left;min-height:96px;padding:20px}
 .mesa-btn.b-art:hover{border-color:var(--blue);filter:none;background:var(--surface2)}
@@ -2970,9 +2974,23 @@ function mesaProductosCat(cat){
     return d.includes('VIBRAD')&&d.includes(kw);
   });
 }
+function mesaEsAngulo(p){
+  var d=(p.descripcion||'')+' '+(p.referencia||'');
+  if(/45\s*[º°]/.test(d)) return true;          // "45º" / "45°"
+  return mesaNorm(d).includes('ANGUL');          // "ángulo" / "angulo"
+}
+function mesaEs70(p){ return mesaAnchoCm({ancho:p.alto})===70; } // alto = 70 cm
+// Bloque de orden: 0 normal · 1 ángulos · 2 alto 70 cm (al final del todo)
+function mesaBloque(p){
+  if(mesaEs70(p)) return 2;
+  if(mesaEsAngulo(p)) return 1;
+  return 0;
+}
 function mesaProductosCatAncho(cat,cm){
   return mesaProductosCat(cat).filter(function(p){return mesaAnchoCm(p)===cm;})
     .sort(function(a,b){
+      var ba=mesaBloque(a), bb=mesaBloque(b);
+      if(ba!==bb) return ba-bb;                        // normal → ángulos → 70cm
       var altoA=+a.alto||0, altoB=+b.alto||0;
       if(altoB!==altoA) return altoB-altoA;            // alto: mayor a menor
       var largoA=+a.largo||0, largoB=+b.largo||0;
@@ -2996,7 +3014,7 @@ function renderMesa(){
     el.innerHTML=mesaCrumbs()+
       '<div class="mesa-grid">'+MESA_CATS.map(function(c){
         var n=mesaProductosCat(c).length;
-        return '<button class="mesa-btn b-cat" onclick="mesaSelCat(\''+c.id+'\')">'+c.nombre+'<small>'+(n?n+' artículo'+(n===1?'':'s'):'sin artículos')+'</small></button>';
+        return '<button class="mesa-btn b-cat cat-'+c.id+'" onclick="mesaSelCat(\''+c.id+'\')">'+c.nombre+'<small>'+(n?n+' artículo'+(n===1?'':'s'):'sin artículos')+'</small></button>';
       }).join('')+'</div>';
     return;
   }
