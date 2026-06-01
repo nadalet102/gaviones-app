@@ -701,8 +701,8 @@ app.post('/api/importar-pdf', async (req, res) => {
       while((m = reCat.exec(text)) !== null) pushLinea(m[1], m[2], parseFloat(m[3] + '.' + (m[4]||'00')));
     }
 
-    // 2) Supplement: any gavión code (GVIBR…) not yet in the catalogue
-    const reGen = /\b(GVIBR\w+)\b\s+([^\n]+?)\s+(\d+)[,.]?(\d{2})\s+\d/g;
+    // 2) Supplement: gaviones vibrados (GVIBR…) y premontados (GPRE…), estén o no en catálogo
+    const reGen = /\b(G(?:VIBR|PRE)\w+)\b\s+([^\n]+?)\s+(\d+)[,.]?(\d{2})\s+\d/g;
     let mg;
     while((mg = reGen.exec(text)) !== null) pushLinea(mg[1], mg[2], parseFloat(mg[3] + '.' + (mg[4]||'00')));
 
