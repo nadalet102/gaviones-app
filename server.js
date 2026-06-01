@@ -140,6 +140,11 @@ async function stockMovimiento(client, producto_id, tipo, cantidad, motivo, refe
   );
 }
 
+// ── VERSIÓN (para confirmar qué backend está desplegado) ───────────────────────
+app.get('/api/version', (req, res) => {
+  res.json({ version: '2026-06-import-mixto', parser: 'GVIBR + GPRE + catalogo', ok: true });
+});
+
 // ── PRODUCTOS ──────────────────────────────────────────────────────────────────
 app.get('/api/productos', async (req, res) => {
   try {
