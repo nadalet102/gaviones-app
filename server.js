@@ -680,30 +680,37 @@ app.post('/api/importar-pdf', async (req, res) => {
       destino = raw.split(/\s{3,}/)[0].trim().replace(/\s+/g,' ');
     }
 
-    // Lines: GVIBRF references
-    // Pattern: GVIBRF... <description> <quantity>
-    const lineaRegex = /\b(GVIBRF\w+)\b\s+([^\n]+?)\s+(\d+)[,.]?(\d{2})\s+\d/g;
+    // Lines: detect ALL product references (vibrado, premontado, etc.)
     const lineas = [];
-    let m;
-    while((m = lineaRegex.exec(text)) !== null) {
-      const ref = m[1];
-      const desc = m[2].trim();
-      const cant = parseFloat(m[3] + '.' + (m[4]||'00'));
-      if(cant > 0 && !lineas.find(l => l.referencia === ref)) {
-        lineas.push({ referencia: ref, descripcion: desc, cantidad: Math.round(cant) });
-      }
+    const pushLinea = (ref, desc, cant) => {
+      if(cant > 0 && !lineas.find(l => l.referencia === ref))
+        lineas.push({ referencia: ref, descripcion: (desc||'').trim(), cantidad: Math.round(cant) });
+    };
+    const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // 1) Match against the actual catalogue references (covers every product type)
+    let catRefs = [];
+    try {
+      catRefs = (await pool.query("SELECT referencia FROM productos WHERE referencia IS NOT NULL AND referencia<>''")).rows
+        .map(r => String(r.referencia).trim()).filter(Boolean);
+    } catch(e) { catRefs = []; }
+    if(catRefs.length) {
+      const alt = [...new Set(catRefs)].sort((a,b)=>b.length-a.length).map(escapeRe).join('|');
+      const reCat = new RegExp('\\b(' + alt + ')\\b\\s+([^\\n]*?)\\s+(\\d+)[,.]?(\\d{2})\\s+\\d', 'g');
+      let m;
+      while((m = reCat.exec(text)) !== null) pushLinea(m[1], m[2], parseFloat(m[3] + '.' + (m[4]||'00')));
     }
 
-    // Fallback: simpler pattern
+    // 2) Supplement: any gavión code (GVIBR…) not yet in the catalogue
+    const reGen = /\b(GVIBR\w+)\b\s+([^\n]+?)\s+(\d+)[,.]?(\d{2})\s+\d/g;
+    let mg;
+    while((mg = reGen.exec(text)) !== null) pushLinea(mg[1], mg[2], parseFloat(mg[3] + '.' + (mg[4]||'00')));
+
+    // 3) Fallback if nothing matched: generic product-code pattern
     if(!lineas.length) {
-      const simple = /\b(GVIBRF\w+)\b[^\n]*?(\d{1,4})[,\.](\d{2})\s/g;
-      while((m = simple.exec(text)) !== null) {
-        const ref = m[1];
-        const cant = parseInt(m[2]);
-        if(cant > 0 && !lineas.find(l => l.referencia === ref)) {
-          lineas.push({ referencia: ref, descripcion: '', cantidad: cant });
-        }
-      }
+      const simple = /\b([A-Z]{2,}\w*\d)\b[^\n]*?(\d{1,4})[,\.](\d{2})\s/g;
+      let ms;
+      while((ms = simple.exec(text)) !== null) pushLinea(ms[1], '', parseInt(ms[2]));
     }
 
     res.json({ numero, cliente_nombre, obra, destino, fecha_pedido, lineas });
