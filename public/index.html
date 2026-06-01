@@ -59,6 +59,48 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .area-menu .tab:hover{background:var(--surface2);color:var(--text)}
 .area-menu .tab.active{background:var(--blue-l);color:var(--blue)}
 .area-menu .tab.highlight.active{background:var(--green-l);color:var(--green)}
+/* ── MESA DE VIBRADO ── */
+.mesa-tab{margin:6px auto;background:#facc15;color:#1a1a1a;font-weight:800;font-size:13px;letter-spacing:.04em;border-radius:999px;padding:9px 24px;border-bottom:none!important;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:background .12s}
+.mesa-tab:hover{background:#eab308;color:#1a1a1a}
+.mesa-tab.active{background:#eab308;color:#1a1a1a;border-bottom:none!important}
+.mesa-wrap{max-width:1000px;margin:0 auto;padding:18px}
+.mesa-bc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:15px;font-weight:600;color:var(--text2)}
+.mesa-bc .crumb{cursor:pointer;color:var(--blue)}
+.mesa-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.mesa-grid.cols1{grid-template-columns:1fr}
+.mesa-grid.cols3{grid-template-columns:repeat(3,1fr)}
+.mesa-grid.cols4{grid-template-columns:repeat(4,1fr)}
+.mesa-btn{border:none;border-radius:16px;padding:34px 18px;font-size:24px;font-weight:800;letter-spacing:.02em;cursor:pointer;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:120px;text-align:center;line-height:1.15;box-shadow:0 2px 8px rgba(0,0,0,.12);transition:transform .08s,filter .12s}
+.mesa-btn:hover{filter:brightness(1.06)}
+.mesa-btn:active{transform:scale(.97)}
+.mesa-btn i{font-size:40px}
+.mesa-btn small{font-size:14px;font-weight:600;opacity:.92}
+.mesa-btn.b-nuevo{background:linear-gradient(135deg,#2563eb,#1d4ed8)}
+.mesa-btn.b-repetir{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.mesa-btn.b-cat{background:linear-gradient(135deg,#475569,#334155);font-size:20px;min-height:110px}
+.mesa-btn.b-ancho{background:linear-gradient(135deg,#0891b2,#0e7490);font-size:30px}
+.mesa-btn.b-art{background:var(--surface);color:var(--text);border:2px solid var(--border2);box-shadow:none;font-size:18px;align-items:flex-start;text-align:left;min-height:96px;padding:20px}
+.mesa-btn.b-art:hover{border-color:var(--blue);filter:none;background:var(--surface2)}
+.mesa-btn.b-art .ref{font-family:monospace;font-weight:800;font-size:20px;color:var(--blue)}
+.mesa-btn.b-art .desc{font-size:13px;font-weight:500;color:var(--text2)}
+.mesa-back{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:12px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-bottom:14px}
+.mesa-empty{text-align:center;padding:40px;color:var(--text2);font-size:16px}
+/* keypad */
+.kp-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+.kp-overlay.open{display:flex}
+.kp-card{background:var(--surface);border-radius:20px;padding:22px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.kp-prod{text-align:center;margin-bottom:8px}
+.kp-prod .ref{font-family:monospace;font-weight:800;font-size:22px;color:var(--blue)}
+.kp-prod .desc{font-size:13px;color:var(--text2)}
+.kp-display{font-family:monospace;font-size:46px;font-weight:800;text-align:center;background:var(--surface2);border-radius:14px;padding:14px;margin:12px 0;color:var(--text);min-height:74px}
+.kp-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kp-key{border:none;background:var(--surface2);border:1px solid var(--border2);border-radius:14px;font-size:28px;font-weight:700;padding:18px 0;cursor:pointer;color:var(--text);transition:background .1s}
+.kp-key:active{background:var(--blue-l)}
+.kp-key.kp-clear{color:var(--red)}
+.kp-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:12px}
+.kp-cancel{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:14px;font-size:18px;font-weight:700;padding:16px;cursor:pointer}
+.kp-ok{background:linear-gradient(135deg,#16a34a,#15803d);border:none;color:#fff;border-radius:14px;font-size:20px;font-weight:800;padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+@media(max-width:640px){.mesa-grid.cols4{grid-template-columns:repeat(2,1fr)}.mesa-grid.cols3{grid-template-columns:repeat(2,1fr)}.mesa-btn{font-size:20px;padding:26px 14px}}
 .view{display:none}.view.active{display:block}
 .container{max-width:1280px;margin:0 auto;padding:16px 20px}
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:12px}
@@ -214,6 +256,37 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <div class="area-menu">
       <div class="tab" id="tab-cal" onclick="switchTab('cal')"><i class="ti ti-calendar"></i> Cargas</div>
       <div class="tab" id="tab-hist" onclick="switchTab('hist')"><i class="ti ti-history"></i> Historial</div>
+    </div>
+  </div>
+
+  <div class="tab mesa-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> MESA DE VIBRADO</div>
+</div>
+
+<!-- MESA DE VIBRADO -->
+<div class="view" id="view-mesa">
+  <div class="mesa-wrap" id="mesa-content"></div>
+</div>
+<div class="kp-overlay" id="kp-overlay">
+  <div class="kp-card">
+    <div class="kp-prod" id="kp-prod"></div>
+    <div class="kp-display" id="kp-display">0</div>
+    <div class="kp-keys">
+      <button class="kp-key" onclick="kpDigit('7')">7</button>
+      <button class="kp-key" onclick="kpDigit('8')">8</button>
+      <button class="kp-key" onclick="kpDigit('9')">9</button>
+      <button class="kp-key" onclick="kpDigit('4')">4</button>
+      <button class="kp-key" onclick="kpDigit('5')">5</button>
+      <button class="kp-key" onclick="kpDigit('6')">6</button>
+      <button class="kp-key" onclick="kpDigit('1')">1</button>
+      <button class="kp-key" onclick="kpDigit('2')">2</button>
+      <button class="kp-key" onclick="kpDigit('3')">3</button>
+      <button class="kp-key kp-clear" onclick="kpClear()"><i class="ti ti-backspace"></i></button>
+      <button class="kp-key" onclick="kpDigit('0')">0</button>
+      <button class="kp-key" onclick="kpDigit('00')">00</button>
+    </div>
+    <div class="kp-actions">
+      <button class="kp-cancel" onclick="kpCancel()">Cancelar</button>
+      <button class="kp-ok" onclick="kpConfirm()"><i class="ti ti-check"></i> Añadir a stock</button>
     </div>
   </div>
 </div>
@@ -476,6 +549,7 @@ function renderAll(t){
   else if(t==='clientes') renderClientes();
   else if(t==='cal') renderCal();
   else if(t==='parte') loadParteHoy();
+  else if(t==='mesa') renderMesa();
 }
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.id==='tab-'+t));
@@ -491,6 +565,7 @@ function switchTab(t){
   else if(t==='productos') renderProductos();
   else if(t==='clientes') renderClientes();
   else if(t==='hist') loadHistorial();
+  else if(t==='mesa') renderMesa();
 }
 
 // ── Áreas desplegables de la barra ──────────────────────────────────────────
@@ -2870,6 +2945,142 @@ async function deleteBCCategoria(id){
     renderBCCategorias();renderBCCargas();renderBCList();
     log('Categoría eliminada');
   }catch(e){log('Error','warn');}
+}
+
+// ════════════ MESA DE VIBRADO (pantalla de producción) ════════════
+var MESA_CATS=[
+  {id:'forna', nombre:'GAVIÓN VIBRADO FORNA', kw:'FORNA'},
+  {id:'rojo',  nombre:'GAVIÓN VIBRADO ROJO',  kw:'ROJO'},
+  {id:'gris',  nombre:'GAVIÓN VIBRADO GRIS',  kw:'GRIS'},
+  {id:'blanco',nombre:'GAVIÓN VIBRADO BLANCO',kw:'BLANCO'}
+];
+var MESA_ANCHOS=[20,30,50,100];
+var mesaPaso='inicio', mesaCat=null, mesaAncho=null;
+var kpProductoId=null, kpValor='';
+
+function mesaNorm(s){ return (s||'').toString().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function mesaAnchoCm(p){ var a=+p.ancho||0; return a>0&&a<=5?Math.round(a*100):Math.round(a); }
+function mesaProductosCat(cat){
+  var kw=mesaNorm(cat.kw);
+  return productos.filter(function(p){
+    if(p.activo===false) return false;
+    var d=mesaNorm((p.descripcion||'')+' '+(p.referencia||''));
+    return d.includes('VIBRAD')&&d.includes(kw);
+  });
+}
+function mesaProductosCatAncho(cat,cm){
+  return mesaProductosCat(cat).filter(function(p){return mesaAnchoCm(p)===cm;})
+    .sort(function(a,b){return (a.referencia||'').localeCompare(b.referencia||'');});
+}
+
+function renderMesa(){
+  var el=document.getElementById('mesa-content');
+  if(!el) return;
+  if(mesaPaso==='inicio'){
+    el.innerHTML='<div class="mesa-grid">'+
+      '<button class="mesa-btn b-nuevo" onclick="mesaIr(\'nuevo-cat\')"><i class="ti ti-plus"></i> NUEVO<small>Elegir gavión a producir</small></button>'+
+      '<button class="mesa-btn b-repetir" onclick="mesaIr(\'repetir\')"><i class="ti ti-repeat"></i> REPETIR<small>Volver a producir lo último</small></button>'+
+    '</div>';
+    return;
+  }
+  if(mesaPaso==='repetir'){ renderMesaRepetir(el); return; }
+  if(mesaPaso==='nuevo-cat'){
+    el.innerHTML=mesaCrumbs()+
+      '<div class="mesa-grid">'+MESA_CATS.map(function(c){
+        var n=mesaProductosCat(c).length;
+        return '<button class="mesa-btn b-cat" onclick="mesaSelCat(\''+c.id+'\')">'+c.nombre+'<small>'+(n?n+' artículo'+(n===1?'':'s'):'sin artículos')+'</small></button>';
+      }).join('')+'</div>';
+    return;
+  }
+  if(mesaPaso==='nuevo-ancho'){
+    var cat=MESA_CATS.find(function(c){return c.id===mesaCat;});
+    el.innerHTML=mesaCrumbs()+
+      '<div class="mesa-grid cols4">'+MESA_ANCHOS.map(function(cm){
+        var n=mesaProductosCatAncho(cat,cm).length;
+        return '<button class="mesa-btn b-ancho" onclick="mesaSelAncho('+cm+')">'+cm+' CM<small>'+(n?n+' art.':'—')+'</small></button>';
+      }).join('')+'</div>';
+    return;
+  }
+  if(mesaPaso==='nuevo-art'){
+    var cat2=MESA_CATS.find(function(c){return c.id===mesaCat;});
+    var arts=mesaProductosCatAncho(cat2,mesaAncho);
+    el.innerHTML=mesaCrumbs()+
+      (arts.length?'<div class="mesa-grid cols1">'+arts.map(function(p){
+        return '<button class="mesa-btn b-art" onclick="mesaAbrirCantidad('+p.id+')"><span class="ref">'+(p.referencia||'(sin ref)')+'</span><span class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</span></button>';
+      }).join('')+'</div>'
+      :'<div class="mesa-empty"><i class="ti ti-package-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No hay artículos de '+cat2.nombre+' con ancho '+mesaAncho+' cm.</div>');
+    return;
+  }
+}
+
+function mesaCrumbs(){
+  var parts=['<span class="crumb" onclick="mesaIr(\'nuevo-cat\')">Nuevo</span>'];
+  if(mesaCat){var c=MESA_CATS.find(function(x){return x.id===mesaCat;});parts.push(mesaPaso==='nuevo-ancho'?'<span>'+c.nombre+'</span>':'<span class="crumb" onclick="mesaSelCat(\''+mesaCat+'\')">'+c.nombre+'</span>');}
+  if(mesaAncho&&mesaPaso==='nuevo-art'){parts.push('<span>'+mesaAncho+' cm</span>');}
+  return '<button class="mesa-back" onclick="mesaAtras()"><i class="ti ti-arrow-left"></i> Atrás</button>'+
+    '<div class="mesa-bc">'+parts.join('<i class="ti ti-chevron-right" style="font-size:14px;color:var(--text2)"></i>')+'</div>';
+}
+
+function mesaIr(paso){ mesaPaso=paso; if(paso==='inicio'||paso==='nuevo-cat'){mesaCat=null;mesaAncho=null;} renderMesa(); }
+function mesaSelCat(id){ mesaCat=id; mesaAncho=null; mesaPaso='nuevo-ancho'; renderMesa(); }
+function mesaSelAncho(cm){ mesaAncho=cm; mesaPaso='nuevo-art'; renderMesa(); }
+function mesaAtras(){
+  if(mesaPaso==='nuevo-art'){ mesaPaso='nuevo-ancho'; mesaAncho=null; }
+  else if(mesaPaso==='nuevo-ancho'){ mesaPaso='nuevo-cat'; mesaCat=null; }
+  else { mesaPaso='inicio'; }
+  renderMesa();
+}
+
+function mesaUltimaProduccion(){
+  var lista=movimientos.filter(function(m){return m.tipo==='entrada'&&mesaNorm(m.motivo).includes('MESA DE VIBRADO');});
+  if(!lista.length) lista=movimientos.filter(function(m){return m.tipo==='entrada';});
+  return lista.length?lista[0]:null;
+}
+function renderMesaRepetir(el){
+  var ult=mesaUltimaProduccion();
+  var back='<button class="mesa-back" onclick="mesaIr(\'inicio\')"><i class="ti ti-arrow-left"></i> Atrás</button>';
+  if(!ult){
+    el.innerHTML=back+'<div class="mesa-empty"><i class="ti ti-repeat-off" style="font-size:40px;display:block;margin-bottom:10px"></i>Todavía no hay ninguna producción registrada para repetir.</div>';
+    return;
+  }
+  el.innerHTML=back+
+    '<div class="mesa-bc"><span class="crumb" onclick="mesaIr(\'inicio\')"><i class="ti ti-home"></i> Inicio</span><i class="ti ti-chevron-right" style="font-size:14px;color:var(--text2)"></i><span>Repetir</span></div>'+
+    '<div class="mesa-grid cols1">'+
+      '<div class="mesa-btn b-art" style="cursor:default"><span class="ref">'+ult.referencia+'</span><span class="desc">'+(ult.descripcion||'')+'</span><span class="desc">Última: '+fmtN(ult.cantidad)+' ud · '+fmtFechaHora(ult.created_at)+'</span></div>'+
+      '<button class="mesa-btn b-repetir" onclick="mesaRepetir('+ult.producto_id+','+(Math.round(+ult.cantidad)||0)+')"><i class="ti ti-repeat"></i> REPETIR<small>'+ult.referencia+' — '+fmtN(ult.cantidad)+' ud</small></button>'+
+    '</div>';
+}
+function mesaRepetir(pid,cant){ abrirKeypad(pid, String(cant||'')); }
+
+function mesaAbrirCantidad(pid){ abrirKeypad(pid,''); }
+function abrirKeypad(pid,inicial){
+  kpProductoId=pid; kpValor=inicial||'';
+  var p=productos.find(function(x){return String(x.id)===String(pid);});
+  document.getElementById('kp-prod').innerHTML=p?('<div class="ref">'+(p.referencia||'')+'</div><div class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</div>'):'';
+  kpRender();
+  document.getElementById('kp-overlay').classList.add('open');
+}
+function kpRender(){ document.getElementById('kp-display').textContent=(kpValor===''?'0':kpValor); }
+function kpDigit(d){
+  if(kpValor==='0') kpValor='';
+  if(d==='00'&&kpValor==='') return;
+  if((kpValor+d).length<=6) kpValor+=d;
+  kpRender();
+}
+function kpClear(){ kpValor=kpValor.slice(0,-1); kpRender(); }
+function kpCancel(){ document.getElementById('kp-overlay').classList.remove('open'); kpProductoId=null; kpValor=''; }
+async function kpConfirm(){
+  var cant=parseInt(kpValor)||0;
+  if(!kpProductoId||cant<=0){ log('Introduce una cantidad','warn'); return; }
+  var p=productos.find(function(x){return String(x.id)===String(kpProductoId);});
+  try{
+    await api('POST','/stock/movimiento',{producto_id:+kpProductoId,tipo:'entrada',cantidad:cant,motivo:'Mesa de vibrado'});
+    document.getElementById('kp-overlay').classList.remove('open');
+    await loadAll();
+    log('✓ '+cant+' ud de '+(p?p.referencia:'producto')+' añadidas a stock','ok');
+    mesaPaso='inicio'; mesaCat=null; mesaAncho=null;
+    renderMesa();
+  }catch(e){ log('Error: '+e.message,'warn'); }
 }
 
 function log(msg,type=''){
