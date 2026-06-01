@@ -60,9 +60,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .area-menu .tab.active{background:var(--blue-l);color:var(--blue)}
 .area-menu .tab.highlight.active{background:var(--green-l);color:var(--green)}
 /* ── MESA DE VIBRADO ── */
-.mesa-tab{margin:6px auto;background:#facc15;color:#1a1a1a;font-weight:800;font-size:13px;letter-spacing:.04em;border-radius:999px;padding:9px 24px;border-bottom:none!important;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:background .12s}
+.prod-tabs{display:flex;gap:10px;align-items:center;margin:0 auto}
+.mesa-tab{margin:6px 0;background:#facc15;color:#1a1a1a;font-weight:800;font-size:13px;letter-spacing:.04em;border-radius:999px;padding:9px 24px;border-bottom:none!important;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:background .12s}
 .mesa-tab:hover{background:#eab308;color:#1a1a1a}
 .mesa-tab.active{background:#eab308;color:#1a1a1a;border-bottom:none!important}
+.montado-tab{margin:6px 0;background:#16a34a;color:#fff;font-weight:800;font-size:13px;letter-spacing:.04em;border-radius:999px;padding:9px 24px;border-bottom:none!important;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:background .12s}
+.montado-tab:hover{background:#15803d;color:#fff}
+.montado-tab.active{background:#15803d;color:#fff;border-bottom:none!important}
 .mesa-wrap{max-width:1000px;margin:0 auto;padding:18px}
 .mesa-wrap.full{max-width:none}
 .mesa-grid.arts{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
@@ -265,12 +269,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     </div>
   </div>
 
-  <div class="tab mesa-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> MESA DE VIBRADO</div>
+  <div class="prod-tabs">
+    <div class="tab mesa-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> MESA DE VIBRADO</div>
+    <div class="tab montado-tab" id="tab-montado" onclick="switchTab('montado')"><i class="ti ti-box"></i> ZONA MONTADO</div>
+  </div>
 </div>
 
 <!-- MESA DE VIBRADO -->
 <div class="view" id="view-mesa">
   <div class="mesa-wrap" id="mesa-content"></div>
+</div>
+<!-- ZONA MONTADO -->
+<div class="view" id="view-montado">
+  <div class="mesa-wrap" id="montado-content"></div>
 </div>
 <div class="kp-overlay" id="kp-overlay">
   <div class="kp-card">
@@ -556,6 +567,7 @@ function renderAll(t){
   else if(t==='cal') renderCal();
   else if(t==='parte') loadParteHoy();
   else if(t==='mesa') renderMesa();
+  else if(t==='montado') renderMontado();
 }
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.id==='tab-'+t));
@@ -572,6 +584,7 @@ function switchTab(t){
   else if(t==='clientes') renderClientes();
   else if(t==='hist') loadHistorial();
   else if(t==='mesa') renderMesa();
+  else if(t==='montado') renderMontado();
 }
 
 // ── Áreas desplegables de la barra ──────────────────────────────────────────
@@ -1798,6 +1811,30 @@ function renderMovPanel(){
 }
 
 // ── PEDIDOS ────────────────────────────────────────────────────────────────────
+// Clasifica un pedido por sus líneas: vibrado / premontado / mixto / otro
+function pedidoTipoProduccion(p){
+  var hasVib=false,hasPre=false,hasOtro=false;
+  (p.lineas||[]).forEach(function(l){
+    var d=mesaNorm((l.descripcion||'')+' '+(l.referencia||''));
+    var vib=d.includes('VIBRAD');
+    var pre=d.includes('PREMONT')||d.includes('MONTAD');
+    if(vib) hasVib=true;
+    if(pre) hasPre=true;
+    if(!vib&&!pre) hasOtro=true;
+  });
+  if(hasVib&&hasPre) return 'mixto';
+  if(hasVib) return 'vibrado';
+  if(hasPre) return 'premontado';
+  return hasOtro?'otro':'';
+}
+function badgePedidoProd(p){
+  var t=pedidoTipoProduccion(p);
+  if(t==='vibrado')    return '<span class="badge" style="background:#facc15;color:#1a1a1a;font-weight:700"><i class="ti ti-tools" style="font-size:10px"></i> Vibrado</span>';
+  if(t==='premontado') return '<span class="badge" style="background:#16a34a;color:#fff;font-weight:700"><i class="ti ti-box" style="font-size:10px"></i> Premontado</span>';
+  if(t==='mixto')      return '<span class="badge" style="background:#f97316;color:#fff;font-weight:700"><i class="ti ti-arrows-split-2" style="font-size:10px"></i> Mixto</span>';
+  return '';
+}
+
 function renderPedidos(){
   const search=(document.getElementById('ped-search')?.value||'').toLowerCase();
   const estadoF=document.getElementById('ped-estado')?.value||'';
@@ -1824,6 +1861,7 @@ function renderPedidos(){
           (p.obra?'<span class="badge b-steel"><i class="ti ti-building" style="font-size:10px"></i> '+p.obra+'</span>':'')+
           '<span class="badge '+sc.badge+'">'+sc.label+'</span>'+
           (p.tipo_fabricacion==='stock'?'<span class="badge b-purple">Desde stock</span>':'')+
+          badgePedidoProd(p)+
         '</div>'+
         '<div style="display:flex;gap:6px;align-items:center">'+
           '<span class="dim">Entrega: '+fmtD(p.fecha_entrega)+'</span>'+
@@ -2962,7 +3000,7 @@ var MESA_CATS=[
 ];
 var MESA_ANCHOS=[20,30,50,100];
 var mesaPaso='inicio', mesaCat=null, mesaAncho=null;
-var kpProductoId=null, kpValor='';
+var kpProductoId=null, kpValor='', kpZona='vibrado';
 
 function mesaNorm(s){ return (s||'').toString().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
 function mesaAnchoCm(p){ var a=+p.ancho||0; return a>0&&a<=5?Math.round(a*100):Math.round(a); }
@@ -3078,9 +3116,9 @@ function renderMesaRepetir(el){
 }
 function mesaRepetir(pid,cant){ abrirKeypad(pid, String(cant||'')); }
 
-function mesaAbrirCantidad(pid){ abrirKeypad(pid,''); }
-function abrirKeypad(pid,inicial){
-  kpProductoId=pid; kpValor=inicial||'';
+function mesaAbrirCantidad(pid){ abrirKeypad(pid,'','vibrado'); }
+function abrirKeypad(pid,inicial,zona){
+  kpProductoId=pid; kpValor=inicial||''; kpZona=zona||'vibrado';
   var p=productos.find(function(x){return String(x.id)===String(pid);});
   document.getElementById('kp-prod').innerHTML=p?('<div class="ref">'+(p.referencia||'')+'</div><div class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</div>'):'';
   kpRender();
@@ -3099,14 +3137,94 @@ async function kpConfirm(){
   var cant=parseInt(kpValor)||0;
   if(!kpProductoId||cant<=0){ log('Introduce una cantidad','warn'); return; }
   var p=productos.find(function(x){return String(x.id)===String(kpProductoId);});
+  var motivo=kpZona==='montado'?'Zona montado':'Mesa de vibrado';
   try{
-    await api('POST','/stock/movimiento',{producto_id:+kpProductoId,tipo:'entrada',cantidad:cant,motivo:'Mesa de vibrado'});
+    await api('POST','/stock/movimiento',{producto_id:+kpProductoId,tipo:'entrada',cantidad:cant,motivo:motivo});
     document.getElementById('kp-overlay').classList.remove('open');
     await loadAll();
     log('✓ '+cant+' ud de '+(p?p.referencia:'producto')+' añadidas a stock','ok');
-    mesaPaso='inicio'; mesaCat=null; mesaAncho=null;
-    renderMesa();
+    if(kpZona==='montado'){ montadoPaso='inicio'; montadoAncho=null; renderMontado(); }
+    else { mesaPaso='inicio'; mesaCat=null; mesaAncho=null; renderMesa(); }
   }catch(e){ log('Error: '+e.message,'warn'); }
+}
+
+// ════════════ ZONA MONTADO (gaviones premontados) ════════════
+var montadoPaso='inicio', montadoAncho=null;
+function montadoEsPremontado(p){
+  if(p.activo===false) return false;
+  var d=mesaNorm((p.descripcion||'')+' '+(p.referencia||''));
+  return d.includes('PREMONT')||d.includes('MONTAD');
+}
+function montadoProductos(){ return productos.filter(montadoEsPremontado); }
+function montadoProductosAncho(cm){
+  return montadoProductos().filter(function(p){return mesaAnchoCm(p)===cm;})
+    .sort(function(a,b){
+      var ba=mesaBloque(a), bb=mesaBloque(b);
+      if(ba!==bb) return ba-bb;                        // normal → ángulos → 70cm
+      var altoA=+a.alto||0, altoB=+b.alto||0;
+      if(altoB!==altoA) return altoB-altoA;            // alto: mayor a menor
+      return (+b.largo||0)-(+a.largo||0);              // largo: mayor a menor
+    });
+}
+function renderMontado(){
+  var el=document.getElementById('montado-content');
+  if(!el) return;
+  el.classList.toggle('full', montadoPaso==='nuevo-art');
+  if(montadoPaso==='inicio'){
+    el.innerHTML='<div class="mesa-grid">'+
+      '<button class="mesa-btn b-nuevo" onclick="montadoIr(\'nuevo-ancho\')"><i class="ti ti-plus"></i> NUEVO<small>Elegir premontado por ancho</small></button>'+
+      '<button class="mesa-btn b-repetir" onclick="montadoIr(\'repetir\')"><i class="ti ti-repeat"></i> REPETIR<small>Volver a producir lo último</small></button>'+
+    '</div>';
+    return;
+  }
+  if(montadoPaso==='repetir'){ renderMontadoRepetir(el); return; }
+  if(montadoPaso==='nuevo-ancho'){
+    el.innerHTML=montadoCrumbs()+
+      '<div class="mesa-grid cols4">'+MESA_ANCHOS.map(function(cm){
+        var n=montadoProductosAncho(cm).length;
+        return '<button class="mesa-btn b-ancho" onclick="montadoSelAncho('+cm+')">'+cm+' CM<small>'+(n?n+' art.':'—')+'</small></button>';
+      }).join('')+'</div>';
+    return;
+  }
+  if(montadoPaso==='nuevo-art'){
+    var arts=montadoProductosAncho(montadoAncho);
+    el.innerHTML=montadoCrumbs()+
+      (arts.length?'<div class="mesa-grid arts">'+arts.map(function(p){
+        return '<button class="mesa-btn b-art" onclick="montadoAbrirCantidad('+p.id+')"><span class="desc">'+(p.descripcion||'(sin descripción)')+'</span><span class="ref">'+(p.referencia||'(sin ref)')+' · '+dimStr(p)+'</span></button>';
+      }).join('')+'</div>'
+      :'<div class="mesa-empty"><i class="ti ti-package-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No hay premontados con ancho '+montadoAncho+' cm.</div>');
+    return;
+  }
+}
+function montadoCrumbs(){
+  var parts=['<span class="crumb" onclick="montadoIr(\'nuevo-ancho\')">Premontados</span>'];
+  if(montadoAncho&&montadoPaso==='nuevo-art') parts.push('<span>'+montadoAncho+' cm</span>');
+  return '<button class="mesa-back" onclick="montadoAtras()"><i class="ti ti-arrow-left"></i> Atrás</button>'+
+    '<div class="mesa-bc">'+parts.join('<i class="ti ti-chevron-right" style="font-size:14px;color:var(--text2)"></i>')+'</div>';
+}
+function montadoIr(paso){ montadoPaso=paso; if(paso==='inicio'||paso==='nuevo-ancho') montadoAncho=null; renderMontado(); }
+function montadoSelAncho(cm){ montadoAncho=cm; montadoPaso='nuevo-art'; renderMontado(); }
+function montadoAtras(){
+  if(montadoPaso==='nuevo-art'){ montadoPaso='nuevo-ancho'; montadoAncho=null; }
+  else { montadoPaso='inicio'; }
+  renderMontado();
+}
+function montadoAbrirCantidad(pid){ abrirKeypad(pid,'','montado'); }
+function renderMontadoRepetir(el){
+  var lista=movimientos.filter(function(m){return m.tipo==='entrada'&&mesaNorm(m.motivo).includes('ZONA MONTADO');});
+  if(!lista.length) lista=movimientos.filter(function(m){return m.tipo==='entrada'&&montadoEsPremontado({descripcion:m.descripcion,referencia:m.referencia});});
+  var ult=lista.length?lista[0]:null;
+  var back='<button class="mesa-back" onclick="montadoIr(\'inicio\')"><i class="ti ti-arrow-left"></i> Atrás</button>';
+  if(!ult){
+    el.innerHTML=back+'<div class="mesa-empty"><i class="ti ti-repeat-off" style="font-size:40px;display:block;margin-bottom:10px"></i>Todavía no hay ningún premontado registrado para repetir.</div>';
+    return;
+  }
+  el.innerHTML=back+
+    '<div class="mesa-bc"><span class="crumb" onclick="montadoIr(\'inicio\')"><i class="ti ti-home"></i> Inicio</span><i class="ti ti-chevron-right" style="font-size:14px;color:var(--text2)"></i><span>Repetir</span></div>'+
+    '<div class="mesa-grid cols1">'+
+      '<div class="mesa-btn b-art" style="cursor:default"><span class="desc">'+(ult.descripcion||'')+'</span><span class="ref">'+ult.referencia+' · Última: '+fmtN(ult.cantidad)+' ud · '+fmtFechaHora(ult.created_at)+'</span></div>'+
+      '<button class="mesa-btn b-repetir" onclick="abrirKeypad('+ult.producto_id+',\''+(Math.round(+ult.cantidad)||0)+'\',\'montado\')"><i class="ti ti-repeat"></i> REPETIR<small>'+ult.referencia+' — '+fmtN(ult.cantidad)+' ud</small></button>'+
+    '</div>';
 }
 
 function log(msg,type=''){
