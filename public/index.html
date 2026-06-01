@@ -83,8 +83,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .mesa-btn.b-ancho{background:linear-gradient(135deg,#0891b2,#0e7490);font-size:30px}
 .mesa-btn.b-art{background:var(--surface);color:var(--text);border:2px solid var(--border2);box-shadow:none;font-size:18px;align-items:flex-start;text-align:left;min-height:96px;padding:20px}
 .mesa-btn.b-art:hover{border-color:var(--blue);filter:none;background:var(--surface2)}
-.mesa-btn.b-art .ref{font-family:monospace;font-weight:800;font-size:20px;color:var(--blue)}
-.mesa-btn.b-art .desc{font-size:13px;font-weight:500;color:var(--text2)}
+.mesa-btn.b-art .desc{font-size:19px;font-weight:700;color:var(--text);line-height:1.2}
+.mesa-btn.b-art .ref{font-family:monospace;font-weight:600;font-size:13px;color:var(--text2)}
 .mesa-back{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:12px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-bottom:14px}
 .mesa-empty{text-align:center;padding:40px;color:var(--text2);font-size:16px}
 /* keypad */
@@ -2972,7 +2972,12 @@ function mesaProductosCat(cat){
 }
 function mesaProductosCatAncho(cat,cm){
   return mesaProductosCat(cat).filter(function(p){return mesaAnchoCm(p)===cm;})
-    .sort(function(a,b){return (a.referencia||'').localeCompare(b.referencia||'');});
+    .sort(function(a,b){
+      var altoA=+a.alto||0, altoB=+b.alto||0;
+      if(altoB!==altoA) return altoB-altoA;            // alto: mayor a menor
+      var largoA=+a.largo||0, largoB=+b.largo||0;
+      return largoB-largoA;                            // largo: mayor a menor
+    });
 }
 
 function renderMesa(){
@@ -3009,7 +3014,7 @@ function renderMesa(){
     var arts=mesaProductosCatAncho(cat2,mesaAncho);
     el.innerHTML=mesaCrumbs()+
       (arts.length?'<div class="mesa-grid arts">'+arts.map(function(p){
-        return '<button class="mesa-btn b-art" onclick="mesaAbrirCantidad('+p.id+')"><span class="ref">'+(p.referencia||'(sin ref)')+'</span><span class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</span></button>';
+        return '<button class="mesa-btn b-art" onclick="mesaAbrirCantidad('+p.id+')"><span class="desc">'+(p.descripcion||'(sin descripción)')+'</span><span class="ref">'+(p.referencia||'(sin ref)')+' · '+dimStr(p)+'</span></button>';
       }).join('')+'</div>'
       :'<div class="mesa-empty"><i class="ti ti-package-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No hay artículos de '+cat2.nombre+' con ancho '+mesaAncho+' cm.</div>');
     return;
