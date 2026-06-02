@@ -3300,8 +3300,8 @@ function gavionSVG(p,count){
   var k=66;                                       // píxeles por metro (escala común → conserva proporciones)
   var W=Math.max(52, L*k);                        // largaria → ancho del dibujo
   var Hf=Math.max(30, H*k);                       // altura  → alto del dibujo
-  var D=Math.max(12, Math.min(58, A*k));          // ancho   → profundidad (con tope para que no domine)
-  var dx=D*0.8, dy=D*0.46;
+  var D=Math.max(10, A*k);                        // ancho → profundidad a escala real (sin tope)
+  var dx=D*0.66, dy=D*0.38;                       // proyección isométrica suave; profundidad fiel a la medida
   var ratio=A/L;
   var taper=ang ? (ratio>=0.9 ? W*0.98 : Math.min(W*0.85, W*ratio*1.9)) : 0;  // ángulo exagerado para que se vea; 1×1×1 → triángulo
   var ghosts=count>1?Math.min(2,count-1):0;       // copias detrás para la pila
