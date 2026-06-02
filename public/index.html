@@ -1057,12 +1057,13 @@ async function cerrarParte(id){
 }
 
 // ── CALENDARIO ─────────────────────────────────────────────────────────────────
-// Clave de carga = pedido + fecha. Todas las líneas del mismo pedido el mismo
-// día se tratan como UNA sola carga, sin importar cómo se añadieran.
-function claveCarga(e){ return String(e.fecha_carga).substring(0,10)+'__'+e.pedido_numero; }
+// Clave de carga = el id de la carga programada (carga_grupo_id). Cada carga es
+// independiente, aunque sea del mismo pedido y el mismo día. Las líneas antiguas
+// sin grupo se quedan como su propia carga (SOLO_{id}).
+function claveCarga(e){ return e.carga_grupo_id ? String(e.carga_grupo_id) : 'SOLO_'+e.id; }
 function lineasDeCarga(grupoId){ return entregas.filter(function(e){ return claveCarga(e)===grupoId; }); }
 
-// Agrupa una lista de entregas por carga (pedido + fecha). Mantiene el orden.
+// Agrupa una lista de entregas por carga. Mantiene el orden.
 function agruparCargas(lista){
   var grupos={}, orden=[];
   lista.forEach(function(e){
@@ -1265,9 +1266,9 @@ function editarGrupo(grupoId){
     var isPend=e.estado==='pendiente';
     bodyHTML+=
       '<tr style="border-bottom:1px solid var(--border);background:'+(isPend?'var(--surface)':'var(--green-l)')+'">'+
-        '<td style="padding:8px 10px">'+
-          '<div style="font-weight:500;color:var(--blue-d)">'+e.referencia+'</div>'+
-          '<div class="dim">'+dimStr(e)+'</div>'+
+        '<td style="padding:8px 10px;max-width:320px">'+
+          '<div style="font-weight:500;color:var(--blue-d);font-family:monospace;font-size:12px">'+e.referencia+'</div>'+
+          '<div style="font-size:12px;color:var(--text2);white-space:normal;line-height:1.3">'+(e.descripcion||dimStr(e))+'</div>'+
         '</td>'+
         '<td style="padding:8px 10px;text-align:right;font-family:monospace">'+fmtN(totalPed)+'</td>'+
         '<td style="padding:8px 10px;text-align:right;font-family:monospace;color:var(--green)">'+fmtN(entregado)+'</td>'+
@@ -1709,6 +1710,21 @@ async function deleteGrupoById(idsStr){
 
 async function deleteGrupo(ids){
   await deleteGrupoById(ids.join(','));
+}
+
+// Eliminar una sola línea de la carga (botón papelera del modal)
+async function deleteEntregaById(id){
+  var e=entregas.find(function(x){return String(x.id)===String(id);});
+  var msg=(e&&e.estado==='confirmada')
+    ? 'Esta línea está confirmada (stock descontado). Al eliminar se devolverá el stock. ¿Continuar?'
+    : '¿Eliminar esta línea de la carga?';
+  if(!confirm(msg)) return;
+  try{
+    await api('DELETE','/entregas/'+id);
+    await loadAll();
+    log('Línea eliminada'+(e&&e.estado==='confirmada'?' — stock devuelto':''),'ok');
+    closeModal();
+  }catch(err){ log('Error: '+err.message,'warn'); }
 }
 
 function verDetalleGrupo(grupoId){
@@ -2177,8 +2193,8 @@ function toggleDims(){
 }
 
 function lineaHTML(i,l){
-  return '<div id="linea-'+i+'" data-lid="'+(l&&l.id?l.id:'')+'" style="display:grid;grid-template-columns:1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
-    '<select class="linea-prod" data-i="'+i+'" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)">'+
+  return '<div id="linea-'+i+'" data-lid="'+(l&&l.id?l.id:'')+'" data-pid="'+(l&&l.producto_id?l.producto_id:'')+'" style="display:grid;grid-template-columns:1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
+    '<select class="linea-prod" data-i="'+i+'" onchange="this.closest(\'[data-pid]\').dataset.pid=this.value" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)">'+
       '<option value="">Seleccionar producto...</option>'+
       productos.map(p=>'<option value="'+p.id+'" '+(l&&String(l.producto_id)===String(p.id)?'selected':'')+'>'+prodLabel(p)+'</option>').join('')+
     '</select>'+
@@ -2196,7 +2212,8 @@ function addLineaPedido(){
 function getLineas(){
   const lineas=[];
   document.querySelectorAll('#lineas-container > div').forEach(row=>{
-    const prod=row.querySelector('.linea-prod')?.value;
+    const sel=row.querySelector('.linea-prod')?.value;
+    const prod=(sel&&sel!=='')?sel:(row.dataset.pid||'');   // si el desplegable está vacío, usa el id guardado en la fila
     const cant=parseFloat(row.querySelector('.linea-cant')?.value)||0;
     const lid=row.dataset.lid;
     if(prod&&cant>0) lineas.push({id:lid?+lid:undefined,producto_id:+prod,cantidad:cant});
