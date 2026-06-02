@@ -3301,7 +3301,8 @@ function gavionSVG(p,count){
   var Hf=Math.max(38,Math.min(118,26+H*92));     // alto   → alto del dibujo
   var D=Math.max(14,Math.min(46,10+A*40));        // ancho  → profundidad
   var dx=D*0.8, dy=D*0.46;
-  var taper=ang?Math.min(W*0.98, W*(A/L)) : 0;    // ángulo 45º: la arista trasera se acorta el ancho (largo_atrás = largo − ancho)
+  var ratio=A/L;
+  var taper=ang ? (ratio>=0.9 ? W*0.98 : Math.min(W*0.85, W*ratio*1.9)) : 0;  // ángulo exagerado para que se vea; 1×1×1 → triángulo
   var ghosts=count>1?Math.min(2,count-1):0;       // copias detrás para la pila
   var so=8, padL=12, padT=18, padR=18, padB=14;
   var ox=padL+ghosts*so, oy=padT+dy+ghosts*so;
