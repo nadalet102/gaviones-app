@@ -3182,9 +3182,19 @@ function mesaAtras(){
   renderMesa();
 }
 
+function guardarUltimoVibrado(pid,cant){
+  try{
+    var p=productos.find(function(x){return String(x.id)===String(pid);});
+    localStorage.setItem('gav_ultimo_vibrado',JSON.stringify({
+      producto_id:+pid, referencia:p?p.referencia:'', descripcion:p?p.descripcion:'',
+      cantidad:+cant, created_at:new Date().toISOString()
+    }));
+  }catch(e){}
+}
 function mesaUltimaProduccion(){
+  try{ var s=localStorage.getItem('gav_ultimo_vibrado'); if(s){ var o=JSON.parse(s); if(o&&o.producto_id) return o; } }catch(e){}
+  // Compatibilidad: producciones antiguas que sí dejaban movimiento de stock
   var lista=movimientos.filter(function(m){return m.tipo==='entrada'&&mesaNorm(m.motivo).includes('MESA DE VIBRADO');});
-  if(!lista.length) lista=movimientos.filter(function(m){return m.tipo==='entrada';});
   return lista.length?lista[0]:null;
 }
 function renderMesaRepetir(el){
@@ -3234,6 +3244,7 @@ async function kpConfirm(){
     if(kpZona==='vibrado'){
       // La mesa de vibrado ya NO suma a stock: deja en zona de carado
       await api('POST','/carado/add',{producto_id:+kpProductoId,cantidad:cant});
+      guardarUltimoVibrado(kpProductoId,cant);
       document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
       await loadAll();
       log('✓ '+cant+' ud de '+refTxt+' enviadas a Zona de carado','ok');
@@ -3257,11 +3268,26 @@ async function kpConfirm(){
 // ════════════ ZONA DE CARADO (paso intermedio vibrado → stock) ════════════
 function gavionColor(p){
   var d=mesaNorm((p.descripcion||'')+' '+(p.referencia||''));
-  if(d.includes('ROJO'))   return {face:'#fecaca',top:'#fca5a5',side:'#f87171',wire:'#b91c1c'};
-  if(d.includes('GRIS'))   return {face:'#e5e9ef',top:'#cbd5e1',side:'#9aa7b8',wire:'#475569'};
-  if(d.includes('BLANCO')) return {face:'#f8fafc',top:'#eef2f7',side:'#d8e0ea',wire:'#8a97a8'};
-  if(d.includes('FORNA'))  return {face:'#f3e3c2',top:'#e7d09a',side:'#d6ba80',wire:'#a16207'};
-  return {face:'#dde7c2',top:'#c8d89c',side:'#aec070',wire:'#4d7c0f'};
+  if(d.includes('ROJO'))   return {wire:'#7c8a99', base:'#6e4636', pal:['#c97b5e','#b5634a','#a85540','#cc8a6e','#9e4d3a','#d29a82','#bb6f56','#8f4836']};
+  if(d.includes('GRIS'))   return {wire:'#697079', base:'#5b626b', pal:['#c2c6cb','#a9adb3','#969ba1','#cdd1d5','#8e9398','#b4b9be','#a0a5ab','#787d83']};
+  if(d.includes('BLANCO')) return {wire:'#9aa3ad', base:'#b9bec3', pal:['#f1f3f5','#e4e7ea','#f7f8fa','#d9dde0','#ebedee','#e8ebee','#dfe3e6','#cfd4d8']};
+  // FORNA y por defecto: caliza crema (como las fotos)
+  return {wire:'#8a93a0', base:'#9c8a66', pal:['#e9ddc2','#dccaa6','#d6c49c','#cdb88c','#e3d8be','#c9b487','#bca57a','#ded2b4','#f0e7d4','#b29a6a','#d2c096']};
+}
+// PRNG con semilla → patrón de piedras estable por producto
+function gavRand(seed){ var s=(seed||1)%2147483647; if(s<=0)s+=2147483646; return function(){ s=s*16807%2147483647; return (s-1)/2147483646; }; }
+// Relleno de piedras irregulares dentro de un rectángulo (se recorta a la cara)
+function gavStones(bx,by,bw,bh,pal,rnd){
+  var cell=Math.max(11,Math.min(16,bw/6.5)), out='';
+  for(var y=by-cell; y<by+bh+cell; y+=cell*0.76){
+    for(var x=bx-cell; x<bx+bw+cell; x+=cell*0.76){
+      var cx=x+(rnd()-0.5)*cell*0.55, cy=y+(rnd()-0.5)*cell*0.55;
+      var sides=5+((rnd()*2)|0), r=cell*(0.52+rnd()*0.26), pts='';
+      for(var a=0;a<sides;a++){ var ang=a/sides*6.2832+rnd()*0.55, rr=r*(0.66+rnd()*0.46); pts+=(cx+Math.cos(ang)*rr).toFixed(1)+','+(cy+Math.sin(ang)*rr).toFixed(1)+' '; }
+      out+='<polygon points="'+pts.trim()+'" fill="'+pal[(rnd()*pal.length)|0]+'" stroke="rgba(50,40,25,.18)" stroke-width="0.4"/>';
+    }
+  }
+  return out;
 }
 
 // Dibuja un gavión (malla 3D) escalado por sus medidas; ángulo si procede; apilado si count>1.
@@ -3291,14 +3317,18 @@ function gavionSVG(p,count){
   for(var gy=oy+cut+step*0.5; gy<oy+Hf-1; gy+=step) grid+='<line x1="'+ox+'" y1="'+gy.toFixed(1)+'" x2="'+(ox+W)+'" y2="'+gy.toFixed(1)+'"/>';
   var tgrid='';
   for(var tx=ox+step; tx<ox+W-1; tx+=step) tgrid+='<line x1="'+tx.toFixed(1)+'" y1="'+oy+'" x2="'+(tx+dx).toFixed(1)+'" y2="'+(oy-dy)+'"/>';
+  var sg='';
+  for(var sy=oy+cut+step*0.4; sy<oy+Hf-1; sy+=step) sg+='<line x1="'+(ox+W)+'" y1="'+sy.toFixed(1)+'" x2="'+(ox+W+dx)+'" y2="'+(sy-dy).toFixed(1)+'"/>';
+  var seed=(p.producto_id||p.id||((L*100+A*10+H)|0))||1;
+  var rT=gavRand(seed*7+1), rS=gavRand(seed*13+3), rF=gavRand(seed*17+5);
   // pila (copias detrás)
   var ghostSvg='';
   for(var k=ghosts;k>=1;k--){
     var s=k*so;
-    ghostSvg+='<g transform="translate('+(-s)+','+(-s)+')" opacity="0.45">'+
-      '<polygon points="'+topPts+'" fill="'+c.top+'" stroke="'+c.wire+'" stroke-width="1.2"/>'+
-      '<polygon points="'+sidePts+'" fill="'+c.side+'" stroke="'+c.wire+'" stroke-width="1.2"/>'+
-      '<polygon points="'+frontPts+'" fill="'+c.face+'" stroke="'+c.wire+'" stroke-width="1.4"/>'+
+    ghostSvg+='<g transform="translate('+(-s)+','+(-s)+')" opacity="0.4">'+
+      '<polygon points="'+topPts+'" fill="'+c.pal[4]+'" stroke="'+c.wire+'" stroke-width="1.1"/>'+
+      '<polygon points="'+sidePts+'" fill="'+c.pal[6]+'" stroke="'+c.wire+'" stroke-width="1.1"/>'+
+      '<polygon points="'+frontPts+'" fill="'+c.pal[3]+'" stroke="'+c.wire+'" stroke-width="1.3"/>'+
     '</g>';
   }
   var badge='';
@@ -3311,14 +3341,22 @@ function gavionSVG(p,count){
     '<defs>'+
       '<clipPath id="cf'+uid+'"><polygon points="'+frontPts+'"/></clipPath>'+
       '<clipPath id="ct'+uid+'"><polygon points="'+topPts+'"/></clipPath>'+
+      '<clipPath id="cs'+uid+'"><polygon points="'+sidePts+'"/></clipPath>'+
     '</defs>'+
     '<ellipse cx="'+(ox+W/2+dx/2)+'" cy="'+(oy+Hf+5)+'" rx="'+(W*0.55).toFixed(1)+'" ry="5.5" fill="rgba(0,0,0,.10)"/>'+
     ghostSvg+
-    '<polygon points="'+topPts+'" fill="'+c.top+'" stroke="'+c.wire+'" stroke-width="1.4"/>'+
-    '<polygon points="'+sidePts+'" fill="'+c.side+'" stroke="'+c.wire+'" stroke-width="1.4"/>'+
-    '<polygon points="'+frontPts+'" fill="'+c.face+'" stroke="'+c.wire+'" stroke-width="1.8"/>'+
-    '<g clip-path="url(#cf'+uid+')" stroke="'+c.wire+'" stroke-width="1" opacity="0.5">'+grid+'</g>'+
-    '<g clip-path="url(#ct'+uid+')" stroke="'+c.wire+'" stroke-width="0.9" opacity="0.4">'+tgrid+'</g>'+
+    '<polygon points="'+topPts+'" fill="'+c.base+'"/>'+
+    '<g clip-path="url(#ct'+uid+')">'+gavStones(ox,oy-dy,W+dx,cut+dy+1,c.pal,rT)+'</g>'+
+    '<g clip-path="url(#ct'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.5">'+tgrid+'</g>'+
+    '<polygon points="'+topPts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
+    '<polygon points="'+sidePts+'" fill="'+c.base+'"/>'+
+    '<g clip-path="url(#cs'+uid+')">'+gavStones(ox+W,oy+cut-dy,dx,Hf+dy,c.pal,rS)+'</g>'+
+    '<g clip-path="url(#cs'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.45">'+sg+'</g>'+
+    '<polygon points="'+sidePts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
+    '<polygon points="'+frontPts+'" fill="'+c.base+'"/>'+
+    '<g clip-path="url(#cf'+uid+')">'+gavStones(ox,oy,W,Hf,c.pal,rF)+'</g>'+
+    '<g clip-path="url(#cf'+uid+')" stroke="'+c.wire+'" stroke-width="0.9" opacity="0.55">'+grid+'</g>'+
+    '<polygon points="'+frontPts+'" fill="none" stroke="'+c.wire+'" stroke-width="2"/>'+
     badge+
   '</svg>';
 }
