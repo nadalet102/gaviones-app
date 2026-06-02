@@ -3301,24 +3301,30 @@ function gavionSVG(p,count){
   var Hf=Math.max(38,Math.min(118,26+H*92));     // alto   → alto del dibujo
   var D=Math.max(14,Math.min(46,10+A*40));        // ancho  → profundidad
   var dx=D*0.8, dy=D*0.46;
-  var cut=ang?Hf*0.46:0;                          // cuña: lado alto a la DERECHA, baja hacia la izquierda
+  var taper=ang?Math.min(W*0.98, W*(A/L)) : 0;    // ángulo 45º: la arista trasera se acorta el ancho (largo_atrás = largo − ancho)
   var ghosts=count>1?Math.min(2,count-1):0;       // copias detrás para la pila
   var so=8, padL=12, padT=18, padR=18, padB=14;
   var ox=padL+ghosts*so, oy=padT+dy+ghosts*so;
-  var vbW=Math.ceil(ox+W+dx+padR), vbH=Math.ceil(oy+Hf+padB);
+  var bx=ox+dx+W-taper;                            // x de la arista trasera (acortada por el ángulo)
+  var maxX=Math.max(ox+W, bx);
+  var vbW=Math.ceil(maxX+padR), vbH=Math.ceil(oy+Hf+padB);
   var P=(x,y)=>x.toFixed(1)+','+y.toFixed(1);
-  var FTL=[ox,oy+cut], FTR=[ox+W,oy], FBR=[ox+W,oy+Hf], FBL=[ox,oy+Hf];
-  var BTL=[ox+dx,oy+cut-dy], BTR=[ox+W+dx,oy-dy], BBR=[ox+W+dx,oy+Hf-dy];
+  // Altura SIEMPRE completa. El ángulo solo acorta la cara trasera (planta = trapecio; triángulo si ancho=largo)
+  var FTL=[ox,oy], FTR=[ox+W,oy], FBR=[ox+W,oy+Hf], FBL=[ox,oy+Hf];
+  var BTL=[ox+dx,oy-dy], BTR=[bx,oy-dy], BBR=[bx,oy+Hf-dy];
   var poly=(arr)=>arr.map(q=>P(q[0],q[1])).join(' ');
   var frontPts=poly([FTL,FTR,FBR,FBL]), topPts=poly([FTL,FTR,BTR,BTL]), sidePts=poly([FTR,BTR,BBR,FBR]);
-  // malla cara frontal (recortada al polígono)
+  // malla cara frontal (rectángulo completo)
   var step=Math.max(11,Math.min(19,W/6)), grid='';
-  for(var gx=ox+step; gx<ox+W-1; gx+=step) grid+='<line x1="'+gx.toFixed(1)+'" y1="'+(oy-dy)+'" x2="'+gx.toFixed(1)+'" y2="'+(oy+Hf)+'"/>';
+  for(var gx=ox+step; gx<ox+W-1; gx+=step) grid+='<line x1="'+gx.toFixed(1)+'" y1="'+oy+'" x2="'+gx.toFixed(1)+'" y2="'+(oy+Hf)+'"/>';
   for(var gy=oy+step*0.5; gy<oy+Hf-1; gy+=step) grid+='<line x1="'+ox+'" y1="'+gy.toFixed(1)+'" x2="'+(ox+W)+'" y2="'+gy.toFixed(1)+'"/>';
+  // malla cara superior (recede hacia la arista trasera acortada)
   var tgrid='';
-  for(var tx=ox+step; tx<ox+W-1; tx+=step) tgrid+='<line x1="'+tx.toFixed(1)+'" y1="'+oy+'" x2="'+(tx+dx).toFixed(1)+'" y2="'+(oy-dy)+'"/>';
+  for(var tx=ox+step; tx<ox+W-1; tx+=step){ var f=(tx-ox)/W, bxr=ox+dx+f*(W-taper); tgrid+='<line x1="'+tx.toFixed(1)+'" y1="'+oy+'" x2="'+bxr.toFixed(1)+'" y2="'+(oy-dy)+'"/>'; }
+  // malla cara diagonal (lateral)
   var sg='';
-  for(var sy=oy+step*0.4; sy<oy+Hf-1; sy+=step) sg+='<line x1="'+(ox+W)+'" y1="'+sy.toFixed(1)+'" x2="'+(ox+W+dx)+'" y2="'+(sy-dy).toFixed(1)+'"/>';
+  for(var sy=oy+step*0.4; sy<oy+Hf-1; sy+=step) sg+='<line x1="'+(ox+W)+'" y1="'+sy.toFixed(1)+'" x2="'+bx.toFixed(1)+'" y2="'+(sy-dy).toFixed(1)+'"/>';
+  var sbx=Math.min(ox+W,bx), sbw=Math.abs(bx-(ox+W))+1;   // bbox de la cara diagonal
   var seed=(p.producto_id||p.id||((L*100+A*10+H)|0))||1;
   var rT=gavRand(seed*7+1), rS=gavRand(seed*13+3), rF=gavRand(seed*17+5);
   // pila (copias detrás)
@@ -3346,11 +3352,11 @@ function gavionSVG(p,count){
     '<ellipse cx="'+(ox+W/2+dx/2)+'" cy="'+(oy+Hf+5)+'" rx="'+(W*0.55).toFixed(1)+'" ry="5.5" fill="rgba(0,0,0,.10)"/>'+
     ghostSvg+
     '<polygon points="'+topPts+'" fill="'+c.base+'"/>'+
-    '<g clip-path="url(#ct'+uid+')">'+gavStones(ox,oy-dy,W+dx,cut+dy+1,c.pal,rT)+'</g>'+
+    '<g clip-path="url(#ct'+uid+')">'+gavStones(ox,oy-dy,maxX-ox,dy+1,c.pal,rT)+'</g>'+
     '<g clip-path="url(#ct'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.5">'+tgrid+'</g>'+
     '<polygon points="'+topPts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
     '<polygon points="'+sidePts+'" fill="'+c.base+'"/>'+
-    '<g clip-path="url(#cs'+uid+')">'+gavStones(ox+W,oy-dy,dx,Hf+dy,c.pal,rS)+'</g>'+
+    '<g clip-path="url(#cs'+uid+')">'+gavStones(sbx,oy-dy,sbw,Hf+dy,c.pal,rS)+'</g>'+
     '<g clip-path="url(#cs'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.45">'+sg+'</g>'+
     '<polygon points="'+sidePts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
     '<polygon points="'+frontPts+'" fill="'+c.base+'"/>'+
