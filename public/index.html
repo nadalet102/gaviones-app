@@ -3301,24 +3301,24 @@ function gavionSVG(p,count){
   var Hf=Math.max(38,Math.min(118,26+H*92));     // alto   → alto del dibujo
   var D=Math.max(14,Math.min(46,10+A*40));        // ancho  → profundidad
   var dx=D*0.8, dy=D*0.46;
-  var cut=ang?Hf*0.42:0;                          // corte del ángulo (techo inclinado)
+  var cut=ang?Hf*0.46:0;                          // cuña: lado alto a la DERECHA, baja hacia la izquierda
   var ghosts=count>1?Math.min(2,count-1):0;       // copias detrás para la pila
   var so=8, padL=12, padT=18, padR=18, padB=14;
   var ox=padL+ghosts*so, oy=padT+dy+ghosts*so;
   var vbW=Math.ceil(ox+W+dx+padR), vbH=Math.ceil(oy+Hf+padB);
   var P=(x,y)=>x.toFixed(1)+','+y.toFixed(1);
-  var FTL=[ox,oy], FTR=[ox+W,oy+cut], FBR=[ox+W,oy+Hf], FBL=[ox,oy+Hf];
-  var BTL=[ox+dx,oy-dy], BTR=[ox+W+dx,oy+cut-dy], BBR=[ox+W+dx,oy+Hf-dy];
+  var FTL=[ox,oy+cut], FTR=[ox+W,oy], FBR=[ox+W,oy+Hf], FBL=[ox,oy+Hf];
+  var BTL=[ox+dx,oy+cut-dy], BTR=[ox+W+dx,oy-dy], BBR=[ox+W+dx,oy+Hf-dy];
   var poly=(arr)=>arr.map(q=>P(q[0],q[1])).join(' ');
   var frontPts=poly([FTL,FTR,FBR,FBL]), topPts=poly([FTL,FTR,BTR,BTL]), sidePts=poly([FTR,BTR,BBR,FBR]);
   // malla cara frontal (recortada al polígono)
   var step=Math.max(11,Math.min(19,W/6)), grid='';
   for(var gx=ox+step; gx<ox+W-1; gx+=step) grid+='<line x1="'+gx.toFixed(1)+'" y1="'+(oy-dy)+'" x2="'+gx.toFixed(1)+'" y2="'+(oy+Hf)+'"/>';
-  for(var gy=oy+cut+step*0.5; gy<oy+Hf-1; gy+=step) grid+='<line x1="'+ox+'" y1="'+gy.toFixed(1)+'" x2="'+(ox+W)+'" y2="'+gy.toFixed(1)+'"/>';
+  for(var gy=oy+step*0.5; gy<oy+Hf-1; gy+=step) grid+='<line x1="'+ox+'" y1="'+gy.toFixed(1)+'" x2="'+(ox+W)+'" y2="'+gy.toFixed(1)+'"/>';
   var tgrid='';
   for(var tx=ox+step; tx<ox+W-1; tx+=step) tgrid+='<line x1="'+tx.toFixed(1)+'" y1="'+oy+'" x2="'+(tx+dx).toFixed(1)+'" y2="'+(oy-dy)+'"/>';
   var sg='';
-  for(var sy=oy+cut+step*0.4; sy<oy+Hf-1; sy+=step) sg+='<line x1="'+(ox+W)+'" y1="'+sy.toFixed(1)+'" x2="'+(ox+W+dx)+'" y2="'+(sy-dy).toFixed(1)+'"/>';
+  for(var sy=oy+step*0.4; sy<oy+Hf-1; sy+=step) sg+='<line x1="'+(ox+W)+'" y1="'+sy.toFixed(1)+'" x2="'+(ox+W+dx)+'" y2="'+(sy-dy).toFixed(1)+'"/>';
   var seed=(p.producto_id||p.id||((L*100+A*10+H)|0))||1;
   var rT=gavRand(seed*7+1), rS=gavRand(seed*13+3), rF=gavRand(seed*17+5);
   // pila (copias detrás)
@@ -3350,7 +3350,7 @@ function gavionSVG(p,count){
     '<g clip-path="url(#ct'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.5">'+tgrid+'</g>'+
     '<polygon points="'+topPts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
     '<polygon points="'+sidePts+'" fill="'+c.base+'"/>'+
-    '<g clip-path="url(#cs'+uid+')">'+gavStones(ox+W,oy+cut-dy,dx,Hf+dy,c.pal,rS)+'</g>'+
+    '<g clip-path="url(#cs'+uid+')">'+gavStones(ox+W,oy-dy,dx,Hf+dy,c.pal,rS)+'</g>'+
     '<g clip-path="url(#cs'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.45">'+sg+'</g>'+
     '<polygon points="'+sidePts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
     '<polygon points="'+frontPts+'" fill="'+c.base+'"/>'+
