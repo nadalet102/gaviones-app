@@ -325,13 +325,19 @@ app.patch('/api/pedidos-gav/:id/estado', async (req, res) => {
     res.json((await pool.query('UPDATE pedidos SET estado=$1 WHERE id=$2 RETURNING *',[req.body.estado,req.params.id])).rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
 });
+// Observaciones por línea de pedido (edición rápida desde la lista)
+app.patch('/api/lineas/:id/nota', async (req, res) => {
+  try {
+    res.json((await pool.query('UPDATE lineas_pedido SET notas=$1 WHERE id=$2 RETURNING *',[req.body.notas||null,req.params.id])).rows[0]);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
 
 // ── ENTREGAS PARCIALES ────────────────────────────────────────────────────────
 app.get('/api/entregas', async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT e.*,
-        l.cantidad as linea_cantidad, l.pedido_id,
+        l.cantidad as linea_cantidad, l.pedido_id, l.notas as linea_notas,
         pr.referencia, pr.descripcion, pr.largo, pr.ancho, pr.alto, pr.unidad,
         pe.numero as pedido_numero, pe.cliente_nombre, pe.obra, pe.maps_url
       FROM entregas_parciales e
