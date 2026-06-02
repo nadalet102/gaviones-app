@@ -1428,7 +1428,7 @@ function imprimirEntregaUnicaObj(e){
     '</tr></thead>'+
     '<tbody>'+
       '<tr>'+
-        '<td class="ref-cell"><div class="ref-big">'+e.referencia+'</div><div class="ref-dim">'+(dimStr(e)||e.descripcion||'')+'</div></td>'+
+        '<td class="ref-cell"><div class="ref-big">'+e.referencia+'</div><div class="ref-dim">'+(dimStr(e)||e.descripcion||'')+'</div>'+(e.linea_notas?'<div style="font-size:12px;color:#b45309;margin-top:4px;font-weight:600">⚠ '+e.linea_notas+'</div>':'')+'</td>'+
         '<td class="qty-cell">'+fmtN(e.cantidad)+'</td>'+
         '<td class="chk-cell"><div class="chk-box'+(conf?' done':'')+'"></div></td>'+
       '</tr>'+
@@ -1570,7 +1570,7 @@ async function imprimirCargaGrupo(fecha, pedidoNum, lineasParam){
     inner+='<tr>'+
       '<td style="padding:10px 14px;text-align:center;font-size:12px;color:#6b7280;font-weight:600">'+(i+1)+'</td>'+
       '<td class="ref-cell"><div class="ref-big">'+e.referencia+'</div></td>'+
-      '<td class="ref-cell"><div class="ref-dim" style="font-size:12px">'+(dimStr(e)||'—')+'</div></td>'+
+      '<td class="ref-cell"><div class="ref-dim" style="font-size:12px">'+(dimStr(e)||'—')+'</div>'+(e.linea_notas?'<div style="font-size:11px;color:#b45309;margin-top:3px;font-weight:600">⚠ '+e.linea_notas+'</div>':'')+'</td>'+
       '<td class="qty-cell" style="font-size:26px">'+fmtN(e.cantidad)+'</td>'+
       '<td class="chk-cell"><div class="chk-box'+(isConf?' done':'')+'"></div></td>'+
     '</tr>';
@@ -1857,6 +1857,17 @@ function badgePedidoProd(p){
   return '';
 }
 
+// Guarda la observación de una línea de pedido (edición rápida desde la lista)
+async function guardarNotaLinea(lineaId, valor){
+  var v=(valor||'').trim()||null;
+  try{
+    await api('PATCH','/lineas/'+lineaId+'/nota',{notas:v});
+    pedidos.forEach(function(p){ (p.lineas||[]).forEach(function(l){ if(String(l.id)===String(lineaId)) l.notas=v; }); });
+    entregas.forEach(function(e){ if(String(e.linea_pedido_id)===String(lineaId)) e.linea_notas=v; });
+    log('Observación guardada','ok');
+  }catch(e){ log('Error: '+e.message,'warn'); }
+}
+
 function renderPedidos(){
   const search=(document.getElementById('ped-search')?.value||'').toLowerCase();
   const estadoF=document.getElementById('ped-estado')?.value||'';
@@ -1914,7 +1925,13 @@ function renderPedidos(){
             '<td class="r mono" style="color:'+(pend>0?'var(--red)':'var(--green)')+'">'+fmtN(pend)+'</td>'+
             '<td>'+proxCarga+'</td>'+
             '<td><button class="btn btn-outline btn-sm" onclick="openModal(\'entrega\',null,'+l.id+')"><i class="ti ti-calendar-plus"></i> Programar</button></td>'+
-          '</tr>';
+          '</tr>'+
+          '<tr style="background:var(--surface)"><td colspan="6" style="padding:0 10px 8px 10px;border-bottom:1px solid var(--border)">'+
+            '<div style="display:flex;align-items:center;gap:6px">'+
+              '<i class="ti ti-note" style="font-size:13px;color:var(--text2);flex-shrink:0"></i>'+
+              '<input type="text" value="'+(l.notas?String(l.notas).replace(/"/g,'&quot;'):'')+'" placeholder="Observaciones de la línea (salen en la hoja de carga)..." onchange="guardarNotaLinea('+l.id+',this.value)" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)">'+
+            '</div>'+
+          '</td></tr>';
         }).join('')+
         '</tbody></table>'+
         (entregasPend.length||totalEntregado>0?
