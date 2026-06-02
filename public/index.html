@@ -67,6 +67,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .montado-tab{margin:6px 0;background:#16a34a;color:#fff;font-weight:800;font-size:13px;letter-spacing:.04em;border-radius:999px;padding:9px 24px;border-bottom:none!important;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:background .12s}
 .montado-tab:hover{background:#15803d;color:#fff}
 .montado-tab.active{background:#15803d;color:#fff;border-bottom:none!important}
+.carado-tab{margin:6px 0;background:#f97316;color:#fff;font-weight:800;font-size:13px;letter-spacing:.04em;border-radius:999px;padding:9px 24px;border-bottom:none!important;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:background .12s}
+.carado-tab:hover{background:#ea580c;color:#fff}
+.carado-tab.active{background:#ea580c;color:#fff;border-bottom:none!important}
+.carado-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;padding:6px 2px}
+.carado-card{background:var(--surface);border:2px solid var(--border2);border-radius:16px;padding:18px 16px 14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:transform .12s,box-shadow .12s,border-color .12s;text-align:center;font-family:inherit}
+.carado-card:hover{border-color:#ea580c;box-shadow:0 8px 22px rgba(234,88,12,.18);transform:translateY(-3px)}
+.carado-card:active{transform:translateY(-1px)}
+.carado-draw{width:100%;display:flex;justify-content:center;align-items:flex-end;min-height:158px}
+.carado-draw svg{width:auto;height:158px;max-width:100%}
+.carado-desc{font-size:14px;font-weight:700;color:var(--text);line-height:1.25}
+.carado-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.carado-meta .carado-ref{font-family:monospace;font-weight:600;color:var(--text)}
+.carado-count{margin-top:4px;font-size:30px;font-weight:900;color:#ea580c;font-family:monospace;line-height:1;display:flex;flex-direction:column;align-items:center}
+.carado-count small{font-size:10px;font-weight:600;color:var(--text2);letter-spacing:.04em;text-transform:uppercase;margin-top:3px;font-family:inherit}
+.carado-head{font-size:13px;font-weight:600;color:var(--text2);padding:4px 4px 12px;display:flex;align-items:center;gap:8px}
 .mesa-wrap{max-width:1000px;margin:0 auto;padding:18px}
 .mesa-wrap.full{max-width:none}
 .mesa-grid.arts{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
@@ -270,6 +285,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   </div>
 
   <div class="prod-tabs">
+    <div class="tab carado-tab" id="tab-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> ZONA CARADO</div>
     <div class="tab mesa-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> MESA DE VIBRADO</div>
     <div class="tab montado-tab" id="tab-montado" onclick="switchTab('montado')"><i class="ti ti-box"></i> ZONA MONTADO</div>
   </div>
@@ -282,6 +298,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 <!-- ZONA MONTADO -->
 <div class="view" id="view-montado">
   <div class="mesa-wrap" id="montado-content"></div>
+</div>
+<!-- ZONA CARADO -->
+<div class="view" id="view-carado">
+  <div class="mesa-wrap full" id="carado-content"></div>
 </div>
 <div class="kp-overlay" id="kp-overlay">
   <div class="kp-card">
@@ -303,7 +323,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     </div>
     <div class="kp-actions">
       <button class="kp-cancel" onclick="kpCancel()">Cancelar</button>
-      <button class="kp-ok" onclick="kpConfirm()"><i class="ti ti-check"></i> Añadir a stock</button>
+      <button class="kp-ok" onclick="kpConfirm()"><i class="ti ti-check"></i> <span id="kp-ok-label">Añadir a stock</span></button>
     </div>
   </div>
 </div>
@@ -500,7 +520,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 
 <script>
 // ── DATA ───────────────────────────────────────────────────────────────────────
-let productos=[], stock=[], clientes=[], pedidos=[], necesidades=[], movimientos=[], entregas=[], parteHoy=null;
+let productos=[], stock=[], clientes=[], pedidos=[], necesidades=[], movimientos=[], entregas=[], parteHoy=null, carado=[];
 let editId=null, modalType=null;
 let pedidoLogActual=[]; // log de actualizaciones del pedido en edición
 let sortField='largo', sortDir='desc';
@@ -557,6 +577,7 @@ async function loadAll(){
       api('GET','/pedidos-gav'),api('GET','/necesidades'),
       api('GET','/stock/movimientos'),api('GET','/entregas')
     ]);
+    try{ carado=await api('GET','/carado'); }catch(e){ carado=[]; }
     setSyncStatus('ok');
     const t=document.querySelector('.tab.active')?.id?.replace('tab-','');
     renderAll(t);
@@ -574,6 +595,7 @@ function renderAll(t){
   else if(t==='parte') loadParteHoy();
   else if(t==='mesa') renderMesa();
   else if(t==='montado') renderMontado();
+  else if(t==='carado') renderCarado();
 }
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.id==='tab-'+t));
@@ -591,6 +613,7 @@ function switchTab(t){
   else if(t==='hist') loadHistorial();
   else if(t==='mesa') renderMesa();
   else if(t==='montado') renderMontado();
+  else if(t==='carado') renderCarado();
 }
 
 // ── Áreas desplegables de la barra ──────────────────────────────────────────
@@ -3064,7 +3087,7 @@ var MESA_CATS=[
 ];
 var MESA_ANCHOS=[20,30,50,100];
 var mesaPaso='inicio', mesaCat=null, mesaAncho=null;
-var kpProductoId=null, kpValor='', kpZona='vibrado';
+var kpProductoId=null, kpValor='', kpZona='vibrado', kpMax=null;
 
 function mesaNorm(s){ return (s||'').toString().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
 function mesaAnchoCm(p){ var a=+p.ancho||0; return a>0&&a<=5?Math.round(a*100):Math.round(a); }
@@ -3181,10 +3204,13 @@ function renderMesaRepetir(el){
 function mesaRepetir(pid,cant){ abrirKeypad(pid, String(cant||'')); }
 
 function mesaAbrirCantidad(pid){ abrirKeypad(pid,'','vibrado'); }
-function abrirKeypad(pid,inicial,zona){
-  kpProductoId=pid; kpValor=inicial||''; kpZona=zona||'vibrado';
+function abrirKeypad(pid,inicial,zona,max){
+  kpProductoId=pid; kpValor=inicial||''; kpZona=zona||'vibrado'; kpMax=(max&&max>0)?max:null;
   var p=productos.find(function(x){return String(x.id)===String(pid);});
-  document.getElementById('kp-prod').innerHTML=p?('<div class="ref">'+(p.referencia||'')+'</div><div class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</div>'):'';
+  var maxTxt=kpMax?'<div class="desc" style="color:var(--amber);font-weight:600">Máximo en carado: '+fmtN(kpMax)+'</div>':'';
+  document.getElementById('kp-prod').innerHTML=p?('<div class="ref">'+(p.referencia||'')+'</div><div class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</div>'+maxTxt):'';
+  var lbl={vibrado:'A zona de carado',montado:'Añadir a stock',carado:'Pasar a stock'}[kpZona]||'Añadir a stock';
+  var lblEl=document.getElementById('kp-ok-label'); if(lblEl) lblEl.textContent=lbl;
   kpRender();
   document.getElementById('kp-overlay').classList.add('open');
 }
@@ -3193,23 +3219,128 @@ function kpDigit(d){
   if(kpValor==='0') kpValor='';
   if(d==='00'&&kpValor==='') return;
   if((kpValor+d).length<=6) kpValor+=d;
+  if(kpMax&&parseInt(kpValor)>kpMax) kpValor=String(kpMax);   // no superar lo apilado en carado
   kpRender();
 }
 function kpClear(){ kpValor=kpValor.slice(0,-1); kpRender(); }
-function kpCancel(){ document.getElementById('kp-overlay').classList.remove('open'); kpProductoId=null; kpValor=''; }
+function kpCancel(){ document.getElementById('kp-overlay').classList.remove('open'); kpProductoId=null; kpValor=''; kpMax=null; }
 async function kpConfirm(){
   var cant=parseInt(kpValor)||0;
   if(!kpProductoId||cant<=0){ log('Introduce una cantidad','warn'); return; }
+  if(kpMax&&cant>kpMax){ log('Máximo '+fmtN(kpMax)+' ud','warn'); return; }
   var p=productos.find(function(x){return String(x.id)===String(kpProductoId);});
-  var motivo=kpZona==='montado'?'Zona montado':'Mesa de vibrado';
+  var refTxt=p?p.referencia:'producto';
   try{
-    await api('POST','/stock/movimiento',{producto_id:+kpProductoId,tipo:'entrada',cantidad:cant,motivo:motivo});
-    document.getElementById('kp-overlay').classList.remove('open');
-    await loadAll();
-    log('✓ '+cant+' ud de '+(p?p.referencia:'producto')+' añadidas a stock','ok');
-    if(kpZona==='montado'){ montadoPaso='inicio'; montadoAncho=null; renderMontado(); }
-    else { mesaPaso='inicio'; mesaCat=null; mesaAncho=null; renderMesa(); }
+    if(kpZona==='vibrado'){
+      // La mesa de vibrado ya NO suma a stock: deja en zona de carado
+      await api('POST','/carado/add',{producto_id:+kpProductoId,cantidad:cant});
+      document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
+      await loadAll();
+      log('✓ '+cant+' ud de '+refTxt+' enviadas a Zona de carado','ok');
+      mesaPaso='inicio'; mesaCat=null; mesaAncho=null; renderMesa();
+    } else if(kpZona==='carado'){
+      await api('POST','/carado/to-stock',{producto_id:+kpProductoId,cantidad:cant});
+      document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
+      await loadAll();
+      log('✓ '+cant+' ud de '+refTxt+' pasadas a stock','ok');
+      renderCarado();
+    } else { // montado
+      await api('POST','/stock/movimiento',{producto_id:+kpProductoId,tipo:'entrada',cantidad:cant,motivo:'Zona montado'});
+      document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
+      await loadAll();
+      log('✓ '+cant+' ud de '+refTxt+' añadidas a stock','ok');
+      montadoPaso='inicio'; montadoAncho=null; renderMontado();
+    }
   }catch(e){ log('Error: '+e.message,'warn'); }
+}
+
+// ════════════ ZONA DE CARADO (paso intermedio vibrado → stock) ════════════
+function gavionColor(p){
+  var d=mesaNorm((p.descripcion||'')+' '+(p.referencia||''));
+  if(d.includes('ROJO'))   return {face:'#fecaca',top:'#fca5a5',side:'#f87171',wire:'#b91c1c'};
+  if(d.includes('GRIS'))   return {face:'#e5e9ef',top:'#cbd5e1',side:'#9aa7b8',wire:'#475569'};
+  if(d.includes('BLANCO')) return {face:'#f8fafc',top:'#eef2f7',side:'#d8e0ea',wire:'#8a97a8'};
+  if(d.includes('FORNA'))  return {face:'#f3e3c2',top:'#e7d09a',side:'#d6ba80',wire:'#a16207'};
+  return {face:'#dde7c2',top:'#c8d89c',side:'#aec070',wire:'#4d7c0f'};
+}
+
+// Dibuja un gavión (malla 3D) escalado por sus medidas; ángulo si procede; apilado si count>1.
+function gavionSVG(p,count){
+  count=Math.max(1,Math.round(+count||1));
+  var L=+p.largo||1, A=+p.ancho||0.5, H=+p.alto||0.5;
+  var ang=mesaEsAngulo(p);
+  var c=gavionColor(p);
+  var uid='gv'+(p.producto_id||p.id||Math.floor(Math.random()*1e6));
+  var W=Math.max(58,Math.min(150,42+L*54));     // largo  → ancho del dibujo
+  var Hf=Math.max(38,Math.min(118,26+H*92));     // alto   → alto del dibujo
+  var D=Math.max(14,Math.min(46,10+A*40));        // ancho  → profundidad
+  var dx=D*0.8, dy=D*0.46;
+  var cut=ang?Hf*0.42:0;                          // corte del ángulo (techo inclinado)
+  var ghosts=count>1?Math.min(2,count-1):0;       // copias detrás para la pila
+  var so=8, padL=12, padT=18, padR=18, padB=14;
+  var ox=padL+ghosts*so, oy=padT+dy+ghosts*so;
+  var vbW=Math.ceil(ox+W+dx+padR), vbH=Math.ceil(oy+Hf+padB);
+  var P=(x,y)=>x.toFixed(1)+','+y.toFixed(1);
+  var FTL=[ox,oy], FTR=[ox+W,oy+cut], FBR=[ox+W,oy+Hf], FBL=[ox,oy+Hf];
+  var BTL=[ox+dx,oy-dy], BTR=[ox+W+dx,oy+cut-dy], BBR=[ox+W+dx,oy+Hf-dy];
+  var poly=(arr)=>arr.map(q=>P(q[0],q[1])).join(' ');
+  var frontPts=poly([FTL,FTR,FBR,FBL]), topPts=poly([FTL,FTR,BTR,BTL]), sidePts=poly([FTR,BTR,BBR,FBR]);
+  // malla cara frontal (recortada al polígono)
+  var step=Math.max(11,Math.min(19,W/6)), grid='';
+  for(var gx=ox+step; gx<ox+W-1; gx+=step) grid+='<line x1="'+gx.toFixed(1)+'" y1="'+(oy-dy)+'" x2="'+gx.toFixed(1)+'" y2="'+(oy+Hf)+'"/>';
+  for(var gy=oy+cut+step*0.5; gy<oy+Hf-1; gy+=step) grid+='<line x1="'+ox+'" y1="'+gy.toFixed(1)+'" x2="'+(ox+W)+'" y2="'+gy.toFixed(1)+'"/>';
+  var tgrid='';
+  for(var tx=ox+step; tx<ox+W-1; tx+=step) tgrid+='<line x1="'+tx.toFixed(1)+'" y1="'+oy+'" x2="'+(tx+dx).toFixed(1)+'" y2="'+(oy-dy)+'"/>';
+  // pila (copias detrás)
+  var ghostSvg='';
+  for(var k=ghosts;k>=1;k--){
+    var s=k*so;
+    ghostSvg+='<g transform="translate('+(-s)+','+(-s)+')" opacity="0.45">'+
+      '<polygon points="'+topPts+'" fill="'+c.top+'" stroke="'+c.wire+'" stroke-width="1.2"/>'+
+      '<polygon points="'+sidePts+'" fill="'+c.side+'" stroke="'+c.wire+'" stroke-width="1.2"/>'+
+      '<polygon points="'+frontPts+'" fill="'+c.face+'" stroke="'+c.wire+'" stroke-width="1.4"/>'+
+    '</g>';
+  }
+  var badge='';
+  if(count>1){
+    var lab='×'+fmtN(count), bw=14+(''+lab).length*7.5;
+    badge='<g><rect x="'+(vbW-bw-4)+'" y="4" rx="11" ry="11" width="'+bw+'" height="22" fill="#ea580c"/>'+
+      '<text x="'+(vbW-4-bw/2)+'" y="19.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" font-family="ui-monospace,monospace">'+lab+'</text></g>';
+  }
+  return '<svg viewBox="0 0 '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg">'+
+    '<defs>'+
+      '<clipPath id="cf'+uid+'"><polygon points="'+frontPts+'"/></clipPath>'+
+      '<clipPath id="ct'+uid+'"><polygon points="'+topPts+'"/></clipPath>'+
+    '</defs>'+
+    '<ellipse cx="'+(ox+W/2+dx/2)+'" cy="'+(oy+Hf+5)+'" rx="'+(W*0.55).toFixed(1)+'" ry="5.5" fill="rgba(0,0,0,.10)"/>'+
+    ghostSvg+
+    '<polygon points="'+topPts+'" fill="'+c.top+'" stroke="'+c.wire+'" stroke-width="1.4"/>'+
+    '<polygon points="'+sidePts+'" fill="'+c.side+'" stroke="'+c.wire+'" stroke-width="1.4"/>'+
+    '<polygon points="'+frontPts+'" fill="'+c.face+'" stroke="'+c.wire+'" stroke-width="1.8"/>'+
+    '<g clip-path="url(#cf'+uid+')" stroke="'+c.wire+'" stroke-width="1" opacity="0.5">'+grid+'</g>'+
+    '<g clip-path="url(#ct'+uid+')" stroke="'+c.wire+'" stroke-width="0.9" opacity="0.4">'+tgrid+'</g>'+
+    badge+
+  '</svg>';
+}
+
+function renderCarado(){
+  var el=document.getElementById('carado-content');
+  if(!el) return;
+  if(!carado || !carado.length){
+    el.innerHTML='<div class="mesa-empty"><i class="ti ti-stack-2" style="font-size:42px;display:block;margin-bottom:12px"></i>No hay gaviones en la zona de carado.<small style="display:block;margin-top:6px;font-weight:400;color:var(--text2)">Lo que produzcas en la Mesa de vibrado caerá aquí. Desde aquí lo pasas a stock cuando esté carado.</small></div>';
+    return;
+  }
+  var html='<div class="carado-head"><i class="ti ti-stack-2" style="color:#ea580c;font-size:16px"></i> Gaviones vibrados pendientes de carar — pulsa uno para pasar unidades a stock</div>';
+  html+='<div class="carado-grid">'+carado.map(function(it){
+    var n=Math.round(+it.cantidad||0);
+    return '<button class="carado-card" onclick="abrirKeypad('+it.producto_id+',\'\',\'carado\','+n+')">'+
+      '<div class="carado-draw">'+gavionSVG(it,n)+'</div>'+
+      '<div class="carado-desc">'+(it.descripcion||it.referencia||'(sin descripción)')+'</div>'+
+      '<div class="carado-meta"><span class="carado-ref">'+(it.referencia||'')+'</span> · '+dimStr(it)+(mesaEsAngulo(it)?' · ángulo':'')+'</div>'+
+      '<div class="carado-count">'+fmtN(n)+'<small>ud apiladas</small></div>'+
+    '</button>';
+  }).join('')+'</div>';
+  el.innerHTML=html;
 }
 
 // ════════════ ZONA MONTADO (gaviones premontados) ════════════
