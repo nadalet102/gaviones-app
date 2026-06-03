@@ -253,6 +253,15 @@ app.post('/api/carado/to-stock', async (req, res) => {
   } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
   finally { client.release(); }
 });
+// Borrar unidades del carado (corrección de errores; NO suma a stock)
+app.post('/api/carado/remove', async (req, res) => {
+  const {producto_id, cantidad} = req.body;
+  if(!producto_id || !(+cantidad>0)) return res.status(400).json({error:'producto_id y cantidad requeridos'});
+  try {
+    await pool.query('UPDATE zona_carado SET cantidad = GREATEST(0, cantidad - $1) WHERE producto_id=$2',[+cantidad, producto_id]);
+    res.json({ok:true});
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
 
 // ── CLIENTES ───────────────────────────────────────────────────────────────────
 app.get('/api/clientes', async (req, res) => {
