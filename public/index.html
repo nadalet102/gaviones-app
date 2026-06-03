@@ -3305,6 +3305,10 @@ function gavionAngulo2D(p,count){
   var vbW=Math.ceil(Wp+pad*2), vbH=Math.ceil(Hp+gap+numH+pad);
   var F=q=>q[0].toFixed(1)+','+q[1].toFixed(1);
   var TL=[ox,oy], TR=[ox+top,oy], BR=[ox+Wp,oy+Hp], BL=[ox,oy+Hp];
+  // derecha = diagonal a la derecha (lado vertical a la izquierda); izquierda = espejo
+  var dd=mesaNorm((p.descripcion||'')+' '+(p.referencia||''));
+  var izq=dd.includes('IZQ')||dd.includes('IZDA');
+  if(izq){ var mir=function(q){return [2*ox+Wp-q[0], q[1]];}; TL=mir(TL); TR=mir(TR); BR=mir(BR); BL=mir(BL); }
   var pts=[TL,TR,BR,BL].map(F).join(' ');
   var step=Math.max(13,Math.min(20,Wp/8)), grid='';
   for(var gx=ox+step; gx<ox+Wp; gx+=step) grid+='<line x1="'+gx.toFixed(1)+'" y1="'+oy+'" x2="'+gx.toFixed(1)+'" y2="'+(oy+Hp)+'"/>';
