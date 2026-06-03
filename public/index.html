@@ -71,7 +71,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .carado-tab:hover{background:#ea580c;color:#fff}
 .carado-tab.active{background:#ea580c;color:#fff;border-bottom:none!important}
 .carado-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;padding:6px 2px}
-.carado-card{background:var(--surface);border:2px solid var(--border2);border-radius:16px;padding:18px 16px 14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:transform .12s,box-shadow .12s,border-color .12s;text-align:center;font-family:inherit}
+.carado-card{position:relative;background:var(--surface);border:2px solid var(--border2);border-radius:16px;padding:18px 16px 14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:transform .12s,box-shadow .12s,border-color .12s;text-align:center;font-family:inherit}
+.carado-del{position:absolute;top:8px;left:8px;width:32px;height:32px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:#dc2626;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;z-index:2;opacity:.5;transition:opacity .12s,background .12s}
+.carado-del:hover{opacity:1;background:#fee2e2;border-color:#fca5a5}
 .carado-card:hover{border-color:#ea580c;box-shadow:0 8px 22px rgba(234,88,12,.18);transform:translateY(-3px)}
 .carado-card:active{transform:translateY(-1px)}
 .carado-draw{width:100%;display:flex;justify-content:center;align-items:flex-end;min-height:158px}
@@ -3219,7 +3221,7 @@ function abrirKeypad(pid,inicial,zona,max){
   var p=productos.find(function(x){return String(x.id)===String(pid);});
   var maxTxt=kpMax?'<div class="desc" style="color:var(--amber);font-weight:600">Máximo en carado: '+fmtN(kpMax)+'</div>':'';
   document.getElementById('kp-prod').innerHTML=p?('<div class="ref">'+(p.referencia||'')+'</div><div class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</div>'+maxTxt):'';
-  var lbl={vibrado:'A zona de carado',montado:'Añadir a stock',carado:'Pasar a stock'}[kpZona]||'Añadir a stock';
+  var lbl={vibrado:'A zona de carado',montado:'Añadir a stock',carado:'Pasar a stock','carado-del':'Borrar de carado'}[kpZona]||'Añadir a stock';
   var lblEl=document.getElementById('kp-ok-label'); if(lblEl) lblEl.textContent=lbl;
   kpRender();
   document.getElementById('kp-overlay').classList.add('open');
@@ -3254,6 +3256,12 @@ async function kpConfirm(){
       document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
       await loadAll();
       log('✓ '+cant+' ud de '+refTxt+' pasadas a stock','ok');
+      renderCarado();
+    } else if(kpZona==='carado-del'){
+      await api('POST','/carado/remove',{producto_id:+kpProductoId,cantidad:cant});
+      document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
+      await loadAll();
+      log('🗑 '+cant+' ud de '+refTxt+' borradas de carado','ok');
       renderCarado();
     } else { // montado
       await api('POST','/stock/movimiento',{producto_id:+kpProductoId,tipo:'entrada',cantidad:cant,motivo:'Zona montado'});
@@ -3418,15 +3426,16 @@ function renderCarado(){
     el.innerHTML='<div class="mesa-empty"><i class="ti ti-stack-2" style="font-size:42px;display:block;margin-bottom:12px"></i>No hay gaviones en la zona de carado.<small style="display:block;margin-top:6px;font-weight:400;color:var(--text2)">Lo que produzcas en la Mesa de vibrado caerá aquí. Desde aquí lo pasas a stock cuando esté carado.</small></div>';
     return;
   }
-  var html='<div class="carado-head"><i class="ti ti-stack-2" style="color:#ea580c;font-size:16px"></i> Gaviones vibrados pendientes de carar — pulsa uno para pasar unidades a stock</div>';
+  var html='<div class="carado-head"><i class="ti ti-stack-2" style="color:#ea580c;font-size:16px"></i> Gaviones vibrados pendientes de carar — pulsa uno para pasar a stock, o la papelera para borrar</div>';
   html+='<div class="carado-grid">'+carado.map(function(it){
     var n=Math.round(+it.cantidad||0);
-    return '<button class="carado-card" onclick="abrirKeypad('+it.producto_id+',\'\',\'carado\','+n+')">'+
+    return '<div class="carado-card" onclick="abrirKeypad('+it.producto_id+',\'\',\'carado\','+n+')">'+
+      '<button class="carado-del" title="Borrar de carado" onclick="event.stopPropagation();abrirKeypad('+it.producto_id+',\''+n+'\',\'carado-del\','+n+')"><i class="ti ti-trash"></i></button>'+
       '<div class="carado-draw">'+gavionSVG(it,n)+'</div>'+
       '<div class="carado-desc">'+(it.descripcion||it.referencia||'(sin descripción)')+'</div>'+
       '<div class="carado-meta"><span class="carado-ref">'+(it.referencia||'')+'</span> · '+dimStr(it)+(mesaEsAngulo(it)?' · ángulo':'')+'</div>'+
       '<div class="carado-count">'+fmtN(n)+'<small>ud apiladas</small></div>'+
-    '</button>';
+    '</div>';
   }).join('')+'</div>';
   el.innerHTML=html;
 }
