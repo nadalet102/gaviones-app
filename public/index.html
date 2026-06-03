@@ -3290,9 +3290,47 @@ function gavStones(bx,by,bw,bh,pal,rnd){
   return out;
 }
 
-// Dibuja un gavión (malla 3D) escalado por sus medidas; ángulo si procede; apilado si count>1.
+// Ángulo (cuña) en 2D: planta con el corte a 45º + altura en grande debajo.
+function gavionAngulo2D(p,count){
+  count=Math.max(1,Math.round(+count||1));
+  var L=+p.largo||1, A=+p.ancho||0.5, H=+p.alto||0.5;
+  var c=gavionColor(p);
+  var uid='ga'+(p.producto_id||p.id||((L*100+A*10+H)|0));
+  var s=64;                                       // px por metro (plano 2D)
+  var Wp=Math.max(74, L*s);                        // largo  → arista delantera (abajo)
+  var Hp=Math.max(36, A*s);                        // ancho  → profundidad
+  var top=Math.max(0,(L-A))*s;                     // arista trasera = largo − ancho (corte 45º)
+  var pad=16, gap=14, numH=46;
+  var ox=pad, oy=pad;
+  var vbW=Math.ceil(Wp+pad*2), vbH=Math.ceil(Hp+gap+numH+pad);
+  var F=q=>q[0].toFixed(1)+','+q[1].toFixed(1);
+  var TL=[ox,oy], TR=[ox+top,oy], BR=[ox+Wp,oy+Hp], BL=[ox,oy+Hp];
+  var pts=[TL,TR,BR,BL].map(F).join(' ');
+  var step=Math.max(13,Math.min(20,Wp/8)), grid='';
+  for(var gx=ox+step; gx<ox+Wp; gx+=step) grid+='<line x1="'+gx.toFixed(1)+'" y1="'+oy+'" x2="'+gx.toFixed(1)+'" y2="'+(oy+Hp)+'"/>';
+  for(var gy=oy+step; gy<oy+Hp; gy+=step) grid+='<line x1="'+ox+'" y1="'+gy.toFixed(1)+'" x2="'+(ox+Wp)+'" y2="'+gy.toFixed(1)+'"/>';
+  var r=gavRand((p.producto_id||1)*11+2);
+  var hcm=Math.round(H*100), cx=ox+Wp/2;
+  var badge='';
+  if(count>1){ var lab='×'+fmtN(count), bw=14+(''+lab).length*7.5;
+    badge='<g><rect x="'+(vbW-bw-4)+'" y="4" rx="11" ry="11" width="'+bw+'" height="22" fill="#ea580c"/><text x="'+(vbW-4-bw/2)+'" y="19.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" font-family="ui-monospace,monospace">'+lab+'</text></g>';
+  }
+  return '<svg viewBox="0 0 '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg">'+
+    '<defs><clipPath id="'+uid+'"><polygon points="'+pts+'"/></clipPath></defs>'+
+    '<polygon points="'+pts+'" fill="'+c.base+'"/>'+
+    '<g clip-path="url(#'+uid+')">'+gavStones(ox,oy,Wp,Hp,c.pal,r)+'</g>'+
+    '<g clip-path="url(#'+uid+')" stroke="'+c.wire+'" stroke-width="0.9" opacity="0.5">'+grid+'</g>'+
+    '<polygon points="'+pts+'" fill="none" stroke="#374151" stroke-width="2.6" stroke-linejoin="round"/>'+
+    badge+
+    '<text x="'+cx+'" y="'+(oy+Hp+gap+8)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#94a3b8" letter-spacing="1.5">ALTURA</text>'+
+    '<text x="'+cx+'" y="'+(oy+Hp+gap+38)+'" text-anchor="middle" font-size="30" font-weight="900" fill="#334155" font-family="ui-monospace,monospace">'+hcm+'<tspan font-size="15" font-weight="700"> cm</tspan></text>'+
+  '</svg>';
+}
+
+// Dibuja un gavión (malla 3D) escalado por sus medidas; los de ángulo van en 2D (plano).
 function gavionSVG(p,count){
   count=Math.max(1,Math.round(+count||1));
+  if(mesaEsAngulo(p)) return gavionAngulo2D(p,count);
   var L=+p.largo||1, A=+p.ancho||0.5, H=+p.alto||0.5;
   var ang=mesaEsAngulo(p);
   var c=gavionColor(p);
