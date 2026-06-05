@@ -110,6 +110,12 @@ async function initDB() {
     ALTER TABLE movimientos_stock ADD COLUMN IF NOT EXISTS referencia_doc TEXT;
     ALTER TABLE movimientos_stock ADD COLUMN IF NOT EXISTS fecha DATE DEFAULT CURRENT_DATE;
 
+    -- Reparación: cargas antiguas guardaron el id de grupo en 'notas' por un desajuste de parámetros.
+    -- Recuperamos el grupo donde notas tiene pinta de id de carga (G + base36) y el grupo está vacío.
+    UPDATE entregas_parciales
+       SET carga_grupo_id = notas, notas = NULL
+     WHERE carga_grupo_id IS NULL AND notas ~ '^G[0-9A-Z]{6,}$';
+
     INSERT INTO productos (tipo,referencia,largo,ancho,alto,descripcion,unidad)
     SELECT * FROM (VALUES
       ('gavion','GAV-1x1x1',1.0,1.0,1.0,'Gavión 1×1×1 m','ud'),
@@ -408,7 +414,7 @@ app.post('/api/entregas', async (req, res) => {
   try {
     const r = await pool.query(
       `INSERT INTO entregas_parciales (linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,carga_grupo_id,notas) VALUES ($1,$2,$3,'pendiente',$4,$5,$6,$7,$8) RETURNING *`,
-      [linea_pedido_id,fecha_carga,cantidad,notas||null,transportista||null,mat_camion||null,mat_remolque||null,carga_grupo_id||null]
+      [linea_pedido_id,fecha_carga,cantidad,transportista||null,mat_camion||null,mat_remolque||null,carga_grupo_id||null,notas||null]
     );
     res.json(r.rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
