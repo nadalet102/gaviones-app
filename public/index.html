@@ -1918,6 +1918,8 @@ function renderPedidos(){
   const estadoF=document.getElementById('ped-estado')?.value||'';
   const prodF=document.getElementById('ped-prod')?.value||'';
   let list=pedidos;
+  // Los pedidos entregados/cancelados pasan al Historial: no se muestran aquí salvo que se filtre por ese estado a propósito
+  if(!['entregado','cancelado'].includes(estadoF)) list=list.filter(p=>!['entregado','cancelado'].includes(p.estado));
   if(search) list=list.filter(p=>(p.numero||'').toLowerCase().includes(search)||(p.cliente_nombre||'').toLowerCase().includes(search)||(p.obra||'').toLowerCase().includes(search));
   if(estadoF) list=list.filter(p=>p.estado===estadoF);
   if(prodF) list=list.filter(p=>pedidoTipoProduccion(p)===prodF);
