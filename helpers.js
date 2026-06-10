@@ -5,8 +5,11 @@ async function stockMovimiento(client, producto_id, tipo, cantidad, motivo, refe
     `INSERT INTO movimientos_stock (producto_id,tipo,cantidad,motivo,referencia_doc,fecha) VALUES ($1,$2,$3,$4,$5,$6)`,
     [producto_id, tipo, Math.abs(+cantidad), motivo, referencia_doc||null, fecha||new Date().toISOString().slice(0,10)]
   );
+  // Sin tope a 0: el stock puede quedar negativo (señal de que se ha entregado
+  // más de lo fabricado). Así cada salida/entrada es exactamente reversible y
+  // no se pierden unidades ni aparece stock fantasma al anular.
   await client.query(
-    `UPDATE stock SET cantidad=GREATEST(0,cantidad+$1), updated_at=NOW() WHERE producto_id=$2`,
+    `UPDATE stock SET cantidad=cantidad+$1, updated_at=NOW() WHERE producto_id=$2`,
     [delta, producto_id]
   );
 }
