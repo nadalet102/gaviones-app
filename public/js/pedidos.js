@@ -23,6 +23,8 @@ function renderNecesidades(){
   });
   var sortArrow=sortDir==='desc'?' ↓':' ↑';
   function sb(f,label){return '<button class="sort-btn'+(sortField===f?' active':'')+'" data-f="'+f+'" onclick="setSortField(this.dataset.f)">'+label+(sortField===f?sortArrow:'')+'</button>';}
+  // Cabecera de columna pulsable para ordenar (clic en la propia palabra)
+  function th(f,label,cls){var a=sortField===f;return '<th class="th-sort'+(cls?' '+cls:'')+(a?' active':'')+'" onclick="setSortField(\''+f+'\')" title="Ordenar por '+label+'">'+label+(a?sortArrow:'')+'</th>';}
   var bar='<div class="sort-btns" style="padding:8px 16px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--border)">'+
     '<span style="font-size:11px;color:var(--text2)">Ordenar:</span>'+
     sb('largo','Largo')+sb('ancho','Ancho')+sb('alto','Alto')+sb('referencia','Ref.')+sb('stock_actual','Stock')+sb('necesidad_neta','Necesidad')+
@@ -34,12 +36,14 @@ function renderNecesidades(){
   '</div>';
   const sorted=sortedProductos(lista);
   el.innerHTML=bar+'<table class="tbl"><thead><tr>'+
-    '<th>Referencia</th><th>Descripción</th><th>Dimensiones</th>'+
-    '<th class="r">Pedido</th>'+
-    '<th class="r">Entregado</th>'+
-    '<th class="r">Pendiente</th>'+
-    '<th class="r">Stock</th>'+
-    '<th class="r">Necesidad</th>'+
+    th('referencia','Referencia')+
+    th('descripcion','Descripción')+
+    th('largo','Dimensiones')+
+    th('pedido_total','Pedido','r')+
+    th('entregado_total','Entregado','r')+
+    th('pendiente_entregar','Pendiente','r')+
+    th('stock_actual','Stock','r')+
+    th('necesidad_neta','Necesidad','r')+
   '</tr></thead><tbody>'+
   (sorted.length?sorted.map(n=>{
     const neta=+n.necesidad_neta||0;
