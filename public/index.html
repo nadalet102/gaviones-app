@@ -77,6 +77,10 @@
 
 <!-- MESA DE VIBRADO -->
 <div class="view" id="view-mesa">
+  <div class="fabrica-toggle">
+    <button class="ft-btn active" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> Vibrado</button>
+    <button class="ft-btn ft-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado <span class="ft-badge" id="ft-badge-mesa">0</span></button>
+  </div>
   <div class="mesa-wrap" id="mesa-content"></div>
 </div>
 <!-- ZONA MONTADO -->
@@ -85,6 +89,10 @@
 </div>
 <!-- ZONA CARADO -->
 <div class="view" id="view-carado">
+  <div class="fabrica-toggle">
+    <button class="ft-btn" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> Vibrado</button>
+    <button class="ft-btn ft-carado active" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado <span class="ft-badge" id="ft-badge-carado">0</span></button>
+  </div>
   <div class="mesa-wrap full" id="carado-content"></div>
 </div>
 <div class="kp-overlay" id="kp-overlay">
