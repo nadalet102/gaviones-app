@@ -429,7 +429,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       </div>
     </div>
     <div class="card">
-      <div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Últimos movimientos</div></div>
+      <div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Últimos movimientos</div><button class="btn btn-outline btn-sm" onclick="recalcularStock()" title="Recalcula el stock desde el histórico de movimientos"><i class="ti ti-calculator"></i> Recalcular stock</button></div>
       <div id="mov-list" style="max-height:340px;overflow-y:auto"></div>
     </div>
   </div>
@@ -1883,6 +1883,19 @@ function renderNecesidades(){
 }
 
 // Panel de movimientos (lista + selector de producto del formulario)
+async function recalcularStock(){
+  try{
+    const prev=await api('GET','/stock/recalcular-preview');
+    if(!prev.descuadres){ mostrarToast('El stock ya está cuadrado ('+prev.total_productos+' productos)','green'); return; }
+    const detalle=prev.items.slice(0,15).map(function(i){return i.referencia+': '+i.stock_actual+' → '+i.stock_calculado;}).join('\n');
+    const mas=prev.items.length>15?('\n…y '+(prev.items.length-15)+' más'):'';
+    if(!confirm('Se han detectado '+prev.descuadres+' producto(s) descuadrado(s):\n\n'+detalle+mas+'\n\n¿Recalcular el stock desde el histórico de movimientos?')) return;
+    const r=await api('POST','/stock/recalcular');
+    await loadAll();
+    log('Stock recalculado: '+r.corregidos+' producto(s) corregido(s)','ok');
+    mostrarToast('Stock recalculado: '+r.corregidos+' producto(s) corregido(s)','green');
+  }catch(e){ log('Error al recalcular: '+e.message,'warn'); }
+}
 function renderMovPanel(){
   if(!document.getElementById('mov-list')) return;
   populateMovProducto();

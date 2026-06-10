@@ -35,4 +35,58 @@ router.post('/api/stock/movimiento', async (req, res) => {
   finally { client.release(); }
 });
 
+// ── RECÁLCULO DE STOCK DESDE EL HISTÓRICO DE MOVIMIENTOS ───────────────────────
+// El stock cacheado (stock.cantidad) puede haberse descuadrado por el antiguo
+// tope a 0. movimientos_stock es el libro real: stock = Σ entradas − Σ salidas.
+// Consulta compartida: stock actual vs stock calculado desde el libro.
+const SQL_DESCUADRES = `
+  SELECT p.id AS producto_id, p.referencia, p.descripcion,
+    COALESCE(s.cantidad,0) AS stock_actual,
+    COALESCE((
+      SELECT SUM(CASE WHEN m.tipo='entrada' THEN m.cantidad ELSE -m.cantidad END)
+      FROM movimientos_stock m WHERE m.producto_id=p.id
+    ),0) AS stock_calculado
+  FROM productos p
+  LEFT JOIN stock s ON s.producto_id=p.id
+  ORDER BY p.referencia`;
+
+function mapDescuadres(rows){
+  return rows
+    .map(r => ({ ...r,
+      stock_actual: +r.stock_actual,
+      stock_calculado: +r.stock_calculado,
+      diferencia: +r.stock_calculado - +r.stock_actual }))
+    .filter(r => r.diferencia !== 0);
+}
+
+// Previsualización: NO modifica nada, solo lista los descuadres detectados.
+router.get('/api/stock/recalcular-preview', async (req, res) => {
+  try {
+    const rows = (await pool.query(SQL_DESCUADRES)).rows;
+    const descuadres = mapDescuadres(rows);
+    res.json({ total_productos: rows.length, descuadres: descuadres.length, items: descuadres });
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+// Aplicación: recalcula stock.cantidad de cada producto desde el libro.
+router.post('/api/stock/recalcular', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Asegurar fila de stock para todo producto antes de recalcular
+    await client.query(`INSERT INTO stock (producto_id, cantidad)
+      SELECT id,0 FROM productos
+      WHERE id NOT IN (SELECT producto_id FROM stock WHERE producto_id IS NOT NULL)`);
+    const antes = mapDescuadres((await client.query(SQL_DESCUADRES)).rows);
+    await client.query(`
+      UPDATE stock s SET cantidad = COALESCE((
+        SELECT SUM(CASE WHEN m.tipo='entrada' THEN m.cantidad ELSE -m.cantidad END)
+        FROM movimientos_stock m WHERE m.producto_id=s.producto_id
+      ),0), updated_at=NOW()`);
+    await client.query('COMMIT');
+    res.json({ ok:true, corregidos: antes.length, items: antes });
+  } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
+  finally { client.release(); }
+});
+
 module.exports = router;
