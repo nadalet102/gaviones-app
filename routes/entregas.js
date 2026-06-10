@@ -56,19 +56,27 @@ router.patch('/api/entregas/:id/confirmar', async (req, res) => {
     await client.query(`UPDATE entregas_parciales SET estado='confirmada' WHERE id=$1`,[req.params.id]);
     await stockMovimiento(client,e.producto_id,'salida',e.cantidad,'Entrega confirmada ped. '+e.pedido_numero,'ENT-'+req.params.id,e.fecha_carga);
 
-    // Check if ALL lines of the pedido are now fully delivered
+    // ¿Está el pedido completo? Lo está cuando NINGUNA línea tiene menos
+    // confirmado que pedido (comprobación por línea, no por suma total).
+    // El cálculo anterior sumaba con un LEFT JOIN que multiplicaba la cantidad
+    // de cada línea por su número de entregas, así que los pedidos con entregas
+    // parciales nunca llegaban a marcarse como entregados.
     const pedidoId = e.pedido_id;
     const check = await client.query(`
       SELECT
-        COALESCE(SUM(l.cantidad),0) as total_pedido,
-        COALESCE(SUM(CASE WHEN ep.estado='confirmada' THEN ep.cantidad ELSE 0 END),0) as total_entregado
+        COUNT(*) FILTER (WHERE l.cantidad > COALESCE(c.entregado,0)) as lineas_incompletas,
+        COUNT(*) as total_lineas
       FROM lineas_pedido l
-      LEFT JOIN entregas_parciales ep ON ep.linea_pedido_id=l.id
+      LEFT JOIN (
+        SELECT linea_pedido_id, SUM(cantidad) AS entregado
+        FROM entregas_parciales WHERE estado='confirmada'
+        GROUP BY linea_pedido_id
+      ) c ON c.linea_pedido_id=l.id
       WHERE l.pedido_id=$1
     `,[pedidoId]);
-    const {total_pedido, total_entregado} = check.rows[0];
+    const {lineas_incompletas, total_lineas} = check.rows[0];
     let pedidoAutoEntregado = false;
-    if(+total_pedido > 0 && +total_entregado >= +total_pedido) {
+    if(+total_lineas > 0 && +lineas_incompletas === 0) {
       await client.query(`UPDATE pedidos SET estado='entregado' WHERE id=$1 AND estado NOT IN ('cancelado','entregado')`,[pedidoId]);
       pedidoAutoEntregado = true;
     }
@@ -83,13 +91,15 @@ router.patch('/api/entregas/:id/anular', async (req, res) => {
   try {
     await client.query('BEGIN');
     const e = (await client.query(
-      'SELECT e.*,l.producto_id,pe.numero as pedido_numero FROM entregas_parciales e JOIN lineas_pedido l ON l.id=e.linea_pedido_id JOIN pedidos pe ON pe.id=l.pedido_id WHERE e.id=$1',
+      'SELECT e.*,l.producto_id,l.pedido_id,pe.numero as pedido_numero FROM entregas_parciales e JOIN lineas_pedido l ON l.id=e.linea_pedido_id JOIN pedidos pe ON pe.id=l.pedido_id WHERE e.id=$1',
       [req.params.id]
     )).rows[0];
     if(!e) throw new Error('Entrega no encontrada');
     if(e.estado!=='confirmada') throw new Error('Solo se pueden anular entregas confirmadas');
     await client.query(`UPDATE entregas_parciales SET estado='pendiente' WHERE id=$1`,[req.params.id]);
     await stockMovimiento(client,e.producto_id,'entrada',e.cantidad,'Anulacion entrega ped. '+e.pedido_numero,'ANUL-'+req.params.id,new Date().toISOString().slice(0,10));
+    // Si el pedido estaba marcado como entregado, ya no está completo: reabrir.
+    await client.query(`UPDATE pedidos SET estado='pendiente' WHERE id=$1 AND estado='entregado'`,[e.pedido_id]);
     await client.query('COMMIT');
     res.json({ok:true});
   } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
@@ -111,11 +121,13 @@ router.delete('/api/entregas/:id', async (req, res) => {
   try {
     await client.query('BEGIN');
     // If confirmed, reverse the stock movement
-    const e = (await client.query('SELECT e.*,l.producto_id FROM entregas_parciales e JOIN lineas_pedido l ON l.id=e.linea_pedido_id WHERE e.id=$1',[req.params.id])).rows[0];
+    const e = (await client.query('SELECT e.*,l.producto_id,l.pedido_id FROM entregas_parciales e JOIN lineas_pedido l ON l.id=e.linea_pedido_id WHERE e.id=$1',[req.params.id])).rows[0];
     if(!e) throw new Error('Entrega no encontrada');
     if(e.estado==='confirmada'){
       // Return stock
       await stockMovimiento(client,e.producto_id,'entrada',e.cantidad,'Anulación entrega confirmada','ANUL-'+req.params.id,new Date().toISOString().slice(0,10));
+      // El pedido podría haber quedado marcado como entregado: reabrir.
+      await client.query(`UPDATE pedidos SET estado='pendiente' WHERE id=$1 AND estado='entregado'`,[e.pedido_id]);
     }
     await client.query('DELETE FROM entregas_parciales WHERE id=$1',[req.params.id]);
     await client.query('COMMIT');
