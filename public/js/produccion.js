@@ -43,9 +43,15 @@ function mesaProductosCatAncho(cat,cm){
     });
 }
 
+// Actualiza el contador de "pendiente en carado" en el conmutador Vibrado/Carado
+function updateFabricaBadge(){
+  var tot=(carado||[]).reduce(function(s,c){return s+Math.round(+c.cantidad||0);},0);
+  ['ft-badge-mesa','ft-badge-carado'].forEach(function(id){ var e=document.getElementById(id); if(e) e.textContent=fmtN(tot); });
+}
 function renderMesa(){
   var el=document.getElementById('mesa-content');
   if(!el) return;
+  updateFabricaBadge();
   el.classList.toggle('full', mesaPaso==='nuevo-art');
   if(mesaPaso==='inicio'){
     el.innerHTML='<div class="mesa-grid">'+
@@ -427,6 +433,7 @@ function renderCargar(){
 function renderCarado(){
   var el=document.getElementById('carado-content');
   if(!el) return;
+  updateFabricaBadge();
   if(!carado || !carado.length){
     el.innerHTML='<div class="mesa-empty"><i class="ti ti-stack-2" style="font-size:42px;display:block;margin-bottom:12px"></i>No hay gaviones en la zona de carado.<small style="display:block;margin-top:6px;font-weight:400;color:var(--text2)">Lo que produzcas en la Mesa de vibrado caerá aquí. Desde aquí lo pasas a stock cuando esté carado.</small></div>';
     return;
