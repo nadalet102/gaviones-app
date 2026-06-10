@@ -18,7 +18,9 @@ router.get('/api/necesidades', async (req, res) => {
           WHERE l.producto_id=pr.id
           AND pe.estado NOT IN ('entregado','cancelado')
         ),0) as pedido_total,
-        -- Ya entregado: entregas confirmadas
+        -- Ya entregado: entregas confirmadas de pedidos ACTIVOS.
+        -- Mismo filtro que pedido_total: si un pedido ya está 'entregado' no debe
+        -- contar ni su pedido ni sus entregas (si no, restaría falso pendiente).
         COALESCE((
           SELECT SUM(e.cantidad)
           FROM entregas_parciales e
@@ -26,9 +28,9 @@ router.get('/api/necesidades', async (req, res) => {
           JOIN pedidos pe ON pe.id=l.pedido_id
           WHERE l.producto_id=pr.id
           AND e.estado='confirmada'
-          AND pe.estado NOT IN ('cancelado')
+          AND pe.estado NOT IN ('entregado','cancelado')
         ),0) as entregado_total,
-        -- Programado pendiente: entregas pendientes de confirmar
+        -- Programado pendiente: entregas pendientes de confirmar (pedidos activos)
         COALESCE((
           SELECT SUM(e.cantidad)
           FROM entregas_parciales e
@@ -36,7 +38,7 @@ router.get('/api/necesidades', async (req, res) => {
           JOIN pedidos pe ON pe.id=l.pedido_id
           WHERE l.producto_id=pr.id
           AND e.estado='pendiente'
-          AND pe.estado NOT IN ('cancelado')
+          AND pe.estado NOT IN ('entregado','cancelado')
         ),0) as programado_pendiente
       FROM productos pr
       LEFT JOIN stock s ON s.producto_id=pr.id
