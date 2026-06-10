@@ -879,7 +879,7 @@ function renderParte(parte){
   });
 
   html+='<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">'+
-    '<div style="font-size:13px;color:var(--text2)">Total fabricado hoy: <strong class="mono">'+fmtN(total)+' uds</strong></div>'+
+    '<div style="font-size:13px;color:var(--text2)">Total fabricado hoy: <strong class="mono" id="parte-total-hoy">'+fmtN(total)+' uds</strong></div>'+
   '</div></div>';
 
 
@@ -1085,7 +1085,8 @@ async function updateParteLinea(parteId, productoId, valor, inputEl){
       const l=parteHoy.lineas.find(x=>String(x.producto_id)===String(productoId));
       if(l) l.cantidad=v;
       const total=(parteHoy.lineas||[]).reduce((s,l)=>s+(+l.cantidad||0),0);
-      const totEl=document.querySelector('.parte-container-total');
+      const totEl=document.getElementById('parte-total-hoy');
+      if(totEl) totEl.textContent=fmtN(total)+' uds';
     }
   }catch(e){log('Error al guardar','warn');}
 }
@@ -1708,20 +1709,28 @@ function imprimirCalendario(){
 }
 
 async function confirmarGrupo(ids){
-  try{
-    var autoPedido=false;
-    for(var i=0;i<ids.length;i++){
+  var autoPedido=false, ok=0, fallos=0;
+  for(var i=0;i<ids.length;i++){
+    try{
       var r=await api('PATCH','/entregas/'+ids[i]+'/confirmar',{});
       if(r&&r.pedidoAutoEntregado) autoPedido=true;
+      ok++;
+    }catch(e){
+      // Si ya estaba confirmada (p. ej. desde otra pestaña), no es un fallo
+      // real: la contamos como hecha y seguimos con el resto del grupo.
+      if(/ya confirmada/i.test(e.message)) ok++;
+      else fallos++;
     }
-    await loadAll();
-    if(autoPedido){
-      log('¡Pedido completamente entregado!','ok');
-      mostrarToast('¡Pedido entregado al completo!','green');
-    }else{
-      log(ids.length+' entrega(s) confirmada(s) — stock actualizado','ok');
-    }
-  }catch(e){log('Error: '+e.message,'warn');}
+  }
+  await loadAll();
+  if(fallos){
+    log('Confirmadas '+ok+' entrega(s), '+fallos+' con error','warn');
+  }else if(autoPedido){
+    log('¡Pedido completamente entregado!','ok');
+    mostrarToast('¡Pedido entregado al completo!','green');
+  }else{
+    log(ok+' entrega(s) confirmada(s) — stock actualizado','ok');
+  }
 }
 
 async function cambiarFechaGrupo(ids, nuevaFecha){
@@ -1817,6 +1826,12 @@ function renderNecesidades(){
   renderMovPanel(); // registro de movimientos + formulario (columna derecha)
   const el=document.getElementById('nec-table');
   if(!el) return;
+  // Preservar el foco y la posición del cursor del buscador: el input se
+  // regenera con innerHTML en cada pulsación y, si no, perdería el foco.
+  const _act=document.activeElement;
+  const _keepFocus=_act&&_act.id==='nec-search';
+  const _selStart=_keepFocus?_act.selectionStart:null;
+  const _selEnd=_keepFocus?_act.selectionEnd:null;
   if(!necesidades.length){el.innerHTML='<div class="empty"><i class="ti ti-package"></i><p>Sin datos</p></div>';return;}
   const TIPO_LABELS={gavion:'Gaviones',colchoneta:'Colchonetas Reno',malla:'Malla',panel:'Paneles',accesorio:'Accesorios',otro:'Otros'};
   var q=(document.getElementById('nec-search')?.value||'').toLowerCase().trim();
@@ -1861,6 +1876,10 @@ function renderNecesidades(){
       '<td class="r">'+( neta>0?'<span class="badge b-red"><i class="ti ti-alert-triangle" style="font-size:10px"></i> FABRICAR '+fmtN(neta)+'</span>':'<span class="badge b-green"><i class="ti ti-check" style="font-size:10px"></i> OK</span>')+'</td>'+
     '</tr>';
   }).join(''):'<tr><td colspan="8" class="dim" style="text-align:center;padding:20px">Sin resultados</td></tr>')+'</tbody></table>';
+  if(_keepFocus){
+    const ns=document.getElementById('nec-search');
+    if(ns){ ns.focus(); try{ ns.setSelectionRange(_selStart,_selEnd); }catch(e){} }
+  }
 }
 
 // Panel de movimientos (lista + selector de producto del formulario)
@@ -2702,166 +2721,6 @@ function renderHistorial(){
   }
 }
 
-// ── IMPORTAR PEDIDO DESDE PDF BC ──────────────────────────────────────────────
-function abrirImportPDF(){
-  document.getElementById('pdf-import-input').value='';
-  document.getElementById('pdf-import-input').click();
-}
-
-async function procesarImportPDF(input){
-  var file=input.files[0];
-  if(!file) return;
-  log('Leyendo PDF...','');
-  mostrarModalImport('cargando');
-
-  // Read PDF as base64
-  var base64=await new Promise(function(res,rej){
-    var r=new FileReader();
-    r.onload=function(){res(r.result.split(',')[1]);};
-    r.onerror=function(){rej(new Error('Error leyendo archivo'));};
-    r.readAsDataURL(file);
-  });
-
-  try{
-    var response=await fetch('/api/importar-pdf',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({base64:base64, media_type:'application/pdf'})
-    });
-    var rawText=await response.text();
-    if(!response.ok){
-      throw new Error('HTTP '+response.status+': '+rawText.substring(0,200));
-    }
-    var pedido;
-    try{ pedido=JSON.parse(rawText); }
-    catch(pe){ throw new Error('Respuesta no es JSON: '+rawText.substring(0,200)); }
-    mostrarModalImport('preview', pedido);
-  }catch(e){
-    mostrarModalImport('error', null, e.message);
-  }
-}
-
-function mostrarModalImport(estado, pedido, errorMsg){
-  var box=document.getElementById('modal-box');
-  box.className='modal wide';
-  document.getElementById('overlay').classList.add('open');
-
-  if(estado==='cargando'){
-    document.getElementById('modal-title').innerHTML='<i class="ti ti-file-import"></i> Importando PDF de Business Central...';
-    document.getElementById('modal-body').innerHTML=
-      '<div style="text-align:center;padding:40px">'+
-        '<div style="font-size:36px;margin-bottom:12px">⏳</div>'+
-        '<div style="font-size:14px;color:var(--text2)">Claude está leyendo el PDF...</div>'+
-        '<div style="font-size:12px;color:var(--text3);margin-top:6px">Extrayendo referencias, cantidades y datos del cliente</div>'+
-      '</div>';
-  importPedidoPendiente = pedido;
-    document.getElementById('modal-foot').innerHTML='';
-    return;
-  }
-
-  if(estado==='error'){
-    document.getElementById('modal-title').innerHTML='<i class="ti ti-alert-triangle"></i> Error al leer el PDF';
-    document.getElementById('modal-body').innerHTML=
-      '<div style="background:var(--red-l);border-radius:var(--radius-sm);padding:14px;color:var(--red)">'+
-        '<strong>Error:</strong> '+(errorMsg||'No se pudo extraer la información')+
-      '</div>'+
-      '<div style="font-size:12px;color:var(--text2);margin-top:12px">Comprueba que el PDF es un pedido de Business Central de Arisac.</div>';
-    document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
-    return;
-  }
-
-  // Preview state — show extracted data for confirmation
-  document.getElementById('modal-title').innerHTML='<i class="ti ti-file-import"></i> Pedido extraído — Revisa y confirma';
-
-  var lineasHTML='';
-  (pedido.lineas||[]).forEach(function(l,i){
-    // Try to find matching product in catalogue
-    var prod=productos.find(function(p){return p.referencia===l.referencia;});
-    var matchColor=prod?'color:var(--green)':'color:var(--amber)';
-    var matchLabel=prod?'<span style="font-size:10px;color:var(--green)"><i class="ti ti-check"></i> En catálogo</span>':'<span style="font-size:10px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> No está en catálogo</span>';
-    lineasHTML+=
-      '<tr style="border-bottom:1px solid var(--border)">'+
-        '<td style="padding:8px 12px;font-family:monospace;font-weight:500;'+matchColor+'">'+l.referencia+'</td>'+
-        '<td style="padding:8px 12px;font-size:12px;color:var(--text2)">'+( l.descripcion||'')+'</td>'+
-        '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-weight:500">'+l.cantidad+'</td>'+
-        '<td style="padding:8px 12px">'+matchLabel+'</td>'+
-      '</tr>';
-  });
-
-  var sinCatalogo=(pedido.lineas||[]).filter(function(l){return!productos.find(function(p){return p.referencia===l.referencia;});}).length;
-
-  document.getElementById('modal-body').innerHTML=
-    // Pedido info
-    '<div style="background:var(--blue-l);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px">'+
-      '<div class="frow3" style="gap:12px">'+
-        '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--blue-d);margin-bottom:3px">Nº Pedido</div>'+
-          '<div style="font-size:16px;font-weight:700;font-family:monospace;color:var(--blue-d)">'+(pedido.numero||'—')+'</div></div>'+
-        '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--blue-d);margin-bottom:3px">Cliente</div>'+
-          '<div style="font-size:13px;font-weight:500">'+(pedido.cliente_nombre||'—')+'</div></div>'+
-        '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--blue-d);margin-bottom:3px">Obra / Ref.</div>'+
-          '<div style="font-size:13px;font-weight:500">'+(pedido.obra||'—')+'</div></div>'+
-      '</div>'+
-      (pedido.destino?'<div style="margin-top:8px;font-size:11px;color:var(--blue-d)"><i class="ti ti-map-pin"></i> '+pedido.destino+'</div>':'')+
-    '</div>'+
-    // Lines
-    (sinCatalogo>0?'<div style="background:var(--amber-l);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> <strong>'+sinCatalogo+' referencia(s)</strong> no están en el catálogo. Se importarán de todos modos — puedes añadirlas al catálogo después.</div>':'')+
-    '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:6px">'+( pedido.lineas||[]).length+' líneas de producto</div>'+
-    '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:6px">'+
-      '<thead><tr style="background:var(--surface2)">'+
-        '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);font-size:11px">Referencia</th>'+
-        '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);font-size:11px">Descripción</th>'+
-        '<th style="padding:8px 12px;text-align:right;border-bottom:1px solid var(--border);font-size:11px">Cantidad</th>'+
-        '<th style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px">Catálogo</th>'+
-      '</tr></thead><tbody>'+lineasHTML+'</tbody></table>';
-
-  document.getElementById('modal-foot').innerHTML=
-    '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
-    '<button class="btn btn-primary" onclick="crearPedidoDesdeImport()"><i class="ti ti-check"></i> Crear pedido</button>';
-}
-
-async function crearPedidoDesdeImport(){
-  var pedido=importPedidoPendiente;
-  if(!pedido){log('No hay pedido pendiente de importar','warn');return;}
-  log('Creando pedido...','');
-
-  // Match references; crea en el catálogo las que no existan (no se pierde ninguna línea)
-  var lineasFinal=[];
-  for(var i=0;i<(pedido.lineas||[]).length;i++){
-    var l=pedido.lineas[i];
-    var prod=await asegurarProducto(l);
-    if(prod){
-      lineasFinal.push({producto_id:prod.id, cantidad:l.cantidad});
-    }
-  }
-
-  // If still nothing, show which refs were tried
-  if(!lineasFinal.length){
-    var refs=(pedido.lineas||[]).map(function(l){return l.referencia;}).join(', ');
-    var cats=productos.slice(0,5).map(function(p){return p.referencia;}).join(', ');
-    log('Sin coincidencias. PDF: '+refs+' | Catálogo: '+cats,'warn');
-    return;
-  }
-
-  var data={
-    numero:pedido.numero||'',
-    cliente_nombre:pedido.cliente_nombre||'',
-    obra:pedido.obra||'',
-    fecha_pedido:pedido.fecha_pedido||null,
-    estado:'pendiente',
-    tipo_fabricacion:'bajo_pedido',
-    lineas:lineasFinal
-  };
-
-  try{
-    await api('POST','/pedidos-gav',data);
-    await loadAll();
-    closeModal();
-    switchTab('pedidos');
-    var noMatch=(pedido.lineas||[]).length-lineasFinal.length;
-    log('Pedido '+pedido.numero+' importado ('+lineasFinal.length+' lineas)'+(noMatch?' — '+noMatch+' ref. sin catálogo omitidas':''),'ok');
-  }catch(e){log('Error al crear pedido: '+e.message,'warn');}
-}
-
 function triggerPDFImportEnModal(){
   var inp=document.getElementById('pdf-modal-input');
   if(inp){inp.value='';inp.click();}
@@ -3010,96 +2869,6 @@ function mostrarToast(msg, tipo){
   document.head.appendChild(style);
   document.body.appendChild(t);
   setTimeout(function(){if(t.parentNode){t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(function(){t.remove();},300);}},4000);
-}
-
-// ── CATEGORÍAS ────────────────────────────────────────────────────────────────
-function renderBCCategorias(){
-  var el=document.getElementById('bc-cats-list');
-  if(!el) return;
-  // Update categoria filter dropdown
-  var catSel=document.getElementById('filter-bc-cat');
-  if(catSel){
-    var curVal=catSel.value;
-    catSel.innerHTML='<option value="">Todas las categorías</option>'+
-      categorias.map(function(cat){return'<option value="'+cat.id+'" '+(curVal===String(cat.id)?'selected':'')+'>'+cat.nombre+'</option>';}).join('');
-  }
-  if(!categorias.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-tag"></i><p>Sin categorías. Crea la primera.</p></div>';
-    return;
-  }
-  el.innerHTML='<div class="card">'+categorias.map(function(cat){
-    var nCargas=cargas.filter(function(c){return String(c.categoria_id)===String(cat.id);}).length;
-    var nPeds=pedidosBC.filter(function(p){return String(p.categoria_id)===String(cat.id);}).length;
-    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">'+
-      '<div style="width:14px;height:14px;border-radius:50%;background:'+cat.color+';flex-shrink:0"></div>'+
-      '<div style="flex:1"><div style="font-weight:500">'+cat.nombre+'</div>'+
-        '<div class="dim">'+nCargas+' carga'+(nCargas!==1?'s':'')+' · '+nPeds+' pedido'+(nPeds!==1?'s BC':'BC')+'</div>'+
-      '</div>'+
-      '<button class="btn btn-outline btn-sm" onclick="bcOpenModalCategoria('+cat.id+')"><i class="ti ti-pencil"></i></button>'+
-      '<button class="btn-icon danger" onclick="deleteBCCategoria('+cat.id+')"><i class="ti ti-trash"></i></button>'+
-    '</div>';
-  }).join('')+'</div>';
-}
-
-function bcOpenModalCategoria(id){
-  var cat=id?categorias.find(function(c){return String(c.id)===String(id);}):null;
-  var box=document.getElementById('modal-box');
-  box.className='modal narrow';
-  document.getElementById('modal-title').innerHTML='<i class="ti ti-tag"></i> '+(id?'Editar categoría':'Nueva categoría');
-  document.getElementById('modal-body').innerHTML=
-    '<div class="field"><label>Nombre</label><input type="text" id="cat-nombre" value="'+(cat?cat.nombre:'')+'" placeholder="Ej: Urgente, Zona Norte..."></div>'+
-    '<div class="field"><label>Color</label>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
-    ['#334155','#1d6fa4','#2d7a3a','#8a5200','#b91c1c','#5b21b6','#0891b2','#be185d','#065f46','#92400e'].map(function(c){
-      return '<div data-color="'+c+'" onclick="selectCatColor(this)" style="width:28px;height:28px;border-radius:50%;background:'+c+';cursor:pointer;border:3px solid '+(cat&&cat.color===c?'#fff':'transparent')+';box-shadow:'+(cat&&cat.color===c?'0 0 0 2px '+c:'none')+'"></div>';
-    }).join('')+
-    '</div>'+
-    '<input type="hidden" id="cat-color" value="'+(cat?cat.color:'#334155')+'">'+
-    '</div>';
-  document.getElementById('modal-foot').innerHTML=
-    (id?'<button class="btn btn-danger btn-sm" onclick="deleteBCCategoria('+id+');closeModal()"><i class="ti ti-trash"></i></button>':'')+
-    '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+
-    '<button class="btn btn-primary" onclick="saveBCCategoria('+(id||'null')+')"><i class="ti ti-device-floppy"></i> Guardar</button>';
-  document.getElementById('overlay').classList.add('open');
-}
-
-function selectCatColor(el){
-  document.querySelectorAll('[data-color]').forEach(function(d){
-    d.style.border='3px solid transparent';d.style.boxShadow='none';
-  });
-  el.style.border='3px solid #fff';
-  el.style.boxShadow='0 0 0 2px '+el.dataset.color;
-  document.getElementById('cat-color').value=el.dataset.color;
-}
-
-async function saveBCCategoria(id){
-  var nombre=document.getElementById('cat-nombre').value.trim();
-  var color=document.getElementById('cat-color').value||'#334155';
-  if(!nombre){log('Introduce un nombre','warn');return;}
-  try{
-    if(id&&id!=='null'){
-      var u=await api('PUT','/categorias/'+id,{nombre,color});
-      Object.assign(categorias.find(function(c){return String(c.id)===String(id);}),u);
-    } else {
-      categorias.push(await api('POST','/categorias',{nombre,color}));
-    }
-    closeModal();
-    renderBCCategorias();
-    renderBCCargas();
-    log('Categoría guardada','ok');
-  }catch(e){log('Error: '+e.message,'warn');}
-}
-
-async function deleteBCCategoria(id){
-  if(!confirm('Eliminar esta categoría? Las cargas y pedidos asociados quedarán sin categoría.')) return;
-  try{
-    await api('DELETE','/categorias/'+id);
-    categorias=categorias.filter(function(c){return String(c.id)!==String(id);});
-    cargas.forEach(function(c){if(String(c.categoria_id)===String(id))c.categoria_id=null;});
-    pedidosBC.forEach(function(p){if(String(p.categoria_id)===String(id))p.categoria_id=null;});
-    renderBCCategorias();renderBCCargas();renderBCList();
-    log('Categoría eliminada');
-  }catch(e){log('Error','warn');}
 }
 
 // ════════════ MESA DE VIBRADO (pantalla de producción) ════════════
