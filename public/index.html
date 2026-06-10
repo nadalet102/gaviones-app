@@ -416,13 +416,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
         </div>
         <div class="frow">
           <div class="field"><label>Tipo</label>
-            <select id="mov-tipo">
+            <select id="mov-tipo" onchange="onMovTipoChange()">
               <option value="entrada">Entrada</option>
               <option value="salida">Salida</option>
-              <option value="ajuste">Ajuste inventario</option>
+              <option value="ajuste">Ajuste inventario (+/−)</option>
             </select>
           </div>
-          <div class="field"><label>Cantidad</label><input type="number" id="mov-cantidad" min="1" placeholder="0"></div>
+          <div class="field"><label>Cantidad</label><input type="number" id="mov-cantidad" placeholder="0">
+            <small id="mov-ajuste-hint" style="display:none;color:var(--text2);font-size:11px">Usa negativo (ej. −5) para restar</small>
+          </div>
         </div>
         <div class="field"><label>Motivo</label><input type="text" id="mov-motivo" placeholder="Motivo del movimiento..."></div>
         <button class="btn btn-green" style="width:100%" onclick="registrarMovimiento()"><i class="ti ti-check"></i> Registrar</button>
@@ -2087,6 +2089,11 @@ function limpiarMovProd(){
   if(sel) sel.style.display='none';
 }
 
+function onMovTipoChange(){
+  const esAjuste=document.getElementById('mov-tipo').value==='ajuste';
+  document.getElementById('mov-ajuste-hint').style.display=esAjuste?'block':'none';
+  document.getElementById('mov-cantidad').placeholder=esAjuste?'+ suma / − resta':'0';
+}
 async function registrarMovimiento(){
   const prod=document.getElementById('mov-producto').value;
   const tipo=document.getElementById('mov-tipo').value;
