@@ -49,8 +49,18 @@
   <div class="area" id="area-produccion">
     <button class="area-btn" onclick="toggleArea('produccion')"><i class="ti ti-building-factory-2"></i> Producción <i class="ti ti-chevron-down chev"></i></button>
     <div class="area-menu">
-      <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-package"></i> Stock y necesidades</div>
       <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
+      <div class="area-sep">Pantallas de fábrica</div>
+      <div class="tab mesa-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> Mesa de vibrado</div>
+      <div class="tab carado-tab" id="tab-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Zona carado</div>
+      <div class="tab montado-tab" id="tab-montado" onclick="switchTab('montado')"><i class="ti ti-box"></i> Zona montado</div>
+    </div>
+  </div>
+
+  <div class="area" id="area-almacen">
+    <button class="area-btn" onclick="toggleArea('almacen')"><i class="ti ti-package"></i> Almacén <i class="ti ti-chevron-down chev"></i></button>
+    <div class="area-menu">
+      <div class="tab" id="tab-nec" onclick="switchTab('nec')"><i class="ti ti-package"></i> Stock y necesidades</div>
       <div class="tab" id="tab-productos" onclick="switchTab('productos')"><i class="ti ti-grid-dots"></i> Catálogo</div>
     </div>
   </div>
@@ -62,12 +72,6 @@
       <div class="tab" id="tab-cargar" onclick="switchTab('cargar')"><i class="ti ti-clipboard-check"></i> Carga (cargador)</div>
       <div class="tab" id="tab-hist" onclick="switchTab('hist')"><i class="ti ti-history"></i> Historial</div>
     </div>
-  </div>
-
-  <div class="prod-tabs">
-    <div class="tab carado-tab" id="tab-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> ZONA CARADO</div>
-    <div class="tab mesa-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> MESA DE VIBRADO</div>
-    <div class="tab montado-tab" id="tab-montado" onclick="switchTab('montado')"><i class="ti ti-box"></i> ZONA MONTADO</div>
   </div>
 </div>
 

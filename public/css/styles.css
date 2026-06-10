@@ -60,6 +60,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .carado-tab{margin:6px 0;background:#f97316;color:#fff;font-weight:800;font-size:13px;letter-spacing:.04em;border-radius:999px;padding:9px 24px;border-bottom:none!important;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:background .12s}
 .carado-tab:hover{background:#ea580c;color:#fff}
 .carado-tab.active{background:#ea580c;color:#fff;border-bottom:none!important}
+/* Items de fábrica dentro del menú de Producción */
+.area-sep{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:8px 11px 3px;margin-top:3px;border-top:1px solid var(--border)}
+.area-menu .tab.mesa-tab,.area-menu .tab.carado-tab,.area-menu .tab.montado-tab{margin:2px 0;font-weight:700;font-size:12px;letter-spacing:0;box-shadow:none}
+.area-menu .tab.mesa-tab:hover,.area-menu .tab.mesa-tab.active{background:#eab308;color:#1a1a1a}
+.area-menu .tab.carado-tab:hover,.area-menu .tab.carado-tab.active{background:#ea580c;color:#fff}
+.area-menu .tab.montado-tab:hover,.area-menu .tab.montado-tab.active{background:#15803d;color:#fff}
 .carado-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;padding:6px 2px}
 .carado-card{position:relative;background:var(--surface);border:2px solid var(--border2);border-radius:16px;padding:18px 16px 14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:transform .12s,box-shadow .12s,border-color .12s;text-align:center;font-family:inherit}
 .carado-del{position:absolute;top:8px;left:8px;width:32px;height:32px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:#dc2626;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;z-index:2;opacity:.5;transition:opacity .12s,background .12s}
