@@ -502,8 +502,16 @@ function getLineas(){
 }
 
 function autoNumPedido(){
-  const n=pedidos.length+1;
-  return 'P-'+new Date().getFullYear()+'-'+String(n).padStart(3,'0');
+  const year=new Date().getFullYear();
+  const re=new RegExp('^P-'+year+'-(\\d+)$');
+  // Siguiente correlativo = mayor número existente de este año + 1.
+  // (Antes usaba pedidos.length+1, que se repetía al borrar pedidos.)
+  let max=0;
+  pedidos.forEach(function(p){
+    const m=re.exec(String(p.numero||''));
+    if(m){ const n=parseInt(m[1],10); if(n>max) max=n; }
+  });
+  return 'P-'+year+'-'+String(max+1).padStart(3,'0');
 }
 
 function closeModal(){

@@ -45,7 +45,12 @@ async function api(method,path,body){
   const opts={method,headers:{'Content-Type':'application/json'}};
   if(body) opts.body=JSON.stringify(body);
   const r=await fetch('/api'+path,opts);
-  if(!r.ok) throw new Error(await r.text());
+  if(!r.ok){
+    const txt=await r.text();
+    let msg=txt;
+    try{ msg=JSON.parse(txt).error||txt; }catch(e){}
+    throw new Error(msg);
+  }
   return r.json();
 }
 async function loadAll(){

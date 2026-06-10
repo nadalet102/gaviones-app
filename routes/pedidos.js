@@ -27,6 +27,11 @@ router.post('/api/pedidos-gav', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Rechazar números de pedido duplicados (evita confusiones y reimportar el mismo PDF)
+    if(numero){
+      const dup = await client.query('SELECT 1 FROM pedidos WHERE numero=$1 LIMIT 1',[numero]);
+      if(dup.rows.length){ await client.query('ROLLBACK'); return res.status(400).json({error:'Ya existe un pedido con el número '+numero}); }
+    }
     const r = await client.query(
       `INSERT INTO pedidos (numero,cliente_id,cliente_nombre,fecha_pedido,fecha_entrega,estado,tipo_fabricacion,obra,notas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [numero,cliente_id||null,cliente_nombre,fecha_pedido||null,fecha_entrega||null,estado||'pendiente',tipo_fabricacion||'bajo_pedido',obra,notas]

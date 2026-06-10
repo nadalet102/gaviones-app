@@ -429,6 +429,9 @@ app.get('/api/pedidos-gav', (req, res) => {
 });
 app.post('/api/pedidos-gav', (req, res) => {
   const { numero, cliente_id, cliente_nombre, fecha_pedido, fecha_entrega, estado, tipo_fabricacion, obra, notas, lineas, maps_url } = req.body;
+  if (numero && db.pedidos.some(p => p.numero === numero)) {
+    return res.status(400).json({ error: 'Ya existe un pedido con el número ' + numero });
+  }
   const pedido = {
     id: nextId('pedidos'), numero, cliente_id: cliente_id || null, cliente_nombre,
     fecha_pedido: fecha_pedido || null, fecha_entrega: fecha_entrega || null,
