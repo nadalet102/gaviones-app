@@ -151,14 +151,16 @@ function renderLineasEntrega(){
   html+='<thead><tr style="background:var(--surface2)">'+
     '<th style="padding:7px 10px;text-align:left;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Producto</th>'+
     '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Total pedido</th>'+
-    '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Ya entregado</th>'+
-    '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Pendiente</th>'+
+    '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Entregado</th>'+
+    '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Programado</th>'+
+    '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Por programar</th>'+
     '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Cargar ahora</th>'+
   '</tr></thead><tbody>';
 
   pedido.lineas.forEach(function(l){
     const entregado=(l.entregas||[]).filter(e=>e.estado==='confirmada').reduce(function(s,e){return s+(+e.cantidad||0);},0);
-    const pendiente=Math.max(0,(+l.cantidad||0)-entregado);
+    const programado=(l.entregas||[]).filter(e=>e.estado==='pendiente').reduce(function(s,e){return s+(+e.cantidad||0);},0);
+    const porProgramar=Math.max(0,(+l.cantidad||0)-entregado-programado);
     html+='<tr style="border-bottom:1px solid var(--border)">'+
       '<td style="padding:8px 10px">'+
         '<div style="font-weight:500">'+l.referencia+'</div>'+
@@ -166,11 +168,12 @@ function renderLineasEntrega(){
       '</td>'+
       '<td style="padding:8px 10px;text-align:right;font-family:monospace">'+fmtN(l.cantidad)+'</td>'+
       '<td style="padding:8px 10px;text-align:right;font-family:monospace;color:var(--green)">'+fmtN(entregado)+'</td>'+
-      '<td style="padding:8px 10px;text-align:right;font-family:monospace;color:'+(pendiente>0?'var(--red)':'var(--text2)')+'">'+fmtN(pendiente)+'</td>'+
+      '<td style="padding:8px 10px;text-align:right;font-family:monospace;color:var(--amber)">'+fmtN(programado)+'</td>'+
+      '<td style="padding:8px 10px;text-align:right;font-family:monospace;color:'+(porProgramar>0?'var(--red)':'var(--text2)')+'">'+fmtN(porProgramar)+'</td>'+
       '<td style="padding:8px 10px;text-align:right">'+
-        '<input type="number" data-linea="'+l.id+'" min="0" max="'+pendiente+'" placeholder="0" '+
+        '<input type="number" data-linea="'+l.id+'" min="0" max="'+porProgramar+'" placeholder="0" '+
           'style="width:80px;font-size:13px;font-family:monospace;text-align:right;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2)" '+
-          (pendiente===0?'disabled title="Todo entregado"':'')+
+          (porProgramar===0?'disabled title="Todo programado o entregado"':'')+
           ' oninput="actualizarTotalEntrega()">'+
       '</td>'+
     '</tr>';

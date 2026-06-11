@@ -539,6 +539,17 @@ app.get('/api/entregas', (req, res) => {
 });
 app.post('/api/entregas', (req, res) => {
   const { linea_pedido_id, fecha_carga, cantidad, notas, transportista, mat_camion, mat_remolque, carga_grupo_id } = req.body;
+  const linea = db.lineas_pedido.find(l => l.id === +linea_pedido_id);
+  if (!linea) return res.status(400).json({ error: 'Línea de pedido no encontrada' });
+  const ya = db.entregas_parciales
+    .filter(x => x.linea_pedido_id === +linea_pedido_id && (x.estado === 'pendiente' || x.estado === 'confirmada'))
+    .reduce((s, x) => s + (+x.cantidad || 0), 0);
+  const queda = (+linea.cantidad) - ya;
+  if (+cantidad > queda) {
+    return res.status(400).json({ error: queda <= 0
+      ? 'Esta línea ya está toda programada/entregada (no quedan unidades sin programar)'
+      : 'Solo quedan ' + queda + ' ud sin programar en esta línea (pedido ' + (+linea.cantidad) + ', ya programado/entregado ' + ya + ')' });
+  }
   const e = {
     id: nextId('entregas_parciales'), linea_pedido_id: +linea_pedido_id, fecha_carga, cantidad,
     estado: 'pendiente', transportista: transportista || null, mat_camion: mat_camion || null,

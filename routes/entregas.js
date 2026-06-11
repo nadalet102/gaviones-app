@@ -23,6 +23,19 @@ router.get('/api/entregas', async (req, res) => {
 router.post('/api/entregas', async (req, res) => {
   const {linea_pedido_id,fecha_carga,cantidad,notas,transportista,mat_camion,mat_remolque,carga_grupo_id} = req.body;
   try {
+    // Control: no permitir programar más de lo que queda sin programar en la línea.
+    // queda = cantidad de la línea − (entregas confirmadas + pendientes).
+    const lc = (await pool.query('SELECT cantidad FROM lineas_pedido WHERE id=$1',[linea_pedido_id])).rows[0];
+    if(!lc) return res.status(400).json({error:'Línea de pedido no encontrada'});
+    const ya = +(await pool.query(
+      "SELECT COALESCE(SUM(cantidad),0) AS s FROM entregas_parciales WHERE linea_pedido_id=$1 AND estado IN ('pendiente','confirmada')",
+      [linea_pedido_id])).rows[0].s;
+    const queda = +lc.cantidad - ya;
+    if(+cantidad > queda) {
+      return res.status(400).json({error: queda<=0
+        ? 'Esta línea ya está toda programada/entregada (no quedan unidades sin programar)'
+        : 'Solo quedan '+queda+' ud sin programar en esta línea (pedido '+(+lc.cantidad)+', ya programado/entregado '+ya+')'});
+    }
     const r = await pool.query(
       `INSERT INTO entregas_parciales (linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,carga_grupo_id,notas) VALUES ($1,$2,$3,'pendiente',$4,$5,$6,$7,$8) RETURNING *`,
       [linea_pedido_id,fecha_carga,cantidad,transportista||null,mat_camion||null,mat_remolque||null,carga_grupo_id||null,notas||null]
