@@ -157,10 +157,12 @@ function renderLineasEntrega(){
     '<th style="padding:7px 10px;text-align:right;font-weight:500;color:var(--text2);border-bottom:1px solid var(--border)">Cargar ahora</th>'+
   '</tr></thead><tbody>';
 
+  var totalPorProg=0;
   pedido.lineas.forEach(function(l){
     const entregado=(l.entregas||[]).filter(e=>e.estado==='confirmada').reduce(function(s,e){return s+(+e.cantidad||0);},0);
     const programado=(l.entregas||[]).filter(e=>e.estado==='pendiente').reduce(function(s,e){return s+(+e.cantidad||0);},0);
     const porProgramar=Math.max(0,(+l.cantidad||0)-entregado-programado);
+    totalPorProg+=porProgramar;
     html+='<tr style="border-bottom:1px solid var(--border)">'+
       '<td style="padding:8px 10px">'+
         '<div style="font-weight:500">'+l.referencia+'</div>'+
@@ -179,7 +181,12 @@ function renderLineasEntrega(){
     '</tr>';
   });
   html+='</tbody></table>';
-  html+='<div style="display:flex;justify-content:flex-end;margin-top:6px;font-size:12px;color:var(--text2)">Total a cargar: <strong style="font-family:monospace" id="total-entrega" style="margin-left:6px;color:var(--blue)">0 ud</strong></div>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px">'+
+    (totalPorProg>0
+      ? '<button class="btn btn-outline btn-sm" onclick="cargarTodoEntrega()"><i class="ti ti-checks"></i> Cargar todo lo pendiente ('+fmtN(totalPorProg)+' ud)</button>'
+      : '<span></span>')+
+    '<div style="font-size:12px;color:var(--text2)">Total a cargar: <strong style="font-family:monospace;margin-left:6px;color:var(--blue)" id="total-entrega">0 ud</strong></div>'+
+  '</div>';
   container.innerHTML=html;
 }
 
@@ -188,6 +195,13 @@ function actualizarTotalEntrega(){
   document.querySelectorAll('[data-linea]').forEach(function(inp){total+=parseInt(inp.value)||0;});
   var el=document.getElementById('total-entrega');
   if(el) el.textContent=fmtN(total)+' ud';
+}
+// Rellena cada línea con todo lo que le queda por programar (su máximo)
+function cargarTodoEntrega(){
+  document.querySelectorAll('#lineas-entrega-container [data-linea]').forEach(function(inp){
+    if(!inp.disabled) inp.value=inp.max||0;
+  });
+  actualizarTotalEntrega();
 }
 
 async function saveEntrega(){
