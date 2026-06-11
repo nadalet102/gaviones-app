@@ -177,16 +177,23 @@ function renderPedidos(){
         '</tr></thead><tbody>'+
         lineas.map(l=>{
           const ent=(l.entregas||[]).filter(e=>e.estado==='confirmada').reduce((s,e)=>s+(+e.cantidad||0),0);
+          const prog=(l.entregas||[]).filter(e=>e.estado==='pendiente').reduce((s,e)=>s+(+e.cantidad||0),0);
           const pend=Math.max(0,(+l.cantidad||0)-ent);
+          const porProgramar=Math.max(0,(+l.cantidad||0)-ent-prog);
           const entPend=(l.entregas||[]).filter(e=>e.estado==='pendiente').sort((a,b)=>a.fecha_carga>b.fecha_carga?1:-1);
-          const proxCarga=entPend.length?fmtD(entPend[0].fecha_carga)+'<span class="dim"> ('+fmtN(entPend[0].cantidad)+' ud)</span>':'<span class="dim">—</span>';
+          const proxCarga=entPend.length
+            ? entPend.map(e=>'<div style="white-space:nowrap"><i class="ti ti-calendar" style="font-size:10px;color:var(--amber)"></i> '+fmtD(e.fecha_carga)+' <span class="dim">('+fmtN(e.cantidad)+' ud)</span></div>').join('')
+            : '<span class="dim">—</span>';
+          const btnProgramar=porProgramar>0
+            ? '<button class="btn btn-outline btn-sm" onclick="openModal(\'entrega\',null,'+l.id+')"><i class="ti ti-calendar-plus"></i> Programar</button>'
+            : '<span class="badge b-green" title="Toda la cantidad ya está programada o entregada"><i class="ti ti-check" style="font-size:10px"></i> Programado</span>';
           return '<tr>'+
             '<td style="max-width:340px"><div style="font-weight:500;font-family:monospace;font-size:11px">'+l.referencia+'</div><div class="dim" style="white-space:normal;line-height:1.3;font-size:12px">'+(l.descripcion||dimStr(l))+'</div></td>'+
             '<td class="r mono">'+fmtN(l.cantidad)+'</td>'+
             '<td class="r mono" style="color:var(--green)">'+fmtN(ent)+'</td>'+
             '<td class="r mono" style="color:'+(pend>0?'var(--red)':'var(--green)')+'">'+fmtN(pend)+'</td>'+
             '<td>'+proxCarga+'</td>'+
-            '<td><button class="btn btn-outline btn-sm" onclick="openModal(\'entrega\',null,'+l.id+')"><i class="ti ti-calendar-plus"></i> Programar</button></td>'+
+            '<td>'+btnProgramar+'</td>'+
           '</tr>'+
           '<tr style="background:var(--surface)"><td colspan="6" style="padding:0 10px 8px 10px;border-bottom:1px solid var(--border)">'+
             '<div style="display:flex;align-items:center;gap:6px">'+
