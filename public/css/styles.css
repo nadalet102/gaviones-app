@@ -165,6 +165,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .tbl th.th-sort{cursor:pointer;user-select:none;transition:color .1s,background .1s}
 .tbl th.th-sort:hover{color:var(--text);background:var(--border)}
 .tbl th.th-sort.active{color:var(--blue)}
+#cal-toggle-entregadas.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:500;white-space:nowrap}
 .b-blue{background:var(--blue-l);color:var(--blue-d)}
 .b-green{background:var(--green-l);color:var(--green)}
