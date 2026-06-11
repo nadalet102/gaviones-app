@@ -5,6 +5,21 @@
 function claveCarga(e){ return e.carga_grupo_id ? String(e.carga_grupo_id) : 'SOLO_'+e.id; }
 function lineasDeCarga(grupoId){ return entregas.filter(function(e){ return claveCarga(e)===grupoId; }); }
 
+// ¿Ver en el calendario las cargas ya entregadas? Por defecto NO (se ocultan).
+var calVerEntregadas=(function(){ try{ return localStorage.getItem('gav_cal_ver_entregadas')==='1'; }catch(e){ return false; } })();
+function toggleCalEntregadas(){
+  calVerEntregadas=!calVerEntregadas;
+  try{ localStorage.setItem('gav_cal_ver_entregadas', calVerEntregadas?'1':'0'); }catch(e){}
+  renderCal();
+}
+// Conjunto de cargas (grupos) totalmente entregadas = todas sus líneas confirmadas.
+function gruposEntregados(){
+  var byG={}, set={};
+  entregas.forEach(function(e){ var k=claveCarga(e); (byG[k]=byG[k]||[]).push(e); });
+  Object.keys(byG).forEach(function(k){ if(byG[k].every(function(e){return e.estado==='confirmada';})) set[k]=true; });
+  return set;
+}
+
 // Agrupa una lista de entregas por carga. Mantiene el orden.
 function agruparCargas(lista){
   var grupos={}, orden=[];
@@ -37,12 +52,19 @@ function renderCal(){
   const today=new Date();
   const mesStr=calY+'-'+String(calM+1).padStart(2,'0');
 
+  // Filtro: ocultar las cargas YA ENTREGADAS salvo que el usuario las muestre.
+  const entregadosSet=calVerEntregadas?{}:gruposEntregados();
+  const visibles=entregas.filter(function(e){return !entregadosSet[claveCarga(e)];});
+  // Botón de filtro: refleja el estado
+  const _tg=document.getElementById('cal-toggle-entregadas');
+  if(_tg){ _tg.classList.toggle('active', calVerEntregadas); _tg.innerHTML='<i class="ti ti-'+(calVerEntregadas?'eye':'eye-off')+'"></i> Entregadas'; }
+
   let html=DOWS.map(d=>'<div class="cal-dow">'+d+'</div>').join('');
   for(let i=0;i<startDow;i++) html+='<div class="cal-day other"></div>';
   for(let d=1;d<=dim;d++){
     const ds=mesStr+'-'+String(d).padStart(2,'0');
     const isToday=today.getFullYear()===calY&&today.getMonth()===calM&&today.getDate()===d;
-    const dayEntregas=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,10)===ds);
+    const dayEntregas=visibles.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,10)===ds);
     const hasCargas=dayEntregas.length>0;
     html+='<div class="cal-day'+(isToday?' today':'')+(hasCargas?' has-cargas':'')+'"'+(hasCargas?' onclick="showDayCargas(\''+ds+'\')"':'')+'>'+
       '<div class="cal-dn">'+d+'</div>'+
@@ -60,10 +82,17 @@ function renderCal(){
   }
   document.getElementById('cal-grid').innerHTML=html;
 
-  const mesCargas=entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,7)===mesStr);
+  const mesCargas=visibles.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,7)===mesStr);
   document.getElementById('cal-count').textContent=mesCargas.length;
+  // Nº de cargas (grupos) entregadas ocultas este mes, para avisar de que siguen disponibles
+  const ocultasMes=calVerEntregadas?0:agruparCargas(entregas.filter(e=>e.fecha_carga&&String(e.fecha_carga).substring(0,7)===mesStr&&entregadosSet[claveCarga(e)])).length;
+  const notaOcultas=ocultasMes>0?'<div style="padding:9px 16px;font-size:11px;color:var(--text2);border-top:1px dashed var(--border)"><i class="ti ti-eye-off"></i> '+ocultasMes+' carga(s) entregada(s) oculta(s). Pulsa <strong>Entregadas</strong> (arriba) para verlas y devolverlas al calendario.</div>':'';
   const cl=document.getElementById('cal-list');
-  if(!mesCargas.length){cl.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Sin cargas este mes</p></div>';return;}
+  if(!mesCargas.length){
+    document.getElementById('cal-count').textContent='0';
+    cl.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>'+(ocultasMes>0?'No hay cargas pendientes este mes':'Sin cargas este mes')+'</p></div>'+notaOcultas;
+    return;
+  }
 
   // Agrupa por pedido + fecha (misma lógica que el resto del calendario)
   const gruposOrdenados=agruparCargas(mesCargas).sort((a,b)=>a.fecha>b.fecha?1:-1);
@@ -112,7 +141,7 @@ function renderCal(){
         '<button class="btn-icon danger" data-ids="'+g.lineas.map(e=>e.id).join(',')+'" onclick="deleteGrupoById(this.dataset.ids)" title="Eliminar carga"><i class="ti ti-trash"></i></button>'+
       '</div>'+
     '</div>';
-  }).join('');
+  }).join('')+notaOcultas;
 }
 
 function calMove(d){
