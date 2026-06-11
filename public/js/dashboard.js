@@ -38,19 +38,25 @@ function renderDash(){
   if(!proxCargas.length){
     cp.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>Sin cargas programadas esta semana</p></div>';
   }else{
-    cp.innerHTML='<table class="tbl"><thead><tr><th>Fecha</th><th>Pedido</th><th>Producto</th><th class="r">Uds.</th><th class="c">Estado</th><th></th></tr></thead><tbody>'+
-    proxCargas.map(e=>'<tr>'+
-      '<td class="mono" style="font-weight:500;color:var(--blue)">'+fmtD(e.fecha_carga)+'</td>'+
-      '<td><div style="font-weight:500">'+e.pedido_numero+'</div><div class="dim">'+(e.cliente_nombre||'')+(e.obra?' · '+e.obra:'')+'</div></td>'+
-      '<td><div style="font-weight:500">'+e.referencia+'</div><div class="dim">'+dimStr(e)+'</div></td>'+
-      '<td class="r mono">'+fmtN(e.cantidad)+'</td>'+
-      '<td class="c"><span class="badge '+(e.estado==='confirmada'?'b-green':'b-amber')+'">'+( e.estado==='confirmada'?'Confirmada':'Pendiente')+'</span></td>'+
-      '<td style="display:flex;gap:5px;align-items:center">'+
-        (e.estado==='pendiente'?'<input type="date" value="'+String(e.fecha_carga).substring(0,10)+'" title="Cambiar fecha" style="font-size:11px;padding:2px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)" onchange="cambiarFechaEntrega('+e.id+',this.value)">':'<span class="dim">'+fmtD(e.fecha_carga)+'</span>')+
-        (e.estado==='pendiente'?'<button class="btn btn-green btn-sm" onclick="confirmarEntrega('+e.id+')"><i class="ti ti-check"></i> Confirmar</button>':'')+
-        (e.estado==='confirmada'?'<button class="btn btn-outline btn-sm" style="color:var(--amber);border-color:var(--amber);font-size:10px" onclick="anularEntrega('+e.id+')"><i class="ti ti-arrow-back-up"></i> Anular</button>':'')+
-      '</td>'+
-    '</tr>').join('')+'</tbody></table>';
+    // Agrupado CARGA a carga (no línea a línea). Al pulsar una fila se abre el
+    // detalle con TODAS las líneas de esa carga.
+    const grupos=agruparCargas(proxCargas).sort((a,b)=>a.fecha>b.fecha?1:-1);
+    cp.innerHTML='<table class="tbl"><thead><tr><th>Fecha</th><th>Carga / Pedido</th><th class="r">Uds.</th><th class="c">Líneas</th><th></th></tr></thead><tbody>'+
+    grupos.map(g=>{
+      const tot=g.lineas.reduce((s,e)=>s+(+e.cantidad||0),0);
+      const ids=g.lineas.map(e=>e.id);
+      const nl=g.lineas.length;
+      return '<tr style="cursor:pointer" onclick="verDetalleGrupo(\''+g.grupo_id+'\')" title="Ver todas las líneas de esta carga">'+
+        '<td class="mono" style="font-weight:500;color:var(--blue)">'+fmtD(g.fecha)+'</td>'+
+        '<td><div style="font-weight:500">'+g.pedido_numero+'</div><div class="dim">'+(g.cliente_nombre||'')+(g.obra?' · '+g.obra:'')+'</div></td>'+
+        '<td class="r mono">'+fmtN(tot)+'</td>'+
+        '<td class="c"><span class="badge b-steel">'+nl+' línea'+(nl===1?'':'s')+'</span></td>'+
+        '<td onclick="event.stopPropagation()" style="text-align:right;white-space:nowrap">'+
+          '<button class="btn btn-green btn-sm" onclick="confirmarGrupo(['+ids.join(',')+'])"><i class="ti ti-check"></i> Confirmar</button> '+
+          '<button class="btn-icon" onclick="verDetalleGrupo(\''+g.grupo_id+'\')" title="Ver líneas"><i class="ti ti-eye"></i></button>'+
+        '</td>'+
+      '</tr>';
+    }).join('')+'</tbody></table>';
   }
 
   // Necesidades urgentes
