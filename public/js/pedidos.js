@@ -48,8 +48,8 @@ function renderNecesidades(){
   (sorted.length?sorted.map(n=>{
     const neta=+n.necesidad_neta||0;
     const rowBg=neta>0?'background:var(--red-l)':+n.stock_actual>0?'background:var(--green-l)':'';
-    return '<tr style="'+rowBg+'">'+
-      '<td class="mono" style="font-weight:500">'+n.referencia+'</td>'+
+    return '<tr style="cursor:pointer;'+rowBg+'" onclick="verProductoStock('+n.producto_id+')" title="Ver historial y fabricar">'+
+      '<td class="mono" style="font-weight:500">'+n.referencia+' <i class="ti ti-history" style="font-size:11px;color:var(--text2)"></i></td>'+
       '<td class="dim">'+(n.descripcion||'—')+'</td>'+
       '<td class="dim">'+dimStr(n)+'</td>'+
       '<td class="r mono">'+fmtN(n.pedido_total)+'</td>'+
@@ -63,6 +63,60 @@ function renderNecesidades(){
     const ns=document.getElementById('nec-search');
     if(ns){ ns.focus(); try{ ns.setSelectionRange(_selStart,_selEnd); }catch(e){} }
   }
+}
+
+// Ficha de un producto: historial de movimientos + añadir stock (fabricar)
+async function verProductoStock(productoId){
+  const p=productos.find(x=>String(x.id)===String(productoId));
+  if(!p){log('Producto no encontrado','warn');return;}
+  const box=document.getElementById('modal-box'); box.className='modal wide';
+  document.getElementById('overlay').classList.add('open');
+  editId=null; modalType='prodStock';
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-package"></i> '+(p.referencia||'')+(p.descripcion?' <span class="dim" style="font-weight:400">— '+p.descripcion+'</span>':'');
+  document.getElementById('modal-foot').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>';
+  document.getElementById('modal-body').innerHTML='<div style="padding:24px;text-align:center;color:var(--text2)"><i class="ti ti-loader"></i> Cargando historial…</div>';
+  let movs=[];
+  try{ movs=await api('GET','/stock/movimientos/'+productoId); }catch(e){ movs=[]; }
+  // Si se cerró el modal mientras cargaba, no pintar
+  if(modalType!=='prodStock') return;
+  const stockActual=+p.stock_actual||0;
+  const filas=movs.length?movs.map(function(m){
+    var esEnt=m.tipo==='entrada';
+    return '<tr>'+
+      '<td class="mono" style="white-space:nowrap">'+fmtD(m.fecha)+'</td>'+
+      '<td><span class="badge '+(esEnt?'b-green':'b-amber')+'">'+(esEnt?'Entrada':'Salida')+'</span></td>'+
+      '<td class="r mono" style="font-weight:600;color:'+(esEnt?'var(--green)':'var(--red)')+'">'+(esEnt?'+':'−')+fmtN(m.cantidad)+'</td>'+
+      '<td style="white-space:normal">'+(m.motivo||'—')+'</td>'+
+      '<td class="dim mono" style="font-size:11px;white-space:nowrap">'+(m.referencia_doc||'')+'</td>'+
+    '</tr>';
+  }).join(''):'<tr><td colspan="5" class="dim" style="text-align:center;padding:18px">Sin movimientos registrados</td></tr>';
+  document.getElementById('modal-body').innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">'+
+      '<div style="font-size:13px;color:var(--text2)">'+(dimStr(p)||'')+(p.unidad?' · '+p.unidad:'')+'</div>'+
+      '<div style="font-size:13px">Stock actual: <strong class="mono" style="font-size:18px;color:'+(stockActual>0?'var(--green)':stockActual<0?'var(--red)':'var(--text2)')+'">'+fmtN(stockActual)+'</strong> ud</div>'+
+    '</div>'+
+    '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px">'+
+      '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:8px"><i class="ti ti-plus"></i> Añadir stock (fabricación no anotada)</div>'+
+      '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'+
+        '<div class="field" style="margin:0"><label>Cantidad</label><input type="number" id="ps-cant" min="1" placeholder="0" style="width:110px" onkeydown="if(event.key===\'Enter\')fabricarDesdeStock('+productoId+')"></div>'+
+        '<div class="field" style="margin:0;flex:1;min-width:160px"><label>Motivo</label><input type="text" id="ps-motivo" value="Fabricación" placeholder="Motivo..."></div>'+
+        '<button class="btn btn-green" onclick="fabricarDesdeStock('+productoId+')"><i class="ti ti-check"></i> Añadir a stock</button>'+
+      '</div>'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:6px">Historial de movimientos ('+movs.length+')</div>'+
+    '<div style="max-height:330px;overflow:auto"><table class="tbl"><thead><tr><th>Fecha</th><th>Mov.</th><th class="r">Uds.</th><th>Motivo / Para quién</th><th>Doc.</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
+}
+async function fabricarDesdeStock(productoId){
+  const cant=parseInt(document.getElementById('ps-cant')?.value)||0;
+  const motivo=(document.getElementById('ps-motivo')?.value||'').trim()||'Fabricación';
+  if(cant<=0){log('Introduce una cantidad','warn');return;}
+  try{
+    await api('POST','/stock/movimiento',{producto_id:+productoId,tipo:'entrada',cantidad:cant,motivo:motivo});
+    await loadAll();
+    renderNecesidades();
+    verProductoStock(productoId); // refresca la ficha con el nuevo movimiento
+    mostrarToast('✓ '+fmtN(cant)+' ud añadidas a stock','green');
+  }catch(e){log('Error: '+e.message,'warn');}
 }
 
 // Panel de movimientos (lista + selector de producto del formulario)

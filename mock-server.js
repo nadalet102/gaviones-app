@@ -277,6 +277,18 @@ app.get('/api/stock/movimientos', (req, res) => {
     });
   res.json(rows);
 });
+app.get('/api/stock/movimientos/:producto_id', (req, res) => {
+  const pid = +req.params.producto_id;
+  const rows = db.movimientos_stock
+    .filter(m => m.producto_id === pid)
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id))
+    .slice(0, 500)
+    .map(m => {
+      const p = findProducto(m.producto_id);
+      return { ...m, referencia: p ? p.referencia : null, descripcion: p ? p.descripcion : null };
+    });
+  res.json(rows);
+});
 app.post('/api/stock/movimiento', (req, res) => {
   const { producto_id, tipo, cantidad, motivo, referencia_doc, fecha } = req.body;
   try {

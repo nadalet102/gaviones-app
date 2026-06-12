@@ -22,6 +22,17 @@ router.get('/api/stock/movimientos', async (req, res) => {
     res.json(r.rows);
   } catch(e) { res.status(500).json({error:e.message}); }
 });
+// Historial completo de movimientos de un producto concreto
+router.get('/api/stock/movimientos/:producto_id', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT m.*,p.referencia,p.descripcion
+      FROM movimientos_stock m JOIN productos p ON p.id=m.producto_id
+      WHERE m.producto_id=$1
+      ORDER BY m.created_at DESC LIMIT 500`, [req.params.producto_id]);
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
 router.post('/api/stock/movimiento', async (req, res) => {
   const {producto_id,tipo,cantidad,motivo,referencia_doc,fecha} = req.body;
   const client = await pool.connect();
