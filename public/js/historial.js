@@ -120,6 +120,8 @@ async function procesarPDFEnModal(input){
     if(pedido.cliente_nombre) document.getElementById('f-cliente-nombre').value=pedido.cliente_nombre;
     if(pedido.obra) document.getElementById('f-obra').value=pedido.obra;
     if(pedido.fecha_pedido) document.getElementById('f-fecha-ped').value=pedido.fecha_pedido;
+    // Notas extraídas del PDF (texto entre **asteriscos**) → notas del pedido
+    if(pedido.notas){ var _nEl=document.getElementById('f-notas'); if(_nEl) _nEl.value=(_nEl.value?_nEl.value+'\n':'')+pedido.notas; }
 
     // Fill lines (creando en el catálogo las referencias que no existan)
     if(pedido.lineas&&pedido.lineas.length){
