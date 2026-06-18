@@ -823,11 +823,11 @@ app.post('/api/importar-pdf', (req, res) => {
     destino: 'Almacén Central, Madrid',
     fecha_pedido: today(),
     lineas: [
-      { referencia: 'GDEC022', descripcion: 'G Letra 75alt x15 x variable cm', cantidad: 12 },
-      { referencia: 'GDEC022', descripcion: 'G Letra 75alt x15 x variable cm', cantidad: 9 },
-      { referencia: 'GMAT0537', descripcion: 'Grapadora Gaviones Manual O20', cantidad: 1 },
+      { referencia: 'GDEC022', descripcion: 'G Letra 75alt x15 x variable cm', cantidad: 12, notas: 'FUENTE MILANO' },
+      { referencia: 'GDEC022', descripcion: 'G Letra 75alt x15 x variable cm', cantidad: 9, notas: 'LA BARDERA' },
+      { referencia: 'GMAT0537', descripcion: 'Grapadora Gaviones Manual O20', cantidad: 1, notas: null },
     ],
-    notas: 'FUENTE MILANO · LA BARDERA · MCIA. REPARTIDA EN 3 PALETS DE 52KG CADA UNO',
+    notas: 'MCIA. REPARTIDA EN 3 PALETS DE 52KG CADA UNO',
   });
 });
 app.post('/api/importar-productos', (req, res) => {

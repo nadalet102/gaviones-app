@@ -135,7 +135,7 @@ async function procesarPDFEnModal(input){
           var prod=await asegurarProducto(l);
           if(prod){
             if(!existia) creados++;
-            container.insertAdjacentHTML('beforeend', lineaHTML(Date.now()+idx,{producto_id:prod.id,cantidad:l.cantidad}));
+            container.insertAdjacentHTML('beforeend', lineaHTML(Date.now()+idx,{producto_id:prod.id,cantidad:l.cantidad,notas:l.notas}));
           } else { omitidos++; }
           idx++;
         }
