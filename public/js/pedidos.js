@@ -538,13 +538,16 @@ function toggleDims(){
 }
 
 function lineaHTML(i,l){
-  return '<div id="linea-'+i+'" data-lid="'+(l&&l.id?l.id:'')+'" data-pid="'+(l&&l.producto_id?l.producto_id:'')+'" style="display:grid;grid-template-columns:1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
-    '<select class="linea-prod" data-i="'+i+'" onchange="this.closest(\'[data-pid]\').dataset.pid=this.value" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)">'+
-      '<option value="">Seleccionar producto...</option>'+
-      productos.map(p=>'<option value="'+p.id+'" '+(l&&String(l.producto_id)===String(p.id)?'selected':'')+'>'+prodLabel(p)+'</option>').join('')+
-    '</select>'+
-    '<input type="number" class="linea-cant" data-i="'+i+'" placeholder="Cant." value="'+(l?l.cantidad:'')+'" min="1" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);font-family:monospace;text-align:right">'+
-    '<button onclick="document.getElementById(\'linea-'+i+'\').remove()" style="background:none;border:1px solid var(--border2);border-radius:4px;padding:5px 6px;cursor:pointer;color:var(--text2)"><i class="ti ti-x" style="font-size:12px"></i></button>'+
+  return '<div id="linea-'+i+'" data-lid="'+(l&&l.id?l.id:'')+'" data-pid="'+(l&&l.producto_id?l.producto_id:'')+'" style="margin-bottom:8px">'+
+    '<div style="display:grid;grid-template-columns:1fr 80px 30px;gap:6px;align-items:center">'+
+      '<select class="linea-prod" data-i="'+i+'" onchange="this.closest(\'[data-pid]\').dataset.pid=this.value" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2)">'+
+        '<option value="">Seleccionar producto...</option>'+
+        productos.map(p=>'<option value="'+p.id+'" '+(l&&String(l.producto_id)===String(p.id)?'selected':'')+'>'+prodLabel(p)+'</option>').join('')+
+      '</select>'+
+      '<input type="number" class="linea-cant" data-i="'+i+'" placeholder="Cant." value="'+(l?l.cantidad:'')+'" min="1" style="font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);font-family:monospace;text-align:right">'+
+      '<button onclick="document.getElementById(\'linea-'+i+'\').remove()" style="background:none;border:1px solid var(--border2);border-radius:4px;padding:5px 6px;cursor:pointer;color:var(--text2)"><i class="ti ti-x" style="font-size:12px"></i></button>'+
+    '</div>'+
+    '<input type="text" class="linea-notas" placeholder="Nota de la línea (p. ej. texto de la letra; sale en la hoja de carga)..." value="'+(l&&l.notas?String(l.notas).replace(/"/g,'&quot;'):'')+'" style="margin-top:4px;width:100%;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--text)">'+
   '</div>';
 }
 
@@ -560,8 +563,9 @@ function getLineas(){
     const sel=row.querySelector('.linea-prod')?.value;
     const prod=(sel&&sel!=='')?sel:(row.dataset.pid||'');   // si el desplegable está vacío, usa el id guardado en la fila
     const cant=parseFloat(row.querySelector('.linea-cant')?.value)||0;
+    const notas=row.querySelector('.linea-notas')?.value.trim()||null;
     const lid=row.dataset.lid;
-    if(prod&&cant>0) lineas.push({id:lid?+lid:undefined,producto_id:+prod,cantidad:cant});
+    if(prod&&cant>0) lineas.push({id:lid?+lid:undefined,producto_id:+prod,cantidad:cant,notas:notas});
   });
   return lineas;
 }

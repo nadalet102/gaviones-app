@@ -61,17 +61,16 @@ router.post('/api/importar-pdf', async (req, res) => {
       destino = raw.split(/\s{3,}/)[0].trim().replace(/\s+/g,' ');
     }
 
-    // Notas: todo lo que vaya entre ** ** NO es un artículo → va a las notas del pedido.
-    const notasArr = [];
-    const reNota = /\*\*([\s\S]*?)\*\*/g;
-    let mn;
-    while((mn = reNota.exec(text)) !== null){
-      const nota = mn[1].replace(/\s+/g,' ').trim();
-      if(nota) notasArr.push(nota);
-    }
-    const notas = notasArr.join(' · ') || null;
-    // Texto sin las notas, para que el parser de líneas no las confunda con artículos
-    const textLineas = text.replace(/\*\*[\s\S]*?\*\*/g, ' ');
+    // Notas entre ** ** con su POSICIÓN (para atribuir cada texto a su línea).
+    const notasMatches = [];
+    { const reNota = /\*\*([\s\S]*?)\*\*/g; let mn;
+      while((mn = reNota.exec(text)) !== null){
+        const t = mn[1].replace(/\s+/g,' ').trim();
+        if(t) notasMatches.push({ idx: mn.index, texto: t });
+      } }
+    // Quitar las notas del texto MANTENIENDO las posiciones (relleno con espacios
+    // de la misma longitud), para poder comparar posición de nota vs. de línea.
+    const textLineas = text.replace(/\*\*[\s\S]*?\*\*/g, s => ' '.repeat(s.length));
 
     // Lines: detect ALL product references (vibrado, premontado, etc.)
     const lineas = [];
@@ -82,7 +81,7 @@ router.post('/api/importar-pdf', async (req, res) => {
     const pushLinea = (ref, desc, cant, idx) => {
       if(cant > 0 && !usados.has(idx)) {
         usados.add(idx);
-        lineas.push({ referencia: ref, descripcion: (desc||'').trim(), cantidad: Math.round(cant) });
+        lineas.push({ referencia: ref, descripcion: (desc||'').trim(), cantidad: Math.round(cant), idx, notas: null });
       }
     };
     const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -112,7 +111,21 @@ router.post('/api/importar-pdf', async (req, res) => {
       while((ms = simple.exec(textLineas)) !== null) pushLinea(ms[1], '', parseInt(ms[2]), ms.index);
     }
 
-    res.json({ numero, cliente_nombre, obra, destino, fecha_pedido, lineas, notas });
+    // Atribuir cada nota a su línea: la PRIMERA nota tras una línea es de esa
+    // línea (p. ej. el texto de la letra). Notas adicionales, o las que no siguen
+    // a ninguna línea, van a las notas generales del pedido.
+    const lineasOrden = [...lineas].sort((a,b)=>a.idx-b.idx);
+    const generales = [];
+    notasMatches.sort((a,b)=>a.idx-b.idx).forEach(n=>{
+      let target = null;
+      for(const l of lineasOrden){ if(l.idx < n.idx) target = l; else break; }
+      if(target && !target.notas) target.notas = n.texto;
+      else generales.push(n.texto);
+    });
+    const notas = generales.join(' · ') || null;
+    const lineasOut = lineas.map(({idx, ...rest}) => rest);
+
+    res.json({ numero, cliente_nombre, obra, destino, fecha_pedido, lineas: lineasOut, notas });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
