@@ -826,6 +826,7 @@ app.post('/api/importar-pdf', (req, res) => {
       { referencia: 'GAV-2x1x1', descripcion: 'Gavión 2×1×1 m', cantidad: 10 },
       { referencia: 'GAV-3x1x1', descripcion: 'Gavión 3×1×1 m', cantidad: 5 },
     ],
+    notas: 'FUENTE MILANO · LA BARDERA · MCIA. REPARTIDA EN 3 PALETS DE 52KG CADA UNO',
   });
 });
 app.post('/api/importar-productos', (req, res) => {
