@@ -823,8 +823,9 @@ app.post('/api/importar-pdf', (req, res) => {
     destino: 'Almacén Central, Madrid',
     fecha_pedido: today(),
     lineas: [
-      { referencia: 'GAV-2x1x1', descripcion: 'Gavión 2×1×1 m', cantidad: 10 },
-      { referencia: 'GAV-3x1x1', descripcion: 'Gavión 3×1×1 m', cantidad: 5 },
+      { referencia: 'GDEC022', descripcion: 'G Letra 75alt x15 x variable cm', cantidad: 12 },
+      { referencia: 'GDEC022', descripcion: 'G Letra 75alt x15 x variable cm', cantidad: 9 },
+      { referencia: 'GMAT0537', descripcion: 'Grapadora Gaviones Manual O20', cantidad: 1 },
     ],
     notas: 'FUENTE MILANO · LA BARDERA · MCIA. REPARTIDA EN 3 PALETS DE 52KG CADA UNO',
   });

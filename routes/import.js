@@ -75,9 +75,15 @@ router.post('/api/importar-pdf', async (req, res) => {
 
     // Lines: detect ALL product references (vibrado, premontado, etc.)
     const lineas = [];
-    const pushLinea = (ref, desc, cant) => {
-      if(cant > 0 && !lineas.find(l => l.referencia === ref))
+    // Dedup por POSICIÓN en el texto, no por referencia: una misma referencia
+    // puede aparecer en varias líneas del pedido (p. ej. dos líneas de letras
+    // GDEC022, FUENTE MILANO y LA BARDERA). Deduplicar por ref las fusionaba.
+    const usados = new Set();
+    const pushLinea = (ref, desc, cant, idx) => {
+      if(cant > 0 && !usados.has(idx)) {
+        usados.add(idx);
         lineas.push({ referencia: ref, descripcion: (desc||'').trim(), cantidad: Math.round(cant) });
+      }
     };
     const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -91,19 +97,19 @@ router.post('/api/importar-pdf', async (req, res) => {
       const alt = [...new Set(catRefs)].sort((a,b)=>b.length-a.length).map(escapeRe).join('|');
       const reCat = new RegExp('\\b(' + alt + ')\\b\\s+([^\\n]*?)\\s+(\\d+)[,.]?(\\d{2})\\s+\\d', 'g');
       let m;
-      while((m = reCat.exec(textLineas)) !== null) pushLinea(m[1], m[2], parseFloat(m[3] + '.' + (m[4]||'00')));
+      while((m = reCat.exec(textLineas)) !== null) pushLinea(m[1], m[2], parseFloat(m[3] + '.' + (m[4]||'00')), m.index);
     }
 
     // 2) Supplement: gaviones vibrados (GVIBR…) y premontados (GPRE…), estén o no en catálogo
     const reGen = /\b(G(?:VIBR|PRE)\w+)\b\s+([^\n]+?)\s+(\d+)[,.]?(\d{2})\s+\d/g;
     let mg;
-    while((mg = reGen.exec(textLineas)) !== null) pushLinea(mg[1], mg[2], parseFloat(mg[3] + '.' + (mg[4]||'00')));
+    while((mg = reGen.exec(textLineas)) !== null) pushLinea(mg[1], mg[2], parseFloat(mg[3] + '.' + (mg[4]||'00')), mg.index);
 
     // 3) Fallback if nothing matched: generic product-code pattern
     if(!lineas.length) {
       const simple = /\b([A-Z]{2,}\w*\d)\b[^\n]*?(\d{1,4})[,\.](\d{2})\s/g;
       let ms;
-      while((ms = simple.exec(textLineas)) !== null) pushLinea(ms[1], '', parseInt(ms[2]));
+      while((ms = simple.exec(textLineas)) !== null) pushLinea(ms[1], '', parseInt(ms[2]), ms.index);
     }
 
     res.json({ numero, cliente_nombre, obra, destino, fecha_pedido, lineas, notas });
