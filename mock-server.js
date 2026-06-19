@@ -34,6 +34,7 @@ const db = {
   entregas_parciales: [],   // {id,linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,carga_grupo_id,notas,created_at}
   zona_carado: [],          // {producto_id,cantidad}
   zona_montaje: [],         // {producto_id,cantidad} — gaviones vacíos montados, listos para vibrar
+  movimientos_produccion: [], // {id,seccion,producto_id,cantidad,fecha} — log para el informe diario
   partes_produccion: [],    // {id,fecha,estado,notas,created_at}
   partes_lineas: [],        // {id,parte_id,producto_id,cantidad}
 };
@@ -54,6 +55,7 @@ const findProducto = (id) => db.productos.find(p => p.id === +id);
 const findStock = (producto_id) => db.stock.find(s => s.producto_id === +producto_id);
 const findCarado = (producto_id) => db.zona_carado.find(z => z.producto_id === +producto_id);
 const findMontaje = (producto_id) => db.zona_montaje.find(z => z.producto_id === +producto_id);
+const logProd = (seccion, producto_id, cantidad) => db.movimientos_produccion.push({ id: nextId('movimientos_produccion'), seccion, producto_id: +producto_id, cantidad: +cantidad, fecha: today() });
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HELPER stockMovimiento (equivalente al de helpers.js)
@@ -185,6 +187,9 @@ function seed() {
   // Montaje (gaviones vacíos montados, listos para vibrar)
   db.zona_montaje.push({ producto_id: 1, cantidad: 20 });
   db.zona_montaje.push({ producto_id: 3, cantidad: 8 });
+  // Log de producción de HOY (para el informe diario)
+  [['montaje',1,20],['montaje',3,12],['vibrado',1,15],['vibrado',3,4],['carado',4,15],['carado',9,6]]
+    .forEach(([s,pid,c]) => db.movimientos_produccion.push({ id: nextId('movimientos_produccion'), seccion: s, producto_id: pid, cantidad: c, fecha: today() }));
 
   // Parte de producción del día (abierto) con líneas para productos no-accesorio
   const parte = { id: nextId('partes_produccion'), fecha: today(), estado: 'abierto', notas: null, created_at: now() };
@@ -377,6 +382,7 @@ app.post('/api/carado/to-stock', (req, res) => {
     if (+cantidad > disp) throw new Error('No hay tantos en zona de carado (disponible: ' + disp + ')');
     z.cantidad = +z.cantidad - +cantidad;
     stockMovimiento(producto_id, 'entrada', +cantidad, 'Carado → stock', null, today());
+    logProd('carado', producto_id, cantidad);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -414,6 +420,7 @@ app.post('/api/montaje/add', (req, res) => {
   let z = findMontaje(producto_id);
   if (!z) { z = { producto_id: +producto_id, cantidad: 0 }; db.zona_montaje.push(z); }
   z.cantidad = +z.cantidad + +cantidad;
+  logProd('montaje', producto_id, cantidad);
   res.json({ ok: true });
 });
 app.post('/api/montaje/to-carado', (req, res) => {
@@ -427,6 +434,7 @@ app.post('/api/montaje/to-carado', (req, res) => {
     let c = findCarado(producto_id);
     if (!c) { c = { producto_id: +producto_id, cantidad: 0 }; db.zona_carado.push(c); }
     c.cantidad = +c.cantidad + +cantidad;
+    logProd('vibrado', producto_id, cantidad);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -436,6 +444,21 @@ app.post('/api/montaje/remove', (req, res) => {
   const z = findMontaje(producto_id);
   if (z) z.cantidad = Math.max(0, +z.cantidad - +cantidad);
   res.json({ ok: true });
+});
+// ── INFORME DIARIO DE PRODUCCIÓN ──────────────────────────────────────────────
+app.get('/api/informe-produccion', (req, res) => {
+  const fecha = (req.query.fecha && /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha)) ? req.query.fecha : today();
+  const agg = {};
+  db.movimientos_produccion.filter(m => m.fecha === fecha).forEach(m => {
+    const k = m.seccion + '|' + m.producto_id;
+    if (!agg[k]) { const p = findProducto(m.producto_id) || {}; agg[k] = { seccion: m.seccion, producto_id: m.producto_id, total: 0, referencia: p.referencia, descripcion: p.descripcion, largo: p.largo, ancho: p.ancho, alto: p.alto, unidad: p.unidad, tipo: p.tipo }; }
+    agg[k].total += +m.cantidad || 0;
+  });
+  const secciones = { montaje: [], vibrado: [], carado: [] };
+  Object.values(agg).filter(x => x.total > 0).forEach(x => { (secciones[x.seccion] = secciones[x.seccion] || []).push(x); });
+  Object.values(secciones).forEach(arr => arr.sort((a, b) => num(b.alto) - num(a.alto) || num(b.largo) - num(a.largo) || String(a.referencia).localeCompare(String(b.referencia))));
+  const totales = { montaje: secciones.montaje.reduce((s,x)=>s+x.total,0), vibrado: secciones.vibrado.reduce((s,x)=>s+x.total,0), carado: secciones.carado.reduce((s,x)=>s+x.total,0) };
+  res.json({ fecha, secciones, totales });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

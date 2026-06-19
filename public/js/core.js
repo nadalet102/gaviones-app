@@ -78,6 +78,7 @@ function renderAll(t){
   else if(t==='clientes') renderClientes();
   else if(t==='cal') renderCal();
   else if(t==='parte') loadParteHoy();
+  else if(t==='informe') renderInforme();
   else if(t==='mesa') renderMesa();
   else if(t==='vibrado') renderVibrado();
   else if(t==='montado') renderMontado();
@@ -99,6 +100,7 @@ function switchTab(t){
   else if(t==='productos') renderProductos();
   else if(t==='clientes') renderClientes();
   else if(t==='hist') loadHistorial();
+  else if(t==='informe') renderInforme();
   else if(t==='mesa') renderMesa();
   else if(t==='vibrado') renderVibrado();
   else if(t==='montado') renderMontado();

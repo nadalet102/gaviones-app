@@ -50,6 +50,7 @@
     <button class="area-btn" onclick="toggleArea('produccion')"><i class="ti ti-building-factory-2"></i> Producción <i class="ti ti-chevron-down chev"></i></button>
     <div class="area-menu">
       <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
+      <div class="tab" id="tab-informe" onclick="switchTab('informe')"><i class="ti ti-report"></i> Informe diario</div>
       <div class="area-sep">Pantallas de fábrica</div>
       <div class="tab montaje-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-hammer"></i> Montaje</div>
       <div class="tab mesa-tab" id="tab-vibrado" onclick="switchTab('vibrado')"><i class="ti ti-tools"></i> Vibrado</div>
@@ -157,6 +158,13 @@
 <div class="view" id="view-parte">
 <div class="container">
   <div id="parte-container"></div>
+</div>
+</div>
+
+<!-- INFORME DIARIO DE PRODUCCIÓN -->
+<div class="view" id="view-informe">
+<div class="container">
+  <div id="informe-container"></div>
 </div>
 </div>
 
