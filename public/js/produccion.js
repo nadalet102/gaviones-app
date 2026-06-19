@@ -240,11 +240,12 @@ function gavStones(bx,by,bw,bh,pal,rnd){
 }
 
 // Ángulo (cuña) en 2D: planta con el corte a 45º + altura en grande debajo.
+var _gavUid=0; // contador para ids de clipPath ÚNICOS por dibujo (evita colisiones entre pantallas)
 function gavionAngulo2D(p,count,vacio){
   count=Math.max(1,Math.round(+count||1));
   var L=+p.largo||1, A=+p.ancho||0.5, H=+p.alto||0.5;
   var c=gavionColor(p);
-  var uid='ga'+(p.producto_id||p.id||((L*100+A*10+H)|0));
+  var uid='ga'+(++_gavUid);
   var s=64;                                       // px por metro (plano 2D)
   var Wp=Math.max(74, L*s);                        // largo  → arista delantera (abajo)
   var Hp=Math.max(36, A*s);                        // ancho  → profundidad
@@ -287,7 +288,7 @@ function gavionSVG(p,count,vacio){
   var L=+p.largo||1, A=+p.ancho||0.5, H=+p.alto||0.5;
   var ang=mesaEsAngulo(p);
   var c=gavionColor(p);
-  var uid='gv'+(p.producto_id||p.id||Math.floor(Math.random()*1e6));
+  var uid='gv'+(++_gavUid);
   var k=66;                                       // píxeles por metro (escala común → conserva proporciones)
   var W=Math.max(52, L*k);                        // largaria → ancho del dibujo
   var Hf=Math.max(30, H*k);                       // altura  → alto del dibujo
