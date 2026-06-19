@@ -33,6 +33,7 @@ const db = {
   lineas_pedido: [],        // {id,pedido_id,producto_id,cantidad,precio_ud,notas}
   entregas_parciales: [],   // {id,linea_pedido_id,fecha_carga,cantidad,estado,transportista,mat_camion,mat_remolque,carga_grupo_id,notas,created_at}
   zona_carado: [],          // {producto_id,cantidad}
+  zona_montaje: [],         // {producto_id,cantidad} — gaviones vacíos montados, listos para vibrar
   partes_produccion: [],    // {id,fecha,estado,notas,created_at}
   partes_lineas: [],        // {id,parte_id,producto_id,cantidad}
 };
@@ -52,6 +53,7 @@ const now = () => new Date().toISOString();
 const findProducto = (id) => db.productos.find(p => p.id === +id);
 const findStock = (producto_id) => db.stock.find(s => s.producto_id === +producto_id);
 const findCarado = (producto_id) => db.zona_carado.find(z => z.producto_id === +producto_id);
+const findMontaje = (producto_id) => db.zona_montaje.find(z => z.producto_id === +producto_id);
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HELPER stockMovimiento (equivalente al de helpers.js)
@@ -180,6 +182,9 @@ function seed() {
   // Zona de carado (producción a la espera de pasar a stock)
   db.zona_carado.push({ producto_id: 4, cantidad: 15 });
   db.zona_carado.push({ producto_id: 9, cantidad: 6 });
+  // Montaje (gaviones vacíos montados, listos para vibrar)
+  db.zona_montaje.push({ producto_id: 1, cantidad: 20 });
+  db.zona_montaje.push({ producto_id: 3, cantidad: 8 });
 
   // Parte de producción del día (abierto) con líneas para productos no-accesorio
   const parte = { id: nextId('partes_produccion'), fecha: today(), estado: 'abierto', notas: null, created_at: now() };
@@ -379,6 +384,56 @@ app.post('/api/carado/remove', (req, res) => {
   const { producto_id, cantidad } = req.body;
   if (!producto_id || !(+cantidad > 0)) return res.status(400).json({ error: 'producto_id y cantidad requeridos' });
   const z = findCarado(producto_id);
+  if (z) z.cantidad = Math.max(0, +z.cantidad - +cantidad);
+  res.json({ ok: true });
+});
+// ── ZONA DE MONTAJE (buffer previo: vacíos montados, listos para vibrar) ──
+app.get('/api/montaje', (req, res) => {
+  const rows = db.zona_montaje
+    .filter(z => +z.cantidad > 0)
+    .map(z => {
+      const p = findProducto(z.producto_id);
+      if (!p) return null;
+      return {
+        producto_id: z.producto_id, cantidad: z.cantidad,
+        referencia: p.referencia, descripcion: p.descripcion,
+        largo: p.largo, ancho: p.ancho, alto: p.alto, unidad: p.unidad, tipo: p.tipo,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (num(a.alto) !== num(b.alto)) return num(b.alto) - num(a.alto);
+      if (num(a.largo) !== num(b.largo)) return num(b.largo) - num(a.largo);
+      return String(a.referencia) < String(b.referencia) ? -1 : String(a.referencia) > String(b.referencia) ? 1 : 0;
+    });
+  res.json(rows);
+});
+app.post('/api/montaje/add', (req, res) => {
+  const { producto_id, cantidad } = req.body;
+  if (!producto_id || !(+cantidad > 0)) return res.status(400).json({ error: 'producto_id y cantidad requeridos' });
+  let z = findMontaje(producto_id);
+  if (!z) { z = { producto_id: +producto_id, cantidad: 0 }; db.zona_montaje.push(z); }
+  z.cantidad = +z.cantidad + +cantidad;
+  res.json({ ok: true });
+});
+app.post('/api/montaje/to-carado', (req, res) => {
+  const { producto_id, cantidad } = req.body;
+  if (!producto_id || !(+cantidad > 0)) return res.status(400).json({ error: 'producto_id y cantidad requeridos' });
+  try {
+    const z = findMontaje(producto_id);
+    const disp = z ? +z.cantidad : 0;
+    if (+cantidad > disp) throw new Error('No hay tantos en zona de montaje (disponible: ' + disp + ')');
+    z.cantidad = +z.cantidad - +cantidad;
+    let c = findCarado(producto_id);
+    if (!c) { c = { producto_id: +producto_id, cantidad: 0 }; db.zona_carado.push(c); }
+    c.cantidad = +c.cantidad + +cantidad;
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/montaje/remove', (req, res) => {
+  const { producto_id, cantidad } = req.body;
+  if (!producto_id || !(+cantidad > 0)) return res.status(400).json({ error: 'producto_id y cantidad requeridos' });
+  const z = findMontaje(producto_id);
   if (z) z.cantidad = Math.max(0, +z.cantidad - +cantidad);
   res.json({ ok: true });
 });

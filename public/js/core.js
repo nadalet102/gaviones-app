@@ -1,5 +1,5 @@
 // ── DATA ───────────────────────────────────────────────────────────────────────
-let productos=[], stock=[], clientes=[], pedidos=[], necesidades=[], movimientos=[], entregas=[], parteHoy=null, carado=[];
+let productos=[], stock=[], clientes=[], pedidos=[], necesidades=[], movimientos=[], entregas=[], parteHoy=null, carado=[], montaje=[];
 let editId=null, modalType=null;
 let pedidoLogActual=[]; // log de actualizaciones del pedido en edición
 let sortField='largo', sortDir='desc';
@@ -62,6 +62,7 @@ async function loadAll(){
       api('GET','/stock/movimientos'),api('GET','/entregas')
     ]);
     try{ carado=await api('GET','/carado'); }catch(e){ carado=[]; }
+    try{ montaje=await api('GET','/montaje'); }catch(e){ montaje=[]; }
     setSyncStatus('ok');
     const t=document.querySelector('.tab.active')?.id?.replace('tab-','');
     renderAll(t);
@@ -78,6 +79,7 @@ function renderAll(t){
   else if(t==='cal') renderCal();
   else if(t==='parte') loadParteHoy();
   else if(t==='mesa') renderMesa();
+  else if(t==='vibrado') renderVibrado();
   else if(t==='montado') renderMontado();
   else if(t==='carado') renderCarado();
   else if(t==='cargar') renderCargar();
@@ -98,6 +100,7 @@ function switchTab(t){
   else if(t==='clientes') renderClientes();
   else if(t==='hist') loadHistorial();
   else if(t==='mesa') renderMesa();
+  else if(t==='vibrado') renderVibrado();
   else if(t==='montado') renderMontado();
   else if(t==='carado') renderCarado();
 }
