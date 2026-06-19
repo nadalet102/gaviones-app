@@ -109,6 +109,21 @@ router.post('/api/montaje/remove', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
+// Premontado: se monta y va DIRECTO a stock (no pasa por vibrado/carado). Cuenta como montaje.
+router.post('/api/montaje/premontado', async (req, res) => {
+  const {producto_id, cantidad} = req.body;
+  if(!producto_id || !(+cantidad>0)) return res.status(400).json({error:'producto_id y cantidad requeridos'});
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await stockMovimiento(client, producto_id, 'entrada', +cantidad, 'Montaje premontado', null, new Date().toISOString().slice(0,10));
+    await client.query(`INSERT INTO movimientos_produccion (seccion,producto_id,cantidad) VALUES ('montaje',$1,$2)`,[producto_id, +cantidad]);
+    await client.query('COMMIT');
+    res.json({ok:true});
+  } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
+  finally { client.release(); }
+});
+
 // ── INFORME DIARIO DE PRODUCCIÓN (por sección: montaje / vibrado / carado) ──────
 router.get('/api/informe-produccion', async (req, res) => {
   const fecha = (req.query.fecha && /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha))

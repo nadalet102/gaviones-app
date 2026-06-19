@@ -106,6 +106,8 @@ function seed() {
     ['accesorio', 'ALAMBRE-ATD', null, null, null, 'Alambre de atado (rollo 50m)', 'rollo'],
     ['colchoneta', 'COL-6x2x0.17', 6.0, 2.0, 0.17, 'Colchoneta Reno 6×2×0.17 m', 'ud'],
     ['colchoneta', 'COL-4x2x0.17', 4.0, 2.0, 0.17, 'Colchoneta Reno 4×2×0.17 m', 'ud'],
+    ['gavion', 'GPRE-2x1x1', 2.0, 1.0, 1.0, 'Gavión PREMONTADO 2×1×1 m', 'ud'],
+    ['gavion', 'GPRE-1x1x1', 1.0, 1.0, 1.0, 'Gavión PREMONTADO 1×1×1 m', 'ud'],
   ];
   productosSeed.forEach(([tipo, referencia, largo, ancho, alto, descripcion, unidad]) => {
     const id = nextId('productos');
@@ -443,6 +445,13 @@ app.post('/api/montaje/remove', (req, res) => {
   if (!producto_id || !(+cantidad > 0)) return res.status(400).json({ error: 'producto_id y cantidad requeridos' });
   const z = findMontaje(producto_id);
   if (z) z.cantidad = Math.max(0, +z.cantidad - +cantidad);
+  res.json({ ok: true });
+});
+app.post('/api/montaje/premontado', (req, res) => {
+  const { producto_id, cantidad } = req.body;
+  if (!producto_id || !(+cantidad > 0)) return res.status(400).json({ error: 'producto_id y cantidad requeridos' });
+  stockMovimiento(producto_id, 'entrada', +cantidad, 'Montaje premontado', null, today());
+  logProd('montaje', producto_id, cantidad);
   res.json({ ok: true });
 });
 // ── INFORME DIARIO DE PRODUCCIÓN ──────────────────────────────────────────────
