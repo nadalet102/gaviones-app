@@ -6,7 +6,7 @@ var MESA_CATS=[
   {id:'blanco',nombre:'GAVIÓN VIBRADO BLANCO',kw:'BLANCO'}
 ];
 var MESA_ANCHOS=[20,30,50,100];
-var mesaPaso='inicio', mesaCat=null, mesaAncho=null;
+var mesaPaso='inicio', mesaCat=null, mesaAncho=null, mesaTipo='vibrado';
 var kpProductoId=null, kpValor='', kpZona='vibrado', kpMax=null;
 
 function mesaNorm(s){ return (s||'').toString().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
@@ -56,15 +56,33 @@ function renderMesa(){
   var el=document.getElementById('mesa-content');
   if(!el) return;
   updateFabricaBadge();
-  el.classList.toggle('full', mesaPaso==='nuevo-art');
+  el.classList.toggle('full', mesaPaso==='nuevo-art'||mesaPaso==='pre-art');
   if(mesaPaso==='inicio'){
     el.innerHTML='<div class="mesa-grid">'+
-      '<button class="mesa-btn b-nuevo" onclick="mesaIr(\'nuevo-cat\')"><i class="ti ti-plus"></i> MONTAR<small>Elegir gavión a montar (vacío)</small></button>'+
+      '<button class="mesa-btn b-nuevo" onclick="mesaTipoSel(\'vibrado\')"><i class="ti ti-tools"></i> VIBRADO<small>Montar gavión para vibrar</small></button>'+
+      '<button class="mesa-btn b-art" style="background:#16a34a;color:#fff;border-color:#15803d" onclick="mesaTipoSel(\'premontado\')"><i class="ti ti-box"></i> PREMONTADO<small>Montar y pasar a stock</small></button>'+
       '<button class="mesa-btn b-repetir" onclick="mesaIr(\'repetir\')"><i class="ti ti-repeat"></i> REPETIR<small>Volver a montar lo último</small></button>'+
     '</div>';
     return;
   }
   if(mesaPaso==='repetir'){ renderMesaRepetir(el); return; }
+  if(mesaPaso==='pre-ancho'){
+    el.innerHTML=mesaPreCrumbs()+
+      '<div class="mesa-grid cols4">'+MESA_ANCHOS.map(function(cm){
+        var n=montadoProductosAncho(cm).length;
+        return '<button class="mesa-btn b-ancho" onclick="mesaPreSelAncho('+cm+')">'+cm+' CM<small>'+(n?n+' art.':'—')+'</small></button>';
+      }).join('')+'</div>';
+    return;
+  }
+  if(mesaPaso==='pre-art'){
+    var pre=montadoProductosAncho(mesaAncho);
+    el.innerHTML=mesaPreCrumbs()+
+      (pre.length?'<div class="mesa-grid arts">'+pre.map(function(p){
+        return '<button class="mesa-btn b-art" onclick="mesaPreAbrirCantidad('+p.id+')"><span class="desc">'+(p.descripcion||'(sin descripción)')+'</span><span class="ref">'+(p.referencia||'(sin ref)')+' · '+dimStr(p)+'</span></button>';
+      }).join('')+'</div>'
+      :'<div class="mesa-empty"><i class="ti ti-package-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No hay premontados con ancho '+mesaAncho+' cm.</div>');
+    return;
+  }
   if(mesaPaso==='nuevo-cat'){
     el.innerHTML=mesaCrumbs()+
       '<div class="mesa-grid">'+MESA_CATS.map(function(c){
@@ -103,21 +121,31 @@ function mesaCrumbs(){
 }
 
 function mesaIr(paso){ mesaPaso=paso; if(paso==='inicio'||paso==='nuevo-cat'){mesaCat=null;mesaAncho=null;} renderMesa(); }
+function mesaTipoSel(t){ mesaTipo=t; mesaCat=null; mesaAncho=null; mesaPaso=(t==='premontado')?'pre-ancho':'nuevo-cat'; renderMesa(); }
 function mesaSelCat(id){ mesaCat=id; mesaAncho=null; mesaPaso='nuevo-ancho'; renderMesa(); }
 function mesaSelAncho(cm){ mesaAncho=cm; mesaPaso='nuevo-art'; renderMesa(); }
+function mesaPreSelAncho(cm){ mesaAncho=cm; mesaPaso='pre-art'; renderMesa(); }
+function mesaPreAbrirCantidad(pid){ abrirKeypad(pid,'','montaje-premontado'); }
+function mesaPreCrumbs(){
+  var parts=['<span class="crumb" onclick="mesaTipoSel(\'premontado\')">Premontados</span>'];
+  if(mesaAncho&&mesaPaso==='pre-art') parts.push('<span>'+mesaAncho+' cm</span>');
+  return '<button class="mesa-back" onclick="mesaAtras()"><i class="ti ti-arrow-left"></i> Atrás</button>'+
+    '<div class="mesa-bc">'+parts.join('<i class="ti ti-chevron-right" style="font-size:14px;color:var(--text2)"></i>')+'</div>';
+}
 function mesaAtras(){
   if(mesaPaso==='nuevo-art'){ mesaPaso='nuevo-ancho'; mesaAncho=null; }
   else if(mesaPaso==='nuevo-ancho'){ mesaPaso='nuevo-cat'; mesaCat=null; }
+  else if(mesaPaso==='pre-art'){ mesaPaso='pre-ancho'; mesaAncho=null; }
   else { mesaPaso='inicio'; }
   renderMesa();
 }
 
-function guardarUltimoVibrado(pid,cant){
+function guardarUltimoVibrado(pid,cant,tipo){
   try{
     var p=productos.find(function(x){return String(x.id)===String(pid);});
     localStorage.setItem('gav_ultimo_vibrado',JSON.stringify({
       producto_id:+pid, referencia:p?p.referencia:'', descripcion:p?p.descripcion:'',
-      cantidad:+cant, created_at:new Date().toISOString()
+      cantidad:+cant, tipo:tipo||'vibrado', created_at:new Date().toISOString()
     }));
   }catch(e){}
 }
@@ -138,10 +166,10 @@ function renderMesaRepetir(el){
     '<div class="mesa-bc"><span class="crumb" onclick="mesaIr(\'inicio\')"><i class="ti ti-home"></i> Inicio</span><i class="ti ti-chevron-right" style="font-size:14px;color:var(--text2)"></i><span>Repetir</span></div>'+
     '<div class="mesa-grid cols1">'+
       '<div class="mesa-btn b-art" style="cursor:default"><span class="ref">'+ult.referencia+'</span><span class="desc">'+(ult.descripcion||'')+'</span><span class="desc">Última: '+fmtN(ult.cantidad)+' ud · '+fmtFechaHora(ult.created_at)+'</span></div>'+
-      '<button class="mesa-btn b-repetir" onclick="mesaRepetir('+ult.producto_id+','+(Math.round(+ult.cantidad)||0)+')"><i class="ti ti-repeat"></i> REPETIR<small>'+ult.referencia+' — '+fmtN(ult.cantidad)+' ud</small></button>'+
+      '<button class="mesa-btn b-repetir" onclick="mesaRepetir('+ult.producto_id+','+(Math.round(+ult.cantidad)||0)+',\''+(ult.tipo||'vibrado')+'\')"><i class="ti ti-repeat"></i> REPETIR<small>'+ult.referencia+' — '+fmtN(ult.cantidad)+' ud'+(ult.tipo==='premontado'?' · premontado':'')+'</small></button>'+
     '</div>';
 }
-function mesaRepetir(pid,cant){ abrirKeypad(pid, String(cant||'')); }
+function mesaRepetir(pid,cant,tipo){ abrirKeypad(pid, String(cant||''), tipo==='premontado'?'montaje-premontado':'montaje'); }
 
 function mesaAbrirCantidad(pid){ abrirKeypad(pid,'','montaje'); }
 function abrirKeypad(pid,inicial,zona,max){
@@ -149,7 +177,7 @@ function abrirKeypad(pid,inicial,zona,max){
   var p=productos.find(function(x){return String(x.id)===String(pid);});
   var maxTxt=kpMax?'<div class="desc" style="color:var(--amber);font-weight:600">Disponible: '+fmtN(kpMax)+'</div>':'';
   document.getElementById('kp-prod').innerHTML=p?('<div class="ref">'+(p.referencia||'')+'</div><div class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</div>'+maxTxt):'';
-  var lbl={montaje:'Montar (a vibrar)',vibrado:'Vibrar (a carado)',carado:'Pasar a stock',montado:'Añadir a stock','montaje-del':'Borrar de montaje','carado-del':'Borrar de carado'}[kpZona]||'Añadir a stock';
+  var lbl={montaje:'Montar (a vibrar)','montaje-premontado':'Montar premontado (a stock)',vibrado:'Vibrar (a carado)',carado:'Pasar a stock',montado:'Añadir a stock','montaje-del':'Borrar de montaje','carado-del':'Borrar de carado'}[kpZona]||'Añadir a stock';
   var lblEl=document.getElementById('kp-ok-label'); if(lblEl) lblEl.textContent=lbl;
   kpRender();
   document.getElementById('kp-overlay').classList.add('open');
@@ -174,10 +202,18 @@ async function kpConfirm(){
     if(kpZona==='montaje'){
       // Montaje: deja gaviones vacíos montados (preparados para vibrar)
       await api('POST','/montaje/add',{producto_id:+kpProductoId,cantidad:cant});
-      guardarUltimoVibrado(kpProductoId,cant);
+      guardarUltimoVibrado(kpProductoId,cant,'vibrado');
       document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
       await loadAll();
       log('✓ '+cant+' ud de '+refTxt+' montadas (preparadas para vibrar)','ok');
+      mesaPaso='inicio'; mesaCat=null; mesaAncho=null; renderMesa();
+    } else if(kpZona==='montaje-premontado'){
+      // Premontado: se monta y va DIRECTO a stock
+      await api('POST','/montaje/premontado',{producto_id:+kpProductoId,cantidad:cant});
+      guardarUltimoVibrado(kpProductoId,cant,'premontado');
+      document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
+      await loadAll();
+      log('✓ '+cant+' ud de '+refTxt+' premontadas → stock','ok');
       mesaPaso='inicio'; mesaCat=null; mesaAncho=null; renderMesa();
     } else if(kpZona==='vibrado'){
       // Vibrar: pasa del montaje al carado
