@@ -493,6 +493,66 @@ function renderVibrado(){
   el.innerHTML=html;
 }
 
+// ════════════ INFORME DIARIO DE PRODUCCIÓN (por sección) ════════════
+var informeFecha=new Date().toISOString().slice(0,10);
+var informeData=null;
+const INFORME_SEC=[
+  {key:'montaje',label:'Montaje',color:'#3b82f6',icon:'ti-hammer',sub:'gaviones montados (vacíos)'},
+  {key:'vibrado',label:'Vibrado',color:'#ca8a04',icon:'ti-tools',sub:'gaviones vibrados'},
+  {key:'carado',label:'Carado',color:'#ea580c',icon:'ti-stack-2',sub:'gaviones carados (a stock)'}
+];
+async function renderInforme(){
+  var el=document.getElementById('informe-container');
+  if(!el) return;
+  el.innerHTML='<div class="card" style="padding:22px;text-align:center;color:var(--text2)"><i class="ti ti-loader"></i> Cargando informe…</div>';
+  try{ informeData=await api('GET','/informe-produccion?fecha='+informeFecha); }catch(e){ informeData=null; }
+  var d=informeData;
+  if(!d){ el.innerHTML='<div class="empty"><i class="ti ti-report-off"></i><p>No se pudo cargar el informe</p></div>'; return; }
+  function tabla(sec){
+    var items=d.secciones[sec.key]||[];
+    var filas=items.length
+      ? items.map(function(it){return '<tr><td class="mono" style="font-weight:500">'+(it.referencia||'—')+'</td><td class="dim">'+(it.descripcion||'')+'</td><td class="dim">'+(dimStr(it)||'')+'</td><td class="r mono" style="font-weight:600">'+fmtN(it.total)+'</td></tr>';}).join('')
+      : '<tr><td colspan="4" class="dim" style="text-align:center;padding:14px">Sin producción este día</td></tr>';
+    return '<div class="card" style="margin-bottom:14px">'+
+      '<div class="card-hdr" style="border-left:4px solid '+sec.color+';padding-left:12px">'+
+        '<div class="card-title"><i class="ti '+sec.icon+'" style="color:'+sec.color+'"></i> '+sec.label+' <span class="dim" style="font-weight:400;font-size:11px">— '+sec.sub+'</span></div>'+
+        '<span class="badge" style="background:'+sec.color+';color:#fff">'+fmtN(d.totales[sec.key]||0)+' ud</span>'+
+      '</div>'+
+      '<table class="tbl"><thead><tr><th>Referencia</th><th>Descripción</th><th>Dimensiones</th><th class="r">Unidades</th></tr></thead><tbody>'+filas+'</tbody></table>'+
+    '</div>';
+  }
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<i class="ti ti-report" style="font-size:20px;color:var(--blue)"></i>'+
+        '<div><div style="font-size:16px;font-weight:600">Informe diario de producción</div><div class="dim">'+fmtD(d.fecha)+'</div></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;align-items:center">'+
+        '<input type="date" value="'+informeFecha+'" onchange="informeSetFecha(this.value)" style="font-size:13px;padding:5px 9px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">'+
+        '<button class="btn btn-outline btn-sm" onclick="informePrint()"><i class="ti ti-printer"></i> Imprimir</button>'+
+      '</div>'+
+    '</div>'+
+    INFORME_SEC.map(tabla).join('');
+}
+function informeSetFecha(f){ informeFecha=f||new Date().toISOString().slice(0,10); renderInforme(); }
+function informePrint(){
+  var d=informeData; if(!d) return;
+  var cuerpo='<h2 style="margin:0 0 2px">Informe diario de producción</h2><div style="color:#666;margin-bottom:16px">'+fmtD(d.fecha)+'</div>';
+  INFORME_SEC.forEach(function(sec){
+    var items=d.secciones[sec.key]||[];
+    cuerpo+='<h3 style="margin:14px 0 4px;border-left:4px solid '+sec.color+';padding-left:8px">'+sec.label+' — '+fmtN(d.totales[sec.key]||0)+' ud</h3>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f1f5f9">'+
+      '<th style="text-align:left;padding:6px 8px;border:1px solid #e2e8f0">Referencia</th>'+
+      '<th style="text-align:left;padding:6px 8px;border:1px solid #e2e8f0">Descripción</th>'+
+      '<th style="text-align:left;padding:6px 8px;border:1px solid #e2e8f0">Dimensiones</th>'+
+      '<th style="text-align:right;padding:6px 8px;border:1px solid #e2e8f0">Unidades</th></tr></thead><tbody>'+
+      (items.length?items.map(function(it){return '<tr><td style="padding:6px 8px;border:1px solid #e2e8f0;font-family:monospace">'+(it.referencia||'')+'</td><td style="padding:6px 8px;border:1px solid #e2e8f0">'+(it.descripcion||'')+'</td><td style="padding:6px 8px;border:1px solid #e2e8f0">'+(dimStr(it)||'')+'</td><td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;font-family:monospace">'+fmtN(it.total)+'</td></tr>';}).join(''):'<tr><td colspan="4" style="padding:6px 8px;border:1px solid #e2e8f0;color:#888">Sin producción</td></tr>')+
+      '</tbody></table>';
+  });
+  var blob=new Blob(['<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Informe '+fmtD(d.fecha)+'</title><style>body{font-family:sans-serif;margin:24px;color:#1a1a1a}@media print{@page{margin:1.5cm}}</style></head><body>'+cuerpo+'<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};}<\/script></body></html>'],{type:'text/html;charset=utf-8'});
+  window.open(URL.createObjectURL(blob));
+}
+
 // ════════════ ZONA MONTADO (gaviones premontados) ════════════
 var montadoPaso='inicio', montadoAncho=null;
 function montadoEsPremontado(p){

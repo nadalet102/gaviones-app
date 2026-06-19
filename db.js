@@ -93,6 +93,15 @@ async function initDB() {
       notas TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+    -- Log de producción por sección (montaje / vibrado / carado) para el informe diario
+    CREATE TABLE IF NOT EXISTS movimientos_produccion (
+      id SERIAL PRIMARY KEY,
+      seccion TEXT NOT NULL,
+      producto_id INTEGER REFERENCES productos(id) ON DELETE SET NULL,
+      cantidad NUMERIC NOT NULL,
+      fecha DATE DEFAULT CURRENT_DATE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
     CREATE TABLE IF NOT EXISTS partes_lineas (
       id SERIAL PRIMARY KEY,
       parte_id INTEGER REFERENCES partes_produccion(id) ON DELETE CASCADE,
@@ -120,6 +129,7 @@ async function initDB() {
     CREATE INDEX IF NOT EXISTS idx_pedidos_cliente       ON pedidos(cliente_id);
     CREATE INDEX IF NOT EXISTS idx_pedidos_estado        ON pedidos(estado);
     CREATE INDEX IF NOT EXISTS idx_partes_lineas_parte   ON partes_lineas(parte_id);
+    CREATE INDEX IF NOT EXISTS idx_mprod_fecha           ON movimientos_produccion(fecha);
 
     INSERT INTO productos (tipo,referencia,largo,ancho,alto,descripcion,unidad)
     SELECT * FROM (VALUES
