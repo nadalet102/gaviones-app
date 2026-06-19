@@ -43,10 +43,14 @@ function mesaProductosCatAncho(cat,cm){
     });
 }
 
-// Actualiza el contador de "pendiente en carado" en el conmutador Vibrado/Carado
+// Actualiza los contadores del conmutador Montaje/Vibrado/Carado:
+//  · Vibrado = unidades en montaje (vacíos pendientes de vibrar)
+//  · Carado  = unidades en carado (vibrados pendientes de carar)
 function updateFabricaBadge(){
-  var tot=(carado||[]).reduce(function(s,c){return s+Math.round(+c.cantidad||0);},0);
-  ['ft-badge-mesa','ft-badge-carado'].forEach(function(id){ var e=document.getElementById(id); if(e) e.textContent=fmtN(tot); });
+  var totVibrado=(montaje||[]).reduce(function(s,c){return s+Math.round(+c.cantidad||0);},0);
+  var totCarado=(carado||[]).reduce(function(s,c){return s+Math.round(+c.cantidad||0);},0);
+  document.querySelectorAll('.ft-badge-vibrado').forEach(function(e){ e.textContent=fmtN(totVibrado); });
+  document.querySelectorAll('.ft-badge-carado').forEach(function(e){ e.textContent=fmtN(totCarado); });
 }
 function renderMesa(){
   var el=document.getElementById('mesa-content');
@@ -55,8 +59,8 @@ function renderMesa(){
   el.classList.toggle('full', mesaPaso==='nuevo-art');
   if(mesaPaso==='inicio'){
     el.innerHTML='<div class="mesa-grid">'+
-      '<button class="mesa-btn b-nuevo" onclick="mesaIr(\'nuevo-cat\')"><i class="ti ti-plus"></i> NUEVO<small>Elegir gavión a producir</small></button>'+
-      '<button class="mesa-btn b-repetir" onclick="mesaIr(\'repetir\')"><i class="ti ti-repeat"></i> REPETIR<small>Volver a producir lo último</small></button>'+
+      '<button class="mesa-btn b-nuevo" onclick="mesaIr(\'nuevo-cat\')"><i class="ti ti-plus"></i> MONTAR<small>Elegir gavión a montar (vacío)</small></button>'+
+      '<button class="mesa-btn b-repetir" onclick="mesaIr(\'repetir\')"><i class="ti ti-repeat"></i> REPETIR<small>Volver a montar lo último</small></button>'+
     '</div>';
     return;
   }
@@ -139,13 +143,13 @@ function renderMesaRepetir(el){
 }
 function mesaRepetir(pid,cant){ abrirKeypad(pid, String(cant||'')); }
 
-function mesaAbrirCantidad(pid){ abrirKeypad(pid,'','vibrado'); }
+function mesaAbrirCantidad(pid){ abrirKeypad(pid,'','montaje'); }
 function abrirKeypad(pid,inicial,zona,max){
-  kpProductoId=pid; kpValor=inicial||''; kpZona=zona||'vibrado'; kpMax=(max&&max>0)?max:null;
+  kpProductoId=pid; kpValor=inicial||''; kpZona=zona||'montaje'; kpMax=(max&&max>0)?max:null;
   var p=productos.find(function(x){return String(x.id)===String(pid);});
-  var maxTxt=kpMax?'<div class="desc" style="color:var(--amber);font-weight:600">Máximo en carado: '+fmtN(kpMax)+'</div>':'';
+  var maxTxt=kpMax?'<div class="desc" style="color:var(--amber);font-weight:600">Disponible: '+fmtN(kpMax)+'</div>':'';
   document.getElementById('kp-prod').innerHTML=p?('<div class="ref">'+(p.referencia||'')+'</div><div class="desc">'+(p.descripcion||'')+' · '+dimStr(p)+'</div>'+maxTxt):'';
-  var lbl={vibrado:'A zona de carado',montado:'Añadir a stock',carado:'Pasar a stock','carado-del':'Borrar de carado'}[kpZona]||'Añadir a stock';
+  var lbl={montaje:'Montar (a vibrar)',vibrado:'Vibrar (a carado)',carado:'Pasar a stock',montado:'Añadir a stock','montaje-del':'Borrar de montaje','carado-del':'Borrar de carado'}[kpZona]||'Añadir a stock';
   var lblEl=document.getElementById('kp-ok-label'); if(lblEl) lblEl.textContent=lbl;
   kpRender();
   document.getElementById('kp-overlay').classList.add('open');
@@ -167,14 +171,27 @@ async function kpConfirm(){
   var p=productos.find(function(x){return String(x.id)===String(kpProductoId);});
   var refTxt=p?p.referencia:'producto';
   try{
-    if(kpZona==='vibrado'){
-      // La mesa de vibrado ya NO suma a stock: deja en zona de carado
-      await api('POST','/carado/add',{producto_id:+kpProductoId,cantidad:cant});
+    if(kpZona==='montaje'){
+      // Montaje: deja gaviones vacíos montados (preparados para vibrar)
+      await api('POST','/montaje/add',{producto_id:+kpProductoId,cantidad:cant});
       guardarUltimoVibrado(kpProductoId,cant);
       document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
       await loadAll();
-      log('✓ '+cant+' ud de '+refTxt+' enviadas a Zona de carado','ok');
+      log('✓ '+cant+' ud de '+refTxt+' montadas (preparadas para vibrar)','ok');
       mesaPaso='inicio'; mesaCat=null; mesaAncho=null; renderMesa();
+    } else if(kpZona==='vibrado'){
+      // Vibrar: pasa del montaje al carado
+      await api('POST','/montaje/to-carado',{producto_id:+kpProductoId,cantidad:cant});
+      document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
+      await loadAll();
+      log('✓ '+cant+' ud de '+refTxt+' vibradas (pasan a carado)','ok');
+      renderVibrado();
+    } else if(kpZona==='montaje-del'){
+      await api('POST','/montaje/remove',{producto_id:+kpProductoId,cantidad:cant});
+      document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
+      await loadAll();
+      log('🗑 '+cant+' ud de '+refTxt+' borradas de montaje','ok');
+      renderVibrado();
     } else if(kpZona==='carado'){
       await api('POST','/carado/to-stock',{producto_id:+kpProductoId,cantidad:cant});
       document.getElementById('kp-overlay').classList.remove('open'); kpMax=null;
@@ -223,7 +240,7 @@ function gavStones(bx,by,bw,bh,pal,rnd){
 }
 
 // Ángulo (cuña) en 2D: planta con el corte a 45º + altura en grande debajo.
-function gavionAngulo2D(p,count){
+function gavionAngulo2D(p,count,vacio){
   count=Math.max(1,Math.round(+count||1));
   var L=+p.largo||1, A=+p.ancho||0.5, H=+p.alto||0.5;
   var c=gavionColor(p);
@@ -254,7 +271,7 @@ function gavionAngulo2D(p,count){
   return '<svg viewBox="0 0 '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg">'+
     '<defs><clipPath id="'+uid+'"><polygon points="'+pts+'"/></clipPath></defs>'+
     '<polygon points="'+pts+'" fill="'+c.base+'"/>'+
-    '<g clip-path="url(#'+uid+')">'+gavStones(ox,oy,Wp,Hp,c.pal,r)+'</g>'+
+    (vacio?'':'<g clip-path="url(#'+uid+')">'+gavStones(ox,oy,Wp,Hp,c.pal,r)+'</g>')+
     '<g clip-path="url(#'+uid+')" stroke="'+c.wire+'" stroke-width="0.9" opacity="0.5">'+grid+'</g>'+
     '<polygon points="'+pts+'" fill="none" stroke="#374151" stroke-width="2.6" stroke-linejoin="round"/>'+
     badge+
@@ -264,9 +281,9 @@ function gavionAngulo2D(p,count){
 }
 
 // Dibuja un gavión (malla 3D) escalado por sus medidas; los de ángulo van en 2D (plano).
-function gavionSVG(p,count){
+function gavionSVG(p,count,vacio){
   count=Math.max(1,Math.round(+count||1));
-  if(mesaEsAngulo(p)) return gavionAngulo2D(p,count);
+  if(mesaEsAngulo(p)) return gavionAngulo2D(p,count,vacio);
   var L=+p.largo||1, A=+p.ancho||0.5, H=+p.alto||0.5;
   var ang=mesaEsAngulo(p);
   var c=gavionColor(p);
@@ -328,15 +345,15 @@ function gavionSVG(p,count){
     '<ellipse cx="'+(ox+W/2+dx/2)+'" cy="'+(oy+Hf+5)+'" rx="'+(W*0.55).toFixed(1)+'" ry="5.5" fill="rgba(0,0,0,.10)"/>'+
     ghostSvg+
     '<polygon points="'+topPts+'" fill="'+c.base+'"/>'+
-    '<g clip-path="url(#ct'+uid+')">'+gavStones(ox,oy-dy,maxX-ox,dy+1,c.pal,rT)+'</g>'+
+    (vacio?'':'<g clip-path="url(#ct'+uid+')">'+gavStones(ox,oy-dy,maxX-ox,dy+1,c.pal,rT)+'</g>')+
     '<g clip-path="url(#ct'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.5">'+tgrid+'</g>'+
     '<polygon points="'+topPts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
     '<polygon points="'+sidePts+'" fill="'+c.base+'"/>'+
-    '<g clip-path="url(#cs'+uid+')">'+gavStones(sbx,oy-dy,sbw,Hf+dy,c.pal,rS)+'</g>'+
+    (vacio?'':'<g clip-path="url(#cs'+uid+')">'+gavStones(sbx,oy-dy,sbw,Hf+dy,c.pal,rS)+'</g>')+
     '<g clip-path="url(#cs'+uid+')" stroke="'+c.wire+'" stroke-width="0.8" opacity="0.45">'+sg+'</g>'+
     '<polygon points="'+sidePts+'" fill="none" stroke="'+c.wire+'" stroke-width="1.6"/>'+
     '<polygon points="'+frontPts+'" fill="'+c.base+'"/>'+
-    '<g clip-path="url(#cf'+uid+')">'+gavStones(ox,oy,W,Hf,c.pal,rF)+'</g>'+
+    (vacio?'':'<g clip-path="url(#cf'+uid+')">'+gavStones(ox,oy,W,Hf,c.pal,rF)+'</g>')+
     '<g clip-path="url(#cf'+uid+')" stroke="'+c.wire+'" stroke-width="0.9" opacity="0.55">'+grid+'</g>'+
     '<polygon points="'+frontPts+'" fill="none" stroke="'+c.wire+'" stroke-width="2"/>'+
     badge+
@@ -435,7 +452,7 @@ function renderCarado(){
   if(!el) return;
   updateFabricaBadge();
   if(!carado || !carado.length){
-    el.innerHTML='<div class="mesa-empty"><i class="ti ti-stack-2" style="font-size:42px;display:block;margin-bottom:12px"></i>No hay gaviones en la zona de carado.<small style="display:block;margin-top:6px;font-weight:400;color:var(--text2)">Lo que produzcas en la Mesa de vibrado caerá aquí. Desde aquí lo pasas a stock cuando esté carado.</small></div>';
+    el.innerHTML='<div class="mesa-empty"><i class="ti ti-stack-2" style="font-size:42px;display:block;margin-bottom:12px"></i>No hay gaviones en la zona de carado.<small style="display:block;margin-top:6px;font-weight:400;color:var(--text2)">Lo que vibres en la zona de Vibrado caerá aquí. Desde aquí lo pasas a stock cuando esté carado.</small></div>';
     return;
   }
   var html='<div class="carado-head"><i class="ti ti-stack-2" style="color:#ea580c;font-size:16px"></i> Gaviones vibrados pendientes de carar — pulsa uno para pasar a stock, o la papelera para borrar</div>';
@@ -447,6 +464,29 @@ function renderCarado(){
       '<div class="carado-desc">'+(it.descripcion||it.referencia||'(sin descripción)')+'</div>'+
       '<div class="carado-meta"><span class="carado-ref">'+(it.referencia||'')+'</span> · '+dimStr(it)+(mesaEsAngulo(it)?' · ángulo':'')+'</div>'+
       '<div class="carado-count">'+fmtN(n)+'<small>ud apiladas</small></div>'+
+    '</div>';
+  }).join('')+'</div>';
+  el.innerHTML=html;
+}
+
+// ════════════ ZONA VIBRADO (buffer: vacíos montados pendientes de vibrar) ════════════
+function renderVibrado(){
+  var el=document.getElementById('vibrado-content');
+  if(!el) return;
+  updateFabricaBadge();
+  if(!montaje || !montaje.length){
+    el.innerHTML='<div class="mesa-empty"><i class="ti ti-tools" style="font-size:42px;display:block;margin-bottom:12px"></i>No hay gaviones montados pendientes de vibrar.<small style="display:block;margin-top:6px;font-weight:400;color:var(--text2)">Lo que montes en Montaje caerá aquí. Púlsalo para vibrarlo y que pase a Carado.</small></div>';
+    return;
+  }
+  var html='<div class="carado-head"><i class="ti ti-tools" style="color:#ca8a04;font-size:16px"></i> Gaviones vacíos montados, pendientes de vibrar — pulsa uno para vibrarlo (pasa a carado), o la papelera para borrar</div>';
+  html+='<div class="carado-grid">'+montaje.map(function(it){
+    var n=Math.round(+it.cantidad||0);
+    return '<div class="carado-card" onclick="abrirKeypad('+it.producto_id+',\'\',\'vibrado\','+n+')">'+
+      '<button class="carado-del" title="Borrar de montaje" onclick="event.stopPropagation();abrirKeypad('+it.producto_id+',\''+n+'\',\'montaje-del\','+n+')"><i class="ti ti-trash"></i></button>'+
+      '<div class="carado-draw">'+gavionSVG(it,n,true)+'</div>'+
+      '<div class="carado-desc">'+(it.descripcion||it.referencia||'(sin descripción)')+'</div>'+
+      '<div class="carado-meta"><span class="carado-ref">'+(it.referencia||'')+'</span> · '+dimStr(it)+(mesaEsAngulo(it)?' · ángulo':'')+'</div>'+
+      '<div class="carado-count">'+fmtN(n)+'<small>ud montadas</small></div>'+
     '</div>';
   }).join('')+'</div>';
   el.innerHTML=html;

@@ -82,6 +82,10 @@ async function initDB() {
       producto_id INTEGER PRIMARY KEY REFERENCES productos(id) ON DELETE CASCADE,
       cantidad NUMERIC DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS zona_montaje (
+      producto_id INTEGER PRIMARY KEY REFERENCES productos(id) ON DELETE CASCADE,
+      cantidad NUMERIC DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS partes_produccion (
       id SERIAL PRIMARY KEY,
       fecha DATE NOT NULL,

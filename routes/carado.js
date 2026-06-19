@@ -53,4 +53,57 @@ router.post('/api/carado/remove', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
+// ── ZONA DE MONTAJE (buffer previo: gaviones vacíos montados, listos para vibrar) ──
+router.get('/api/montaje', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT z.producto_id, z.cantidad, p.referencia, p.descripcion, p.largo, p.ancho, p.alto, p.unidad, p.tipo
+      FROM zona_montaje z JOIN productos p ON p.id=z.producto_id
+      WHERE z.cantidad > 0
+      ORDER BY p.alto DESC, p.largo DESC, p.referencia`);
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+// El montaje deja aquí los gaviones vacíos montados (preparados para vibrar)
+router.post('/api/montaje/add', async (req, res) => {
+  const {producto_id, cantidad} = req.body;
+  if(!producto_id || !(+cantidad>0)) return res.status(400).json({error:'producto_id y cantidad requeridos'});
+  try {
+    await pool.query(
+      `INSERT INTO zona_montaje (producto_id,cantidad) VALUES ($1,$2)
+       ON CONFLICT (producto_id) DO UPDATE SET cantidad = zona_montaje.cantidad + EXCLUDED.cantidad`,
+      [producto_id, +cantidad]);
+    res.json({ok:true});
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+// Vibrar: pasa del montaje al carado (descuenta de montaje, suma a carado). Sin stock.
+router.post('/api/montaje/to-carado', async (req, res) => {
+  const {producto_id, cantidad} = req.body;
+  if(!producto_id || !(+cantidad>0)) return res.status(400).json({error:'producto_id y cantidad requeridos'});
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const row = (await client.query('SELECT cantidad FROM zona_montaje WHERE producto_id=$1 FOR UPDATE',[producto_id])).rows[0];
+    const disp = row ? +row.cantidad : 0;
+    if(+cantidad > disp) throw new Error('No hay tantos en zona de montaje (disponible: '+disp+')');
+    await client.query('UPDATE zona_montaje SET cantidad = cantidad - $1 WHERE producto_id=$2',[+cantidad, producto_id]);
+    await client.query(
+      `INSERT INTO zona_carado (producto_id,cantidad) VALUES ($1,$2)
+       ON CONFLICT (producto_id) DO UPDATE SET cantidad = zona_carado.cantidad + EXCLUDED.cantidad`,
+      [producto_id, +cantidad]);
+    await client.query('COMMIT');
+    res.json({ok:true});
+  } catch(e) { await client.query('ROLLBACK'); res.status(500).json({error:e.message}); }
+  finally { client.release(); }
+});
+// Borrar unidades del montaje (corrección de errores)
+router.post('/api/montaje/remove', async (req, res) => {
+  const {producto_id, cantidad} = req.body;
+  if(!producto_id || !(+cantidad>0)) return res.status(400).json({error:'producto_id y cantidad requeridos'});
+  try {
+    await pool.query('UPDATE zona_montaje SET cantidad = GREATEST(0, cantidad - $1) WHERE producto_id=$2',[+cantidad, producto_id]);
+    res.json({ok:true});
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
 module.exports = router;

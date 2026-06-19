@@ -51,8 +51,9 @@
     <div class="area-menu">
       <div class="tab highlight" id="tab-parte" onclick="switchTab('parte')"><i class="ti ti-clipboard-list"></i> Parte diario</div>
       <div class="area-sep">Pantallas de fábrica</div>
-      <div class="tab mesa-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> Mesa de vibrado</div>
-      <div class="tab carado-tab" id="tab-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Zona carado</div>
+      <div class="tab montaje-tab" id="tab-mesa" onclick="switchTab('mesa')"><i class="ti ti-hammer"></i> Montaje</div>
+      <div class="tab mesa-tab" id="tab-vibrado" onclick="switchTab('vibrado')"><i class="ti ti-tools"></i> Vibrado</div>
+      <div class="tab carado-tab" id="tab-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado</div>
       <div class="tab montado-tab" id="tab-montado" onclick="switchTab('montado')"><i class="ti ti-box"></i> Zona montado</div>
     </div>
   </div>
@@ -75,23 +76,34 @@
   </div>
 </div>
 
-<!-- MESA DE VIBRADO -->
+<!-- MONTAJE (entrada: montar gaviones vacíos, preparados para vibrar) -->
 <div class="view" id="view-mesa">
   <div class="fabrica-toggle">
-    <button class="ft-btn active" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> Vibrado</button>
-    <button class="ft-btn ft-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado <span class="ft-badge" id="ft-badge-mesa">0</span></button>
+    <button class="ft-btn ft-montaje active" onclick="switchTab('mesa')"><i class="ti ti-hammer"></i> Montaje</button>
+    <button class="ft-btn" onclick="switchTab('vibrado')"><i class="ti ti-tools"></i> Vibrado <span class="ft-badge ft-badge-vibrado">0</span></button>
+    <button class="ft-btn ft-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado <span class="ft-badge ft-badge-carado">0</span></button>
   </div>
   <div class="mesa-wrap" id="mesa-content"></div>
 </div>
-<!-- ZONA MONTADO -->
+<!-- VIBRADO (buffer: vacíos montados pendientes de vibrar → pasan a carado) -->
+<div class="view" id="view-vibrado">
+  <div class="fabrica-toggle">
+    <button class="ft-btn ft-montaje" onclick="switchTab('mesa')"><i class="ti ti-hammer"></i> Montaje</button>
+    <button class="ft-btn active" onclick="switchTab('vibrado')"><i class="ti ti-tools"></i> Vibrado <span class="ft-badge ft-badge-vibrado">0</span></button>
+    <button class="ft-btn ft-carado" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado <span class="ft-badge ft-badge-carado">0</span></button>
+  </div>
+  <div class="mesa-wrap full" id="vibrado-content"></div>
+</div>
+<!-- ZONA MONTADO (premontados, independiente) -->
 <div class="view" id="view-montado">
   <div class="mesa-wrap" id="montado-content"></div>
 </div>
-<!-- ZONA CARADO -->
+<!-- CARADO (buffer: vibrados pendientes de carar → stock) -->
 <div class="view" id="view-carado">
   <div class="fabrica-toggle">
-    <button class="ft-btn" onclick="switchTab('mesa')"><i class="ti ti-tools"></i> Vibrado</button>
-    <button class="ft-btn ft-carado active" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado <span class="ft-badge" id="ft-badge-carado">0</span></button>
+    <button class="ft-btn ft-montaje" onclick="switchTab('mesa')"><i class="ti ti-hammer"></i> Montaje</button>
+    <button class="ft-btn" onclick="switchTab('vibrado')"><i class="ti ti-tools"></i> Vibrado <span class="ft-badge ft-badge-vibrado">0</span></button>
+    <button class="ft-btn ft-carado active" onclick="switchTab('carado')"><i class="ti ti-stack-2"></i> Carado <span class="ft-badge ft-badge-carado">0</span></button>
   </div>
   <div class="mesa-wrap full" id="carado-content"></div>
 </div>
