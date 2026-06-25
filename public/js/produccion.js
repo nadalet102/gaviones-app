@@ -59,7 +59,7 @@ function renderMesa(){
   el.classList.toggle('full', mesaPaso==='nuevo-art'||mesaPaso==='pre-art');
   if(mesaPaso==='inicio'){
     el.innerHTML='<div class="mesa-grid">'+
-      '<button class="mesa-btn b-nuevo" onclick="mesaTipoSel(\'vibrado\')"><i class="ti ti-tools"></i> VIBRADO<small>Montar gavión para vibrar</small></button>'+
+      '<button class="mesa-btn b-nuevo" onclick="mesaTipoSel(\'vibrado\')"><i class="ti ti-tools"></i> GAVIÓN PARA VIBRAR<small>Montar gavión para vibrar</small></button>'+
       '<button class="mesa-btn b-art" style="background:#16a34a;color:#fff;border-color:#15803d" onclick="mesaTipoSel(\'premontado\')"><i class="ti ti-box"></i> PREMONTADO<small>Montar y pasar a stock</small></button>'+
       '<button class="mesa-btn b-repetir" onclick="mesaIr(\'repetir\')"><i class="ti ti-repeat"></i> REPETIR<small>Volver a montar lo último</small></button>'+
     '</div>';
