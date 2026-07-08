@@ -62,6 +62,9 @@ function muroCalculo(H, L){
   return { perfil:perfil, filas:filas, tot:tot };
 }
 
+let calcModo = 'simple';   // 'simple' = un muro · 'tramos' = muro en pendiente
+function calcSetModo(m){ calcModo = m; renderCalculador(); }
+
 function renderCalculador(){
   const el = document.getElementById('calculador-container');
   if(!el) return;
@@ -69,15 +72,11 @@ function renderCalculador(){
   const opts =
     '<optgroup label="Muros escalonados (prontuario)">'+optsPront+'</optgroup>'+
     '<optgroup label="Muros bajos (rectos)"><option value="1">1 metro</option><option value="0.5">0,50 m</option><option value="0.3">0,30 m</option></optgroup>';
-  el.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
-      '<div style="display:flex;align-items:center;gap:10px">'+
-        '<i class="ti ti-wall" style="font-size:20px;color:var(--blue)"></i>'+
-        '<div><div style="font-size:16px;font-weight:600">Calculador de muros de gaviones</div>'+
-        '<div class="dim">Despiece y vistas por altura y longitud (prontuario ARISAC)</div></div>'+
-      '</div>'+
-      '<button class="btn btn-outline btn-sm" onclick="switchTab(\'dash\')"><i class="ti ti-arrow-left"></i> Volver al panel</button>'+
-    '</div>'+
+  const btn = (m,txt) => '<button class="btn btn-sm '+(calcModo===m?'btn-primary':'btn-outline')+'" onclick="calcSetModo(\''+m+'\')">'+txt+'</button>';
+  const toggle =
+    '<div style="display:flex;gap:8px;margin-bottom:14px">'+btn('simple','<i class="ti ti-wall"></i> Un muro')+btn('tramos','<i class="ti ti-stairs"></i> Por tramos (pendiente)')+'</div>';
+
+  const formSimple =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
       '<div class="frow3" style="gap:12px;align-items:flex-end">'+
         '<div class="field" style="margin:0"><label>Altura del muro</label><select id="calc-altura" onchange="muroToggleAncho()">'+opts+'</select></div>'+
@@ -87,7 +86,31 @@ function renderCalculador(){
           '<input type="number" id="calc-long" min="1" step="0.5" placeholder="Ej. 25" onkeydown="if(event.key===\'Enter\')calcularMuro()"></div>'+
         '<button class="btn btn-primary" onclick="calcularMuro()"><i class="ti ti-calculator"></i> Calcular</button>'+
       '</div>'+
-    '</div></div>'+
+    '</div></div>';
+
+  const formTramos =
+    '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
+      '<div class="dim" style="font-size:12px;margin-bottom:10px">Un tramo por línea: <span class="mono">largo x alto</span> (opcional un 3er número = ancho para muros rectos). Ej. <span class="mono">20 x 4</span>, <span class="mono">12 x 2 x 0.5</span>.</div>'+
+      '<div class="frow3" style="gap:10px;align-items:flex-end;margin-bottom:10px">'+
+        '<div class="field" style="margin:0"><label>Largo (m)</label><input type="number" id="tr-largo" min="0.5" step="0.5" placeholder="20"></div>'+
+        '<div class="field" style="margin:0"><label>Altura</label><select id="tr-alto">'+opts+'</select></div>'+
+        '<button class="btn btn-outline btn-sm" onclick="tramoAdd()"><i class="ti ti-plus"></i> Añadir tramo</button>'+
+      '</div>'+
+      '<textarea id="tr-text" rows="5" placeholder="20 x 4&#10;15 x 3&#10;12 x 2&#10;8 x 1" style="width:100%;font-family:var(--mono,monospace);font-size:13px;padding:10px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea>'+
+      '<div style="margin-top:10px"><button class="btn btn-primary" onclick="calcularTramos()"><i class="ti ti-calculator"></i> Calcular muro</button></div>'+
+    '</div></div>';
+
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<i class="ti ti-wall" style="font-size:20px;color:var(--blue)"></i>'+
+        '<div><div style="font-size:16px;font-weight:600">Calculador de muros de gaviones</div>'+
+        '<div class="dim">Despiece y vistas por altura y longitud (prontuario ARISAC)</div></div>'+
+      '</div>'+
+      '<button class="btn btn-outline btn-sm" onclick="switchTab(\'dash\')"><i class="ti ti-arrow-left"></i> Volver al panel</button>'+
+    '</div>'+
+    toggle+
+    (calcModo==='tramos' ? formTramos : formSimple)+
     '<div id="calc-result"></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:14px 16px;font-size:12px;color:var(--text2)">'+
       '<div style="font-weight:600;color:var(--text);margin-bottom:6px"><i class="ti ti-info-circle"></i> Condiciones de diseño del prontuario</div>'+
@@ -95,7 +118,7 @@ function renderCalculador(){
       'Cimentación 5° sobre hormigón de limpieza · Relleno 1.600 kg/m³ · Talud 5°.'+
       '<div style="margin-top:8px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Estimación orientativa; el trabado y el reparto se ajustan en obra.</div>'+
     '</div></div>';
-  muroToggleAncho();
+  if(calcModo!=='tramos') muroToggleAncho();
 }
 
 // Selector de ancho: muros bajos (<2 m, ancho recto) y 2 m (prontuario o 0,50 recto)
@@ -272,6 +295,116 @@ function croquis3DRecto(L, ancho, H, nCourses, courseH){
   }
   out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="10" fill="#7c6a45">'+fmtN(L)+' m largo · '+String(H).replace('.',',')+' m alto · '+String(ancho).replace('.',',')+' m ancho</text>';
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),640)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista 3D del muro recto">'+out+'</svg>';
+}
+
+// ── MURO POR TRAMOS (en pendiente): cada tramo con su largo y altura ──
+function tramoAdd(){
+  const L = parseFloat(document.getElementById('tr-largo').value);
+  const H = document.getElementById('tr-alto').value;
+  if(!(L>0)) return;
+  const ta = document.getElementById('tr-text');
+  const line = String(L).replace('.',',')+' x '+String(H).replace('.',',');
+  ta.value = ta.value.trim() ? (ta.value.replace(/\s*$/,'')+'\n'+line) : line;
+  document.getElementById('tr-largo').value='';
+  document.getElementById('tr-largo').focus();
+}
+
+function parseTramos(text){
+  const tramos=[], errores=[];
+  const allowed={}; Object.keys(MURO_TABLA).forEach(k=>allowed[k]=1); [1,0.5,0.3].forEach(k=>allowed[k]=1);
+  (text||'').split(/\n/).forEach(function(line, i){
+    const s=line.trim(); if(!s) return;
+    const nums=(s.replace(/,/g,'.').match(/\d+(\.\d+)?/g)||[]).map(Number);
+    if(nums.length<2){ errores.push('Línea '+(i+1)+' ("'+s+'"): falta largo o alto'); return; }
+    const L=nums[0], H=nums[1], ancho=nums.length>=3?nums[2]:null;
+    if(!(L>0)){ errores.push('Línea '+(i+1)+': largo inválido'); return; }
+    if(!allowed[H]){ errores.push('Línea '+(i+1)+': altura '+String(H).replace('.',',')+' no válida (0,3 / 0,5 / 1 / 2…10)'); return; }
+    if(ancho!=null && !(ancho===0.3||ancho===0.5||ancho===1)){ errores.push('Línea '+(i+1)+': ancho '+String(ancho).replace('.',',')+' no válido (0,3 / 0,5 / 1)'); return; }
+    tramos.push({L:L, H:H, ancho:ancho, raw:s});
+  });
+  return {tramos:tramos, errores:errores};
+}
+
+// Piezas de un tramo (reutiliza el motor: prontuario si ≥2 m y sin ancho; recto en caso contrario)
+function muroPiezasTramo(t){
+  const recto = (t.ancho!=null) || t.H<2;
+  if(!recto){
+    const m=muroCalculo(t.H, t.L), piezas=[];
+    [[1, m.tot.a1],[0.5, m.tot.a05]].forEach(function(b){
+      const a=b[0], acc=b[1];
+      if(acc.p2) piezas.push({largo:2, ancho:a, alto:1, n:acc.p2});
+      if(acc.p15) piezas.push({largo:1.5, ancho:a, alto:1, n:acc.p15});
+      if(acc.p1) piezas.push({largo:1, ancho:a, alto:1, n:acc.p1});
+    });
+    return {tipo:'escalonado', piezas:piezas, granular: MURO_TABLA[t.H].granular*t.L};
+  }
+  const ancho = t.ancho!=null ? t.ancho : 0.5;
+  const courseH = (t.H>=1)?1:t.H, nCourses=(t.H>=1)?Math.round(t.H):1;
+  const cnt={p2:0,p15:0,p1:0};
+  for(var c=0;c<nCourses;c++) muroTramo(t.L, c%2===1).forEach(function(p){ muroAddPieza(cnt,p); });
+  const piezas=[];
+  if(cnt.p2) piezas.push({largo:2, ancho:ancho, alto:courseH, n:cnt.p2});
+  if(cnt.p15) piezas.push({largo:1.5, ancho:ancho, alto:courseH, n:cnt.p15});
+  if(cnt.p1) piezas.push({largo:1, ancho:ancho, alto:courseH, n:cnt.p1});
+  return {tipo:'recto', piezas:piezas, granular: t.L*ancho*t.H};
+}
+
+function calcularTramos(){
+  const res=document.getElementById('calc-result');
+  const parsed=parseTramos(document.getElementById('tr-text').value);
+  const fmtm = x=>String(x).replace('.',',');
+  const errBlock = parsed.errores.length ? '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:12px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> '+parsed.errores.join('<br>')+'</div></div>' : '';
+  if(!parsed.tramos.length){
+    res.innerHTML='<div class="empty"><i class="ti ti-stairs"></i><p>Escribe al menos un tramo (largo x alto)</p></div>'+errBlock;
+    return;
+  }
+  const agg={}; let granTotal=0, totalGav=0, largoTotal=0, hMax=0;
+  const filasTramo = parsed.tramos.map(function(t, idx){
+    const r=muroPiezasTramo(t); let nGav=0;
+    r.piezas.forEach(function(p){ const k=p.largo+'|'+p.ancho+'|'+p.alto; if(!agg[k]) agg[k]={largo:p.largo,ancho:p.ancho,alto:p.alto,n:0}; agg[k].n+=p.n; nGav+=p.n; });
+    granTotal+=r.granular; totalGav+=nGav; largoTotal+=t.L; hMax=Math.max(hMax,t.H);
+    return {idx:idx+1, t:t, tipo:r.tipo, nGav:nGav, granular:r.granular};
+  });
+  const piezasOrden = Object.keys(agg).map(k=>agg[k]).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo));
+  const despiece='<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+
+    piezasOrden.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('')+
+    '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones</td><td class="r mono" style="font-weight:700">'+fmtN(totalGav)+'</td></tr></tbody></table>';
+  const porTramo='<table class="tbl"><thead><tr><th>Tramo</th><th>Largo</th><th>Alto</th><th>Tipo</th><th class="r">Gaviones</th><th class="r">Granular</th></tr></thead><tbody>'+
+    filasTramo.map(f=>'<tr><td class="mono">'+f.idx+'</td><td>'+fmtN(f.t.L)+' m</td><td>'+fmtm(f.t.H)+' m'+(f.t.ancho!=null?(' · '+fmtm(f.t.ancho)+' ancho'):'')+'</td><td class="dim">'+f.tipo+'</td><td class="r mono">'+fmtN(f.nGav)+'</td><td class="r mono">'+f.granular.toLocaleString('es-ES',{maximumFractionDigits:2})+' m³</td></tr>').join('')+'</tbody></table>';
+
+  res.innerHTML =
+    '<div class="card">'+
+      '<div class="card-hdr"><div class="card-title"><i class="ti ti-stairs"></i> Muro por tramos · '+fmtN(largoTotal)+' m totales · '+parsed.tramos.length+' tramos</div>'+
+        '<span class="badge b-steel">altura máx '+fmtm(hMax)+' m</span></div>'+
+      despiece+
+      '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular total</span> '+
+        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+granTotal.toLocaleString('es-ES',{maximumFractionDigits:2})+' m³</strong></div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-numbers"></i> Desglose por tramo</div></div>'+porTramo+'</div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Perfil longitudinal (alzado)</div>'+
+      '<span class="dim" style="font-size:11px">bases alineadas · los remates escalonan</span></div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPerfilLongitudinal(parsed.tramos)+'</div></div>'+
+    errBlock+
+    '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:12px 16px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> v1: cada tramo se calcula por separado y se suma. El <strong>solape/traba entre escalones</strong> lo añadiremos en la siguiente vuelta.</div></div>';
+}
+
+// Alzado longitudinal: la "escalera" del muro (bases alineadas, remates escalonados)
+function croquisPerfilLongitudinal(tramos){
+  const totalL=tramos.reduce((s,t)=>s+t.L,0), hMax=tramos.reduce((m,t)=>Math.max(m,t.H),0);
+  const xs=Math.max(2, Math.min(16, 860/totalL)), ys=18;
+  const padL=16,padR=16,padT=18,padB=34;
+  const Wpx=totalL*xs, Hpx=hMax*ys, vbW=padL+Wpx+padR, vbH=padT+Hpx+padB;
+  const x0=padL, groundY=padT+Hpx; let out='', x=x0;
+  tramos.forEach(function(t, i){
+    const w=t.L*xs, h=t.H*ys, topY=groundY-h, fill=i%2===0?'#d6e0f0':'#c4d3e8';
+    out+='<rect x="'+x.toFixed(1)+'" y="'+topY.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+fill+'" stroke="#5b7599" stroke-width="1"/>';
+    for(var k=1;k<t.H;k++){ const ly=groundY-k*ys; out+='<line x1="'+x.toFixed(1)+'" y1="'+ly.toFixed(1)+'" x2="'+(x+w).toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="#8fa3bf" stroke-width="0.4" opacity="0.6"/>'; }
+    if(h>=14) out+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(topY+12).toFixed(1)+'" font-size="10" fill="#334155" text-anchor="middle">'+String(t.H).replace('.',',')+' m</text>';
+    out+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(groundY+14).toFixed(1)+'" font-size="9" fill="#64748b" text-anchor="middle">'+fmtN(t.L)+' m</text>';
+    x+=w;
+  });
+  out+='<line x1="'+x0+'" y1="'+groundY+'" x2="'+(x0+Wpx).toFixed(1)+'" y2="'+groundY+'" stroke="#334155" stroke-width="1.5"/>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),860)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal del muro">'+out+'</svg>';
 }
 
 function croquisTrabado(H, L){
