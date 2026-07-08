@@ -90,7 +90,11 @@ function renderCalculador(){
 
   const formTramos =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
-      '<div class="dim" style="font-size:12px;margin-bottom:10px">Un tramo por línea: <span class="mono">largo x alto</span> (opcional un 3er número = ancho para muros rectos). Ej. <span class="mono">20 x 4</span>, <span class="mono">12 x 2 x 0.5</span>.</div>'+
+      '<div class="dim" style="font-size:12px;margin-bottom:10px">Un tramo por línea: <span class="mono">largo x alto</span> (opcional 3er nº = ancho recto; y <span class="mono">/ desnivel</span> = lo que baja al siguiente). Ej. <span class="mono">20 x 4</span>, <span class="mono">16 x 3 / 1</span>, <span class="mono">12 x 2 x 0.5 / 1</span>.</div>'+
+      '<div class="frow3" style="gap:10px;align-items:flex-end;margin-bottom:10px">'+
+        '<div class="field" style="margin:0"><label>Perfil</label><select id="tr-perfil" onchange="tramoTogglePerfil()"><option value="base">Base corrida</option><option value="esc">Todo escalonado</option></select></div>'+
+        '<div class="field" style="margin:0;display:none" id="tr-esc-wrap"><label>Escalón por defecto (m)</label><input type="number" id="tr-esc" min="0" step="0.5" value="1"></div>'+
+      '</div>'+
       '<div class="frow3" style="gap:10px;align-items:flex-end;margin-bottom:10px">'+
         '<div class="field" style="margin:0"><label>Largo (m)</label><input type="number" id="tr-largo" min="0.5" step="0.5" placeholder="20"></div>'+
         '<div class="field" style="margin:0"><label>Altura</label><select id="tr-alto">'+opts+'</select></div>'+
@@ -118,7 +122,7 @@ function renderCalculador(){
       'Cimentación 5° sobre hormigón de limpieza · Relleno 1.600 kg/m³ · Talud 5°.'+
       '<div style="margin-top:8px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Estimación orientativa; el trabado y el reparto se ajustan en obra.</div>'+
     '</div></div>';
-  if(calcModo!=='tramos') muroToggleAncho();
+  if(calcModo==='tramos') tramoTogglePerfil(); else muroToggleAncho();
 }
 
 // Selector de ancho: muros bajos (<2 m, ancho recto) y 2 m (prontuario o 0,50 recto)
@@ -309,20 +313,30 @@ function tramoAdd(){
   document.getElementById('tr-largo').focus();
 }
 
-function parseTramos(text){
+function parseTramos(text, defDrop){
   const tramos=[], errores=[];
   const allowed={}; Object.keys(MURO_TABLA).forEach(k=>allowed[k]=1); [1,0.5,0.3].forEach(k=>allowed[k]=1);
+  const dd = (defDrop>=0) ? defDrop : 1;
   (text||'').split(/\n/).forEach(function(line, i){
     const s=line.trim(); if(!s) return;
-    const nums=(s.replace(/,/g,'.').match(/\d+(\.\d+)?/g)||[]).map(Number);
+    const parts=s.replace(/,/g,'.').split('/');           // "/ desnivel" al final (opcional)
+    const nums=(parts[0].match(/\d+(\.\d+)?/g)||[]).map(Number);
+    const dropNums=parts.length>1 ? (parts[1].match(/\d+(\.\d+)?/g)||[]).map(Number) : [];
     if(nums.length<2){ errores.push('Línea '+(i+1)+' ("'+s+'"): falta largo o alto'); return; }
     const L=nums[0], H=nums[1], ancho=nums.length>=3?nums[2]:null;
+    const desnivel=dropNums.length ? dropNums[0] : dd;
     if(!(L>0)){ errores.push('Línea '+(i+1)+': largo inválido'); return; }
     if(!allowed[H]){ errores.push('Línea '+(i+1)+': altura '+String(H).replace('.',',')+' no válida (0,3 / 0,5 / 1 / 2…10)'); return; }
     if(ancho!=null && !(ancho===0.3||ancho===0.5||ancho===1)){ errores.push('Línea '+(i+1)+': ancho '+String(ancho).replace('.',',')+' no válido (0,3 / 0,5 / 1)'); return; }
-    tramos.push({L:L, H:H, ancho:ancho, raw:s});
+    tramos.push({L:L, H:H, ancho:ancho, desnivel:desnivel, raw:s});
   });
   return {tramos:tramos, errores:errores};
+}
+
+// Muestra/oculta el escalón por defecto según el perfil elegido
+function tramoTogglePerfil(){
+  const sel=document.getElementById('tr-perfil'), w=document.getElementById('tr-esc-wrap');
+  if(sel && w) w.style.display = (sel.value==='esc') ? '' : 'none';
 }
 
 // Piezas de un tramo (reutiliza el motor: prontuario si ≥2 m y sin ancho; recto en caso contrario)
@@ -351,7 +365,9 @@ function muroPiezasTramo(t){
 
 function calcularTramos(){
   const res=document.getElementById('calc-result');
-  const parsed=parseTramos(document.getElementById('tr-text').value);
+  const perfil = (document.getElementById('tr-perfil')||{}).value || 'base';
+  const defDrop = parseFloat((document.getElementById('tr-esc')||{}).value);
+  const parsed=parseTramos(document.getElementById('tr-text').value, defDrop);
   const fmtm = x=>String(x).replace('.',',');
   const errBlock = parsed.errores.length ? '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:12px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> '+parsed.errores.join('<br>')+'</div></div>' : '';
   if(!parsed.tramos.length){
@@ -382,10 +398,10 @@ function calcularTramos(){
     '</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-numbers"></i> Desglose por tramo</div></div>'+porTramo+'</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Perfil longitudinal (alzado)</div>'+
-      '<span class="dim" style="font-size:11px">bases alineadas · los remates escalonan</span></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPerfilLongitudinal(parsed.tramos)+'</div></div>'+
+      '<span class="dim" style="font-size:11px">'+(perfil==='esc'?'todo escalonado · base y remate bajan':'base corrida · los remates escalonan')+'</span></div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+(perfil==='esc'?croquisPerfilEscalonado(parsed.tramos):croquisPerfilLongitudinal(parsed.tramos))+'</div></div>'+
     errBlock+
-    '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:12px 16px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> v1: cada tramo se calcula por separado y se suma. El <strong>solape/traba entre escalones</strong> lo añadiremos en la siguiente vuelta.</div></div>';
+    '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:12px 16px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> El despiece es el mismo en ambos perfiles (los tramos van uno al lado de otro y solo traban en la junta). El <strong>ajuste fino del solape</strong> lo puliremos si hace falta.</div></div>';
 }
 
 // Alzado longitudinal: la "escalera" del muro (bases alineadas, remates escalonados)
@@ -405,6 +421,43 @@ function croquisPerfilLongitudinal(tramos){
   });
   out+='<line x1="'+x0+'" y1="'+groundY+'" x2="'+(x0+Wpx).toFixed(1)+'" y2="'+groundY+'" stroke="#334155" stroke-width="1.5"/>';
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),860)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal del muro">'+out+'</svg>';
+}
+
+// Alzado "todo escalonado": base y remate bajan; los tramos contiguos se solapan y traban
+function croquisPerfilEscalonado(tramos){
+  const totalL=tramos.reduce((s,t)=>s+t.L,0);
+  // cotas de base acumuladas (cada tramo baja su desnivel hacia el siguiente)
+  const base=[0]; for(let i=1;i<tramos.length;i++) base[i]=base[i-1]-(tramos[i-1].desnivel||0);
+  let maxE=-1e9, minE=1e9;
+  tramos.forEach((t,i)=>{ maxE=Math.max(maxE, base[i]+t.H); minE=Math.min(minE, base[i]); });
+  const span=maxE-minE;
+  const xs=Math.max(2, Math.min(16, 840/totalL)), ys=Math.max(10, Math.min(24, 200/span));
+  const padL=18,padR=18,padT=16,padB=32;
+  const Wpx=totalL*xs, vbW=padL+Wpx+padR, vbH=padT+span*ys+padB;
+  const Y=e=>padT+(maxE-e)*ys;
+  const x0=padL; let out='', x=x0; const xend=[];
+  // gaviones por tramo (piezas 2/1,5/1 m coloreadas, trabadas por hilada)
+  tramos.forEach(function(t,i){
+    const w=t.L*xs, nC=(t.H>=1)?Math.round(t.H):1, cH=(t.H>=1)?1:t.H;
+    for(let c=0;c<nC;c++){
+      const yTop=Y(base[i]+(c+1)*cH); let px=x;
+      muroTramo(t.L, c%2===1).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+(cH*ys).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; px+=pw; });
+    }
+    out+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(Y(base[i]+t.H)-5).toFixed(1)+'" font-size="10" fill="#111827" text-anchor="middle">'+String(t.H).replace('.',',')+' m</text>';
+    out+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(Y(minE)+14).toFixed(1)+'" font-size="9" fill="#64748b" text-anchor="middle">'+fmtN(t.L)+' m</text>';
+    xend.push(x+w); x+=w;
+  });
+  // solape entre tramos contiguos (banda compartida de cotas) + terreno escalonado
+  for(let i=0;i<tramos.length-1;i++){
+    const bx=xend[i], top1=base[i]+tramos[i].H, top2=base[i+1]+tramos[i+1].H;
+    const shTop=Math.min(top1, top2), shBot=Math.max(base[i], base[i+1]);
+    if(shTop>shBot){ out+='<rect x="'+(bx-6).toFixed(1)+'" y="'+Y(shTop).toFixed(1)+'" width="12" height="'+((shTop-shBot)*ys).toFixed(1)+'" fill="none" stroke="#dc2626" stroke-width="1.3" stroke-dasharray="4 3"/>'; }
+    // riser del terreno
+    out+='<line x1="'+bx.toFixed(1)+'" y1="'+Y(base[i]).toFixed(1)+'" x2="'+bx.toFixed(1)+'" y2="'+Y(base[i+1]).toFixed(1)+'" stroke="#8a6d3b" stroke-width="1.4" stroke-dasharray="3 2"/>';
+  }
+  // línea de terreno bajo cada tramo
+  let gx=x0; tramos.forEach(function(t,i){ const w=t.L*xs, by=Y(base[i]); out+='<line x1="'+gx.toFixed(1)+'" y1="'+by.toFixed(1)+'" x2="'+(gx+w).toFixed(1)+'" y2="'+by.toFixed(1)+'" stroke="#8a6d3b" stroke-width="1.4"/>'; gx+=w; });
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),860)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal escalonado del muro">'+out+'</svg>';
 }
 
 function croquisTrabado(H, L){
