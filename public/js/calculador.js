@@ -191,7 +191,7 @@ function calcularMuro(){
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisTrabado(h, L)+muroLeyenda()+
     '</div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-box-model"></i> Sección y vista 3D</div>'+
-      '<span class="dim" style="font-size:11px">se ensancha hacia la base</span></div>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dSingle('+h+','+L+',null)"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end">'+
         '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sección (ancho × alto)</div>'+croquisSeccion(h)+'</div>'+
         '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Vista 3D</div>'+croquis3D(h, L)+'</div>'+
@@ -233,7 +233,7 @@ function calcularMuroRecto(H, L, ancho, res){
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisRectoAlzado(L, nCourses, courseH)+muroLeyenda()+
     '</div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-box-model"></i> Sección y vista 3D</div>'+
-      '<span class="dim" style="font-size:11px">muro recto de ancho uniforme</span></div>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dSingle('+H+','+L+','+ancho+')"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end">'+
         '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sección (ancho × alto)</div>'+croquisSeccionBaja(ancho, H)+'</div>'+
         '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Vista 3D</div>'+croquis3DRecto(L, ancho, H, nCourses, courseH)+'</div>'+
@@ -381,6 +381,7 @@ function calcularTramos(){
     granTotal+=r.granular; totalGav+=nGav; largoTotal+=t.L; hMax=Math.max(hMax,t.H);
     return {idx:idx+1, t:t, tipo:r.tipo, nGav:nGav, granular:r.granular};
   });
+  window.__muroTramos = { tramos: parsed.tramos, perfil: perfil };
   const piezasOrden = Object.keys(agg).map(k=>agg[k]).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo));
   const despiece='<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+
     piezasOrden.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('')+
@@ -398,7 +399,7 @@ function calcularTramos(){
     '</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-numbers"></i> Desglose por tramo</div></div>'+porTramo+'</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Perfil longitudinal (alzado)</div>'+
-      '<span class="dim" style="font-size:11px">'+(perfil==='esc'?'todo escalonado · base y remate bajan':'base corrida · los remates escalonan')+'</span></div>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+(perfil==='esc'?croquisPerfilEscalonado(parsed.tramos):croquisPerfilLongitudinal(parsed.tramos))+'</div></div>'+
     errBlock+
     '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:12px 16px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> El despiece es el mismo en ambos perfiles (los tramos van uno al lado de otro y solo traban en la junta). El <strong>ajuste fino del solape</strong> lo puliremos si hace falta.</div></div>';
