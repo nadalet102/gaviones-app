@@ -53,7 +53,10 @@ function muroCalculo(H, L){
 function renderCalculador(){
   const el = document.getElementById('calculador-container');
   if(!el) return;
-  const opts = Object.keys(MURO_TABLA).map(h => '<option value="'+h+'">'+h+' metros</option>').join('');
+  const optsPront = Object.keys(MURO_TABLA).map(h => '<option value="'+h+'">'+h+' metros</option>').join('');
+  const opts =
+    '<optgroup label="Muros escalonados (prontuario)">'+optsPront+'</optgroup>'+
+    '<optgroup label="Muros bajos (rectos)"><option value="1">1 metro</option><option value="0.5">0,50 m</option><option value="0.3">0,30 m</option></optgroup>';
   el.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
       '<div style="display:flex;align-items:center;gap:10px">'+
@@ -65,7 +68,9 @@ function renderCalculador(){
     '</div>'+
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
       '<div class="frow3" style="gap:12px;align-items:flex-end">'+
-        '<div class="field" style="margin:0"><label>Altura del muro</label><select id="calc-altura">'+opts+'</select></div>'+
+        '<div class="field" style="margin:0"><label>Altura del muro</label><select id="calc-altura" onchange="muroToggleAncho()">'+opts+'</select></div>'+
+        '<div class="field" style="margin:0;display:none" id="calc-ancho-wrap"><label>Ancho del gavión</label>'+
+          '<select id="calc-ancho"><option value="0.5">0,50 m</option><option value="0.3">0,30 m</option></select></div>'+
         '<div class="field" style="margin:0"><label>Longitud del muro (m)</label>'+
           '<input type="number" id="calc-long" min="1" step="0.5" placeholder="Ej. 25" onkeydown="if(event.key===\'Enter\')calcularMuro()"></div>'+
         '<button class="btn btn-primary" onclick="calcularMuro()"><i class="ti ti-calculator"></i> Calcular</button>'+
@@ -80,11 +85,19 @@ function renderCalculador(){
     '</div></div>';
 }
 
+// Muestra/oculta el selector de ancho: solo para muros bajos (rectos, < 2 m)
+function muroToggleAncho(){
+  const h = parseFloat(document.getElementById('calc-altura').value);
+  const wrap = document.getElementById('calc-ancho-wrap');
+  if(wrap) wrap.style.display = (h < 2) ? '' : 'none';
+}
+
 function calcularMuro(){
-  const h = +document.getElementById('calc-altura').value;
+  const h = parseFloat(document.getElementById('calc-altura').value);
   const L = parseFloat(document.getElementById('calc-long').value)||0;
   const res = document.getElementById('calc-result');
   if(!h || L<=0){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-ruler-measure"></i><p>Introduce la longitud del muro</p></div>'; return; }
+  if(h < 2 || !MURO_TABLA[h]) return calcularMuroBajo(h, L, res);   // muros bajos rectos
   const t = MURO_TABLA[h];
   const m = muroCalculo(h, L);
   const granular = t.granular * L;
@@ -135,6 +148,95 @@ function calcularMuro(){
         '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Vista 3D</div>'+croquis3D(h, L)+'</div>'+
       '</div>'+
     '</div>';
+}
+
+// ── MUROS BAJOS (rectos, < 2 m): una sola hilada, ancho de gavión elegible ──
+function calcularMuroBajo(h, L, res){
+  const ancho = parseFloat(document.getElementById('calc-ancho').value) || 0.5;
+  const pat = muroTramo(L, false);
+  const cnt = {p2:0,p15:0,p1:0};
+  pat.forEach(function(p){ muroAddPieza(cnt, p); });
+  const total = cnt.p2+cnt.p15+cnt.p1;
+  const granular = L * ancho * h;
+  const granStr = granular.toLocaleString('es-ES', {maximumFractionDigits:2});
+  const aStr = String(ancho).replace('.',','), hStr = String(h).replace('.',',');
+
+  function fila(largo, n){
+    return n>0 ? '<tr><td>Gavión <strong>'+String(largo).replace('.',',')+' m</strong></td><td>'+String(largo).replace('.',',')+' × '+aStr+' × '+hStr+' m</td><td class="r mono" style="font-weight:600">'+fmtN(n)+'</td></tr>' : '';
+  }
+  const despiece =
+    '<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+
+      fila(2, cnt.p2)+ fila(1.5, cnt.p15)+ fila(1, cnt.p1)+
+      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr>'+
+    '</tbody></table>';
+
+  res.innerHTML =
+    '<div class="card">'+
+      '<div class="card-hdr"><div class="card-title"><i class="ti ti-wall"></i> Muro recto '+hStr+' m alto × '+aStr+' m ancho × '+fmtN(L)+' m largo</div>'+
+        '<span class="badge b-steel">muro bajo · 1 hilada</span></div>'+
+      despiece+
+      '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular</span> '+
+        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+granStr+' m³</strong></div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-grid"></i> Reparto de piezas a lo largo</div>'+
+      '<span class="dim" style="font-size:11px">'+pat.map(function(p){return String(p).replace('.',',');}).join(' · ')+' m</span></div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisBajoAlzado(L, h)+
+      '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#d8ccb0;border:1px solid #8a7a5c;vertical-align:middle"></span> 2 m &nbsp; '+
+      '<span style="display:inline-block;width:12px;height:12px;background:#e6dcc0;border:1px solid #8a7a5c;vertical-align:middle"></span> 1,5 m &nbsp; '+
+      '<span style="display:inline-block;width:12px;height:12px;background:#fcd34d;border:1px solid #b45309;vertical-align:middle"></span> 1 m</div>'+
+    '</div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-box-model"></i> Sección y vista 3D</div>'+
+      '<span class="dim" style="font-size:11px">muro recto de ancho uniforme</span></div>'+
+      '<div class="card-body" style="padding:14px 16px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end">'+
+        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sección (ancho × alto)</div>'+croquisSeccionBaja(ancho, h)+'</div>'+
+        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Vista 3D</div>'+croquis3DBajo(L, ancho, h)+'</div>'+
+      '</div>'+
+    '</div>';
+}
+
+// Alzado del muro bajo: una fila de piezas a lo largo (altura proporcional)
+function croquisBajoAlzado(L, alto){
+  var uW=Math.max(6, Math.min(26, 640/L)), uH=Math.max(16, alto*44), gap=1.5;
+  var w=Math.ceil(L*uW), x=0, rects='';
+  muroTramo(L, false).forEach(function(p){
+    var pw=p*uW, fill=p===2?'#d8ccb0':p===1.5?'#e6dcc0':'#fcd34d';
+    rects+='<rect x="'+x.toFixed(1)+'" y="0" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(uH-gap)+'" fill="'+fill+'" stroke="#8a7a5c" stroke-width="0.6"/>';
+    x+=pw;
+  });
+  return '<svg viewBox="0 0 '+w+' '+Math.ceil(uH)+'" width="'+Math.min(w,660)+'" style="max-width:100%;border:1px solid var(--border);border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reparto de piezas a lo largo">'+rects+'</svg>';
+}
+
+// Sección del muro bajo: rectángulo ancho × alto
+function croquisSeccionBaja(ancho, alto){
+  var sc=64, padL=54, padR=40, padT=14, padB=26;
+  var Wpx=ancho*sc, Hpx=alto*sc, x0=padL, groundY=padT+Hpx;
+  var vbW=x0+Wpx+padR, vbH=Hpx+padT+padB, out='';
+  out+='<rect x="'+x0+'" y="'+padT+'" width="'+Wpx+'" height="'+Hpx+'" fill="#d8ccb0" stroke="#8a7a5c" stroke-width="1.2"/>';
+  out+='<line x1="'+x0+'" y1="'+(padT+Hpx/2)+'" x2="'+(x0+Wpx)+'" y2="'+(padT+Hpx/2)+'" stroke="#b3a67f" stroke-width="0.5" opacity="0.6"/>';
+  out+='<line x1="'+(x0-14)+'" y1="'+groundY+'" x2="'+(x0+Wpx+14)+'" y2="'+groundY+'" stroke="#9c855c" stroke-width="2"/>';
+  out+='<text x="'+(padL-38)+'" y="'+(padT+Hpx/2)+'" font-size="11" fill="#334155" text-anchor="middle" transform="rotate(-90 '+(padL-38)+' '+(padT+Hpx/2)+')">'+String(alto).replace('.',',')+' m</text>';
+  out+='<text x="'+(x0+Wpx/2)+'" y="'+(groundY+16)+'" font-size="11" fill="#334155" text-anchor="middle">'+String(ancho).replace('.',',')+' m</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),240)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sección del muro bajo">'+out+'</svg>';
+}
+
+// Vista 3D isométrica del muro bajo (caja recta, ancho uniforme)
+function croquis3DBajo(L, ancho, alto){
+  var dcos=0.58, dsin=0.32, padT=14, padR=26, padL=16, padB=24;
+  var scW=(640-padL-padR)/(L + ancho*dcos);
+  var scH=(220-padT-padB)/(alto + ancho*dsin);
+  var sc=Math.max(6, Math.min(80, scW, scH));
+  var Lpx=L*sc, hpx=alto*sc, dx=ancho*sc*dcos, dy=-ancho*sc*dsin;
+  var vbW=padL+Lpx+ancho*sc*dcos+padR, vbH=padT+hpx+ancho*sc*dsin+padB;
+  var x0=padL, groundY=padT+hpx+ancho*sc*dsin, topY=groundY-hpx, out='';
+  out+='<polygon points="'+x0+','+groundY+' '+(x0+Lpx)+','+groundY+' '+(x0+Lpx+dx)+','+(groundY+dy)+' '+(x0+dx)+','+(groundY+dy)+'" fill="#e2d3b3" opacity="0.5"/>';
+  out+='<polygon points="'+x0+','+topY+' '+(x0+Lpx)+','+topY+' '+(x0+Lpx+dx)+','+(topY+dy)+' '+(x0+dx)+','+(topY+dy)+'" fill="#cabf9d" stroke="#8a7a5c" stroke-width="0.6"/>';
+  out+='<polygon points="'+(x0+Lpx)+','+topY+' '+(x0+Lpx)+','+(topY+hpx)+' '+(x0+Lpx+dx)+','+(topY+hpx+dy)+' '+(x0+Lpx+dx)+','+(topY+dy)+'" fill="#b3a67f" stroke="#8a7a5c" stroke-width="0.6"/>';
+  out+='<rect x="'+x0+'" y="'+topY+'" width="'+Lpx+'" height="'+hpx+'" fill="#d8ccb0" stroke="#8a7a5c" stroke-width="0.8"/>';
+  var acc=0;
+  muroTramo(L, false).forEach(function(p){ acc+=p; if(acc<L-0.01){ var jx=x0+acc*sc; out+='<line x1="'+jx.toFixed(1)+'" y1="'+topY+'" x2="'+jx.toFixed(1)+'" y2="'+(topY+hpx)+'" stroke="#8a7a5c" stroke-width="0.7"/>'; } });
+  out+='<line x1="'+x0+'" y1="'+(topY+hpx/2)+'" x2="'+(x0+Lpx)+'" y2="'+(topY+hpx/2)+'" stroke="#b3a67f" stroke-width="0.4" opacity="0.6"/>';
+  out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="10" fill="#7c6a45">'+fmtN(L)+' m largo · '+String(alto).replace('.',',')+' m alto · '+String(ancho).replace('.',',')+' m ancho</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),640)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista 3D del muro bajo">'+out+'</svg>';
 }
 
 function croquisTrabado(H, L){
