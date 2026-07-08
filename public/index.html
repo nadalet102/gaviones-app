@@ -131,6 +131,9 @@
 <!-- PANEL -->
 <div class="view active" id="view-dash">
 <div class="container">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="btn btn-outline btn-sm" onclick="switchTab('calculador')" title="Calculador de muros (experimental)"><i class="ti ti-calculator"></i> Calculador de muros</button>
+  </div>
   <div class="grid4" id="kpis" style="margin-bottom:14px"></div>
   <div class="grid2">
     <div class="card">
@@ -146,6 +149,13 @@
     <div class="card-hdr"><div class="card-title"><i class="ti ti-file-text"></i> Pedidos activos</div><button class="btn btn-outline btn-sm" onclick="switchTab('pedidos')">Ver todos</button></div>
     <div id="dash-pedidos-activos"></div>
   </div>
+</div>
+</div>
+
+<!-- CALCULADOR DE MUROS (pestaña oculta: solo se accede por el botón del panel) -->
+<div class="view" id="view-calculador">
+<div class="container">
+  <div id="calculador-container"></div>
 </div>
 </div>
 
@@ -342,5 +352,6 @@
 <script src="js/acciones.js"></script>
 <script src="js/historial.js"></script>
 <script src="js/produccion.js"></script>
+<script src="js/calculador.js"></script>
 </body>
 </html>
