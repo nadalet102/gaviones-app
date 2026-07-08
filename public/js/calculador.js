@@ -177,7 +177,8 @@ function calcularMuro(){
   res.innerHTML =
     '<div class="card">'+
       '<div class="card-hdr"><div class="card-title"><i class="ti ti-building-bridge"></i> Muro '+h+' m alto × '+fmtN(L)+' m largo</div>'+
-        '<span class="badge b-steel">base ≈ '+String(t.base).replace('.',',')+' m · talud 5°</span></div>'+
+        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">base ≈ '+String(t.base).replace('.',',')+' m · talud 5°</span>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaSingle('+h+','+L+',null)"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
       despiece+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular</span> '+
         '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+fmtN(granular)+' m³</strong></div>'+
@@ -223,7 +224,8 @@ function calcularMuroRecto(H, L, ancho, res){
   res.innerHTML =
     '<div class="card">'+
       '<div class="card-hdr"><div class="card-title"><i class="ti ti-wall"></i> Muro recto '+hStr+' m alto × '+aStr+' m ancho × '+fmtN(L)+' m largo</div>'+
-        '<span class="badge b-steel">'+subt+'</span></div>'+
+        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">'+subt+'</span>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaSingle('+H+','+L+','+ancho+')"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
       despiece+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular</span> '+
         '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+granStr+' m³</strong></div>'+
@@ -392,7 +394,8 @@ function calcularTramos(){
   res.innerHTML =
     '<div class="card">'+
       '<div class="card-hdr"><div class="card-title"><i class="ti ti-stairs"></i> Muro por tramos · '+fmtN(largoTotal)+' m totales · '+parsed.tramos.length+' tramos</div>'+
-        '<span class="badge b-steel">altura máx '+fmtm(hMax)+' m</span></div>'+
+        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">altura máx '+fmtm(hMax)+' m</span>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaTramos()"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
       despiece+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular total</span> '+
         '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+granTotal.toLocaleString('es-ES',{maximumFractionDigits:2})+' m³</strong></div>'+
