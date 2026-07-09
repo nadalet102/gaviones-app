@@ -21,14 +21,24 @@ function muroPerfilAnchos(H){
   for(var k=1;k<=H;k++) w.push(1 + Math.max(0, extra - 0.5*(k-1)));
   return w; // bottom→top
 }
-// Tabica una hilada de longitud L con piezas de 2/1,5/1 m; offset la desfasa (trabado).
+// Tabica una hilada de longitud L con piezas COMPLETAS de 2/1,5/1 m que suman EXACTO L.
+// Prioriza piezas de 2 m; el medio metro (L acabado en ,5) lo aporta una pieza de 1,5 m.
+// offset=true desfasa las juntas (trabado): la hilada se coloca "al revés" y, si es todo
+// de 2 m, se rematan los extremos con 1 m (empieza abajo en 1,5 y acaba en 1; arriba al revés).
 function muroTramo(L, offset){
-  var p=[], rem=L;
-  if(offset && rem>=2){ p.push(1); rem-=1; }
-  while(rem>=2){ p.push(2); rem-=2; }
-  if(rem>=1.5){ p.push(1.5); rem-=1.5; }
-  else if(rem>0.01){ p.push(1); }
-  return p;
+  var u = Math.round(L*2);                 // longitud en medios metros
+  if(u < 2) return [];                     // < 1 m no admite pieza válida
+  var med=0, uno=0, uu=u;
+  if(uu % 2 === 1){ med=1; uu-=3; }        // un 1,5 m (3 medios) para el medio metro
+  var dos=Math.floor(uu/4), rem=uu-dos*4;  // rem 0 o 2
+  if(rem===2) uno=1;                        // un 1 m
+  var p=[];
+  if(med) p.push(1.5);
+  for(var i=0;i<dos;i++) p.push(2);
+  if(uno) p.push(1);
+  if(!offset) return p;
+  if(med || uno) return p.slice().reverse();          // hilada impar: al revés (trabado)
+  var r=[1]; for(var j=0;j<dos-1;j++) r.push(2); r.push(1); return r; // todo 2 m: 1 m en extremos
 }
 function muroAddPieza(acc, p){ if(p===2) acc.p2++; else if(p===1.5) acc.p15++; else acc.p1++; }
 
