@@ -82,14 +82,19 @@ function muroBandas(w){
 function muroDespiece(H, L, ancho){
   var courses = muroCourses(H, ancho), map={}, filas=[], granular=0;
   courses.forEach(function(c, idx){
-    var bandas = muroBandas(c.w), pat = muroTramo(L, c.offset);
-    bandas.forEach(function(bw){ pat.forEach(function(p){
-      var key=p+'|'+bw+'|'+c.h;
-      if(!map[key]) map[key]={largo:p, ancho:bw, alto:c.h, n:0};
-      map[key].n++;
-    }); });
+    var bandas = muroBandas(c.w), pats = [];
+    bandas.forEach(function(bw, bi){
+      // cada banda de profundidad se trabа con la contigua (desfase alterno)
+      var off = (c.offset !== (bi%2===1)), pat = muroTramo(L, off);
+      pats.push(pat);
+      pat.forEach(function(p){
+        var key=p+'|'+bw+'|'+c.h;
+        if(!map[key]) map[key]={largo:p, ancho:bw, alto:c.h, n:0};
+        map[key].n++;
+      });
+    });
     granular += c.w * c.h;
-    filas.push({course:idx+1, w:c.w, h:c.h, offset:c.offset, pat:pat, bandas:bandas});
+    filas.push({course:idx+1, w:c.w, h:c.h, offset:c.offset, pat:pats[0], pats:pats, bandas:bandas});
   });
   granular *= L;
   var piezas = Object.keys(map).map(function(k){return map[k];})
@@ -231,7 +236,8 @@ function renderMuroResult(H, L, ancho, res){
   res.innerHTML =
     '<div class="card">'+
       '<div class="card-hdr"><div class="card-title"><i class="ti '+(esc?'ti-building-bridge':'ti-wall')+'"></i> '+titulo+'</div>'+
-        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">'+badge+'</span>'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge b-steel">'+badge+'</span>'+
+        '<button class="btn btn-outline btn-sm" onclick="planoFilas('+H+','+L+','+anchoArg+')"><i class="ti ti-stack-2"></i> Plano por hiladas</button>'+
         '<button class="btn btn-outline btn-sm" onclick="fichaSingle('+H+','+L+','+anchoArg+')"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
       despiece+ notaRedondeo+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular</span> '+

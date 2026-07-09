@@ -178,3 +178,40 @@ function fichaTramos(){
     '</div>';
   fichaOpen(sheet, 'ficha-muro-tramos');
 }
+
+// ── PLANO POR HILADAS (cómo va cada fila por dentro, con las bandas de profundidad) ──
+// Vista en planta (desde arriba) de una hilada: largo → , profundidad ↓; bandas trabadas.
+function croquisPlantaHilada(c, L){
+  const xs=Math.max(4, Math.min(18, 720/L)), ys=24, gap=1;
+  const w=c.w, Wpx=L*xs, Dpx=w*ys, padL=8,padT=8,padR=8,padB=6;
+  const vbW=padL+Wpx+padR, vbH=padT+Dpx+padB; let out='';
+  const bandas=muroBandas(w); let z=0;
+  bandas.forEach(function(bw,bi){
+    const off=(c.offset!==(bi%2===1)); let x=0; const y=padT+z*ys;
+    muroTramo(L,off).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p);
+      out+='<rect x="'+(padL+x*xs).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(bw*ys-gap).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>';
+      x+=p;
+    });
+    z+=bw;
+  });
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),740)+'" style="max-width:100%;background:#fff" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta de la hilada">'+out+'</svg>';
+}
+function planoFilas(H, L, ancho){
+  const d=muroDespiece(H, L, (ancho!=null?ancho:(H<2?0.5:null)));
+  const fmtm=x=>String(x).replace('.',',');
+  const secs=d.filas.slice().reverse().map(function(f){
+    const cnt={}; f.bandas.forEach(function(bw,bi){ const off=(f.offset!==(bi%2===1)); muroTramo(L,off).forEach(function(p){ const k=p+'|'+bw; cnt[k]=(cnt[k]||0)+1; }); });
+    const lista=Object.keys(cnt).sort().map(function(k){ const pp=k.split('|'); return fmtm(+pp[0])+'×'+fmtm(+pp[1])+'×'+fmtm(f.h)+' m: <strong>'+cnt[k]+'</strong>'; }).join(' &nbsp;·&nbsp; ');
+    return '<div class="fk-sec"><h2><i class="ti ti-layers-subtract"></i> Hilada '+f.course+(f.course===1?' (base)':'')+' · ancho '+fmtm(f.w)+' m · alto '+fmtm(f.h)+' m</h2>'+
+      '<div class="dim" style="font-size:11px;margin-bottom:6px;color:#64748b">Planta (desde arriba): largo →, profundidad ↓. Bandas trabadas entre sí.</div>'+
+      '<div class="fk-draw">'+croquisPlantaHilada({w:f.w,h:f.h,offset:f.offset}, L)+'</div>'+
+      '<div style="font-size:12px;margin-top:6px;color:#334155">'+lista+'</div></div>';
+  }).join('');
+  const sheet=fichaHead('Plano por hiladas · muro '+fmtm(H)+' m × '+fnum(L)+' m',
+      'Cómo va cada fila por dentro (bandas de profundidad incluidas) · de arriba abajo')+
+    '<div class="fk-body">'+
+      '<div class="fk-sec"><h2><i class="ti ti-info-circle"></i> Cómo leerlo</h2><div style="font-size:12.5px;color:#334155">Una lámina por hilada, de la más alta a la base. Cada lámina es la <strong>vista en planta</strong> (desde arriba) de esa fila: el largo del muro en horizontal y la profundidad (ancho) en vertical, con las <strong>bandas interiores</strong> que no se ven en alzado. Los colores son la medida de la pieza (azul 2 m · verde 1,5 m · ámbar 1 m).</div></div>'+
+      secs+ fichaNota()+
+    '</div>';
+  fichaOpen(sheet, 'plano-hiladas-'+fmtm(H)+'m');
+}
