@@ -355,8 +355,9 @@ function tramoTogglePerfil(){
   if(sel && w) w.style.display = (sel.value==='esc') ? '' : 'none';
 }
 
-// Escalonado por cotas: muro CONTINUO. Soleras (hiladas) largas y continuas; el muro
-// baja de 0,5 en 0,5 y los gaviones de 0,5 m encajan (traban) un peldaño con el siguiente.
+// Escalonado por cotas: muro CONTINUO trabado. Cimentación (base) con floor y coronación
+// con ceil sobre la rejilla de 0,5 → la altura oscila 3/3,5 y sólo hace falta un 0,5 por
+// transición. Se cuenta pieza a pieza como se traba (aparecen 1 m de remate = 1×1×1).
 function generarPorCotas(){
   const res=document.getElementById('calc-result');
   const cMin=parseFloat(document.getElementById('ct-min').value);
@@ -367,61 +368,69 @@ function generarPorCotas(){
   if(!(L>0)||!(H>0)||isNaN(cMin)||isNaN(cMax)){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-mountain"></i><p>Rellena cota mín/máx, longitud y altura de muro</p></div>'; return; }
   const esc=0.5, cell=2, N=Math.max(1, Math.round(L/cell));
   const desnivel=Math.abs(cMax-cMin);
-  const drop=f=>{ if(sent==='sube')return desnivel*(1-f); if(sent==='valle')return desnivel*(1-Math.abs(2*f-1)); if(sent==='monte')return desnivel*Math.abs(2*f-1); return desnivel*f; };
-  // cota de cimentación por columna (cada 2 m), cuantizada a 0,5 → soleras largas
-  let base=[]; for(let j=0;j<N;j++) base.push(-Math.round(drop((j+0.5)/N)/esc)*esc);
-  const minB=Math.min.apply(null,base); base=base.map(b=>b-minB);
-  const fb=base.map(b=>Math.ceil(b-1e-6)), ft=base.map(b=>Math.floor(b+H+1e-6));
-  const maxTop=Math.max.apply(null, base.map(b=>b+H));
-  // despiece cara frontal: hiladas completas (2×1×1) + medios de encaje (2×1×0,5)
-  let cB=0,cH=0;
-  for(let y=0;y<Math.round(maxTop);y++) for(let j=0;j<N;j++) if(fb[j]<=y&&y<ft[j]) cB++;
-  for(let j=0;j<N;j++){ if(base[j]<fb[j]-1e-6) cH++; if(ft[j]<base[j]+H-1e-6) cH++; }
-  const total=cB+cH, granular=cB*2+cH*1;
-  // tramos (runs de igual cota) para 3D y ficha
-  const tramos=[]; let j=0;
-  while(j<N){ let k=j; while(k<N && Math.abs(base[k]-base[j])<1e-9) k++; const nb=(k<N)?base[k]:base[j]; tramos.push({L:(k-j)*cell, H:H, ancho:null, desnivel:base[j]-nb}); j=k; }
-  window.__muroTramos={tramos:tramos, perfil:'esc'};
+  const terr=f=>{ if(sent==='sube')return desnivel*f; if(sent==='valle')return desnivel*(1-Math.abs(2*f-1)); if(sent==='monte')return desnivel*Math.abs(2*f-1); return desnivel*(1-f); };
+  let base=[], crown=[];
+  for(let j=0;j<N;j++){ const t=terr((j+0.5)/N); base.push(Math.floor(t/esc+1e-6)*esc); crown.push(Math.ceil((t+H)/esc-1e-6)*esc); }
+  const minB=Math.min.apply(null,base); base=base.map(b=>b-minB); crown=crown.map(c=>c-minB);
+  const m=porCotasModelo(base, crown, cell, N);   // conteo pieza a pieza + volumen
   const fmtm=x=>String(x).replace('.',',');
+  // tramos (runs de igual base) para 3D y ficha
+  const tramos=[]; let j=0;
+  while(j<N){ let k=j; while(k<N && Math.abs(base[k]-base[j])<1e-9) k++; const nb=(k<N)?base[k]:base[j]; tramos.push({L:(k-j)*cell, H:crown[j]-base[j], ancho:null, desnivel:base[j]-nb}); j=k; }
+  window.__muroTramos={tramos:tramos, perfil:'esc'};
 
+  const filaDesp = m.piezas.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
   res.innerHTML =
     '<div class="card">'+
-      '<div class="card-hdr"><div class="card-title"><i class="ti ti-mountain"></i> Muro continuo por cotas · '+fmtN(L)+' m · escalón 0,5 m</div>'+
-        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">desnivel '+fmtm(desnivel)+' m · '+tramos.length+' soleras</span>'+
+      '<div class="card-hdr"><div class="card-title"><i class="ti ti-mountain"></i> Muro continuo por cotas · '+fmtN(L)+' m · altura '+fmtm(H)+' m (encaje 0,5)</div>'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge b-steel">desnivel '+fmtm(desnivel)+' m · escalón 0,5 m</span>'+
         '<button class="btn btn-outline btn-sm" onclick="fichaTramos()"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
-      '<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+
-        '<tr><td>Gavión <strong>2 m</strong></td><td>2 × 1 × 1 m</td><td class="r mono" style="font-weight:600">'+fmtN(cB)+'</td></tr>'+
-        (cH?'<tr><td>Gavión <strong>2 m (½)</strong></td><td>2 × 1 × 0,5 m</td><td class="r mono" style="font-weight:600">'+fmtN(cH)+'</td></tr>':'')+
-        '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones (cara frontal)</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr>'+
+      '<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+filaDesp+
+        '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones (cara frontal)</td><td class="r mono" style="font-weight:700">'+fmtN(m.total)+'</td></tr>'+
       '</tbody></table>'+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular (cara 1 m ancho)</span> '+
-        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+fmtN(granular)+' m³</strong></div>'+
+        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+fmtN(m.granular)+' m³</strong></div>'+
     '</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado continuo (trabado)</div>'+
       '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotas(base, H, cell)+
-      '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> 2×1×1 (1 m alto) &nbsp; '+
-      '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> 2×1×0,5 (encaje/traba)</div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotas(base, crown, cell)+
+      '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> 1 m alto (2/1 m) &nbsp; '+
+      '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> 0,5 m alto (encaje/traba)</div>'+
     '</div></div>';
 }
 
-// Alzado continuo por cotas: hiladas continuas (soleras) trabadas; los 0,5 también traban
-function croquisPorCotas(base, H, cell){
+// Recorre el muro por hiladas (fulls a la rejilla entera + medios de encaje) y cuenta las
+// piezas EXACTAS como se traban (2 m y 1 m de remate, en alto 1 m y 0,5 m).
+function porCotasModelo(base, crown, cell, N){
+  const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
+  const maxTop=Math.max.apply(null,crown);
+  const cnt={};
+  const add=(x0,x1,alto,off)=>{ muroTramo(x1-x0, off).forEach(p=>{ const k=p+'|'+alto; cnt[k]=(cnt[k]||0)+1; }); };
+  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; add(j*cell,k*cell,1,(Math.floor(y+1e-6)%2===1)); j=k; } else j++; } }
+  // los medios (0,5) traban en vertical por el propio medio metro → se tabican con 2 m (sin desfase, sin piezas de 1 m)
+  const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; add(j*cell,k*cell,0.5,false); j=k; } else j++; } };
+  halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
+  halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
+  const piezas=Object.keys(cnt).map(k=>{ const p=k.split('|'); return {largo:+p[0], alto:+p[1], n:cnt[k]}; })
+    .sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
+  let vol=0, hMin=1e9, hMax=0; for(let j=0;j<N;j++){ const h=crown[j]-base[j]; vol+=h*cell; hMin=Math.min(hMin,h); hMax=Math.max(hMax,h); }
+  return { piezas:piezas, total:piezas.reduce((s,p)=>s+p.n,0), granular:vol, hMin:hMin, hMax:hMax };
+}
+
+// Alzado continuo por cotas: hiladas continuas trabadas; base (floor) y coronación (ceil)
+function croquisPorCotas(base, crown, cell){
   const N=base.length;
-  const fb=base.map(b=>Math.ceil(b-1e-6)), ft=base.map(b=>Math.floor(b+H+1e-6));
-  const maxTop=Math.max.apply(null, base.map(b=>b+H)), Lm=N*cell;
+  const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
+  const maxTop=Math.max.apply(null,crown), Lm=N*cell;
   const xs=Math.max(2, Math.min(14, 900/Lm)), ys=Math.max(8, Math.min(26, 200/maxTop));
   const padL=16,padR=16,padT=14,padB=28, vbW=padL+Lm*xs+padR, vbH=padT+maxTop*ys+padB, groundY=padT+maxTop*ys;
   const X=xm=>padL+xm*xs, Y=ym=>groundY-ym*ys; let out='';
   const piece=(xm,ym,wm,hm,f,s)=>'<rect x="'+X(xm).toFixed(1)+'" y="'+Y(ym+hm).toFixed(1)+'" width="'+(wm*xs).toFixed(1)+'" height="'+(hm*ys).toFixed(1)+'" fill="'+f+'" stroke="'+s+'" stroke-width="0.5"/>';
-  function band(x0,x1,ym,hm,f,s){ const off=(Math.floor(ym+1e-6)%2===1); let x=x0; if(off&&x1-x0>=1){ out+=piece(x,ym,1,hm,f,s); x+=1; } while(x+2<=x1+1e-6){ out+=piece(x,ym,2,hm,f,s); x+=2; } if(x<x1-1e-6) out+=piece(x,ym,x1-x,hm,f,s); }
-  // hiladas completas de 1 m como bandas continuas (trabadas)
-  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ft[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ft[k])k++; band(j*cell,k*cell,y,1,'#3b82f6','#1d4ed8'); j=k; } else j++; } }
-  // medios (0,5) de encaje, también como bandas continuas trabadas (abajo y arriba)
-  const halfBands=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; band(j*cell,k*cell,v,0.5,'#f59e0b','#b45309'); j=k; } else j++; } };
+  function band(x0,x1,ym,hm,f,s,offArg){ const off=(offArg!==undefined)?offArg:(Math.floor(ym+1e-6)%2===1); let x=x0; if(off&&x1-x0>=1){ out+=piece(x,ym,1,hm,f,s); x+=1; } while(x+2<=x1+1e-6){ out+=piece(x,ym,2,hm,f,s); x+=2; } if(x<x1-1e-6) out+=piece(x,ym,x1-x,hm,f,s); }
+  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; band(j*cell,k*cell,y,1,'#3b82f6','#1d4ed8'); j=k; } else j++; } }
+  const halfBands=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; band(j*cell,k*cell,v,0.5,'#f59e0b','#b45309',false); j=k; } else j++; } };
   halfBands(j=>base[j], j=>base[j]<fb[j]-1e-6);
-  halfBands(j=>ft[j],   j=>ft[j]<base[j]+H-1e-6);
-  // terreno
+  halfBands(j=>ct[j],   j=>ct[j]<crown[j]-1e-6);
   let gp=''; for(let j=0;j<N;j++){ gp+=(j?'L':'M')+X(j*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' L'+X((j+1)*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' '; }
   out+='<path d="'+gp+'" fill="none" stroke="#8a6d3b" stroke-width="1.4"/>';
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),900)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado continuo del muro por cotas">'+out+'</svg>';
