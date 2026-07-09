@@ -136,7 +136,7 @@ function renderCalculador(){
           '<div class="field" style="margin:0"><label>Longitud (m)</label><input type="number" id="ct-long" min="1" step="0.5" placeholder="Ej. 80"></div>'+
           '<div class="field" style="margin:0"><label>Altura muro (m)</label><input type="number" id="ct-alt" min="0.5" step="0.5" placeholder="Ej. 3"></div>'+
           '<div class="field" style="margin:0"><label>Escalón (m)</label><select id="ct-esc"><option value="1">1 m</option><option value="0.5">0,5 m</option></select></div>'+
-          '<div class="field" style="margin:0"><label>Sentido</label><select id="ct-sent"><option value="baja">Solo baja</option><option value="valle">Baja y sube (valle)</option><option value="monte">Sube y baja (monte)</option></select></div>'+
+          '<div class="field" style="margin:0"><label>Sentido</label><select id="ct-sent"><option value="baja">Solo baja</option><option value="sube">Solo sube</option><option value="valle">Baja y sube (valle)</option><option value="monte">Sube y baja (monte)</option></select></div>'+
           '<button class="btn btn-primary btn-sm" onclick="generarPorCotas()"><i class="ti ti-wand"></i> Generar</button>'+
         '</div>'+
       '</div>'+
@@ -368,6 +368,7 @@ function generarPorCotas(){
   // secuencia de desniveles según sentido (+ baja el terreno, − sube)
   let drops=[];
   if(sent==='baja'){ for(let i=0;i<nDrop;i++) drops.push(esc); drops.push(0); }
+  else if(sent==='sube'){ for(let i=0;i<nDrop;i++) drops.push(-esc); drops.push(0); }
   else { const s1=(sent==='valle')?esc:-esc; for(let i=0;i<nDrop;i++) drops.push(s1); for(let i=0;i<nDrop;i++) drops.push(-s1); drops.push(0); }
   const n=drops.length;
   // repartir L en peldaños de igual longitud (múltiplos de 0,5), cuadrando el último
