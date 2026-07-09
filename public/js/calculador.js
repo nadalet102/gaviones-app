@@ -433,6 +433,10 @@ function croquisPorCotas(base, crown, cell){
   halfBands(j=>ct[j],   j=>ct[j]<crown[j]-1e-6);
   let gp=''; for(let j=0;j<N;j++){ gp+=(j?'L':'M')+X(j*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' L'+X((j+1)*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' '; }
   out+='<path d="'+gp+'" fill="none" stroke="#8a6d3b" stroke-width="1.4"/>';
+  // rasante (calle): línea recta de punta a punta = altura del muro a cubrir
+  const rL=crown[0], rR=crown[N-1];
+  out+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(rL).toFixed(1)+'" x2="'+X(Lm).toFixed(1)+'" y2="'+Y(rR).toFixed(1)+'" stroke="#dc2626" stroke-width="2"/>';
+  out+='<text x="'+X(Lm/2).toFixed(1)+'" y="'+(Y((rL+rR)/2)-4).toFixed(1)+'" font-size="10" fill="#dc2626" text-anchor="middle" font-family="system-ui">rasante (calle)</text>';
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado continuo del muro por cotas">'+out+'</svg>';
 }
 
