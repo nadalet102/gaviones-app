@@ -263,16 +263,16 @@ function renderMuroResult(H, L, ancho, res){
 // ── CROQUIS UNIFICADOS (aceptan hiladas: ancho y alto variables) ──
 // Alzado de la cara (trabado): largo × alto, cada hilada con su alto (0,5 el remate)
 function croquisCaraC(courses, L){
-  var uW=Math.max(6, Math.min(26, 640/L)), pxM=22, gap=1.5;
   var H=courses.reduce(function(s,c){return s+c.h;},0);
-  var w=Math.ceil(L*uW), hpx=H*pxM, rects='', yAcc=0;
+  var sc=Math.max(12, Math.min(30, 220/H)), gap=1.5;   // MISMA escala X/Y (proporción real)
+  var w=Math.ceil(L*sc), hpx=H*sc, rects='', yAcc=0;
   courses.forEach(function(c){
-    var chh=c.h*pxM, y=hpx-(yAcc+c.h)*pxM, x=0;
-    muroTramo(L, c.offset).forEach(function(p){ var pw=p*uW, col=muroColorPieza(p);
+    var chh=c.h*sc, y=hpx-(yAcc+c.h)*sc, x=0;
+    muroTramo(L, c.offset).forEach(function(p){ var pw=p*sc, col=muroColorPieza(p);
       rects+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(chh-gap).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; x+=pw; });
     yAcc+=c.h;
   });
-  return '<svg viewBox="0 0 '+w+' '+Math.ceil(hpx)+'" width="'+Math.min(w,660)+'" style="max-width:100%;border:1px solid var(--border);border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Trabado de la cara">'+rects+'</svg>';
+  return '<svg viewBox="0 0 '+w+' '+Math.ceil(hpx)+'" width="'+w+'" height="'+Math.ceil(hpx)+'" style="display:block;border:1px solid var(--border);border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Trabado de la cara">'+rects+'</svg>';
 }
 // Sección transversal (ancho × alto): frente a la izquierda, escalones al terreno
 function croquisSeccionC(courses){
@@ -422,7 +422,7 @@ function croquisPorCotas(base, crown, cell){
   const N=base.length;
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), Lm=N*cell;
-  const xs=Math.max(2, Math.min(14, 900/Lm)), ys=Math.max(8, Math.min(26, 200/maxTop));
+  const sc=Math.max(10, Math.min(22, 200/maxTop)), xs=sc, ys=sc;   // MISMA escala X/Y (proporción real)
   const padL=16,padR=16,padT=14,padB=28, vbW=padL+Lm*xs+padR, vbH=padT+maxTop*ys+padB, groundY=padT+maxTop*ys;
   const X=xm=>padL+xm*xs, Y=ym=>groundY-ym*ys; let out='';
   const piece=(xm,ym,wm,hm,f,s)=>'<rect x="'+X(xm).toFixed(1)+'" y="'+Y(ym+hm).toFixed(1)+'" width="'+(wm*xs).toFixed(1)+'" height="'+(hm*ys).toFixed(1)+'" fill="'+f+'" stroke="'+s+'" stroke-width="0.5"/>';
@@ -433,7 +433,7 @@ function croquisPorCotas(base, crown, cell){
   halfBands(j=>ct[j],   j=>ct[j]<crown[j]-1e-6);
   let gp=''; for(let j=0;j<N;j++){ gp+=(j?'L':'M')+X(j*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' L'+X((j+1)*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' '; }
   out+='<path d="'+gp+'" fill="none" stroke="#8a6d3b" stroke-width="1.4"/>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),900)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado continuo del muro por cotas">'+out+'</svg>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado continuo del muro por cotas">'+out+'</svg>';
 }
 
 // Piezas de un tramo (reutiliza el motor: prontuario si ≥2 m y sin ancho; recto en caso contrario)
@@ -488,7 +488,7 @@ function calcularTramos(){
 // Alzado longitudinal: la "escalera" del muro (bases alineadas, remates escalonados)
 function croquisPerfilLongitudinal(tramos){
   const totalL=tramos.reduce((s,t)=>s+t.L,0), hMax=tramos.reduce((m,t)=>Math.max(m,t.H),0);
-  const xs=Math.max(2, Math.min(16, 860/totalL)), ys=18;
+  const sc=Math.max(6, Math.min(20, 200/hMax)), xs=sc, ys=sc;   // MISMA escala X/Y
   const padL=16,padR=16,padT=18,padB=34;
   const Wpx=totalL*xs, Hpx=hMax*ys, vbW=padL+Wpx+padR, vbH=padT+Hpx+padB;
   const x0=padL, groundY=padT+Hpx; let out='', x=x0;
@@ -501,7 +501,7 @@ function croquisPerfilLongitudinal(tramos){
     x+=w;
   });
   out+='<line x1="'+x0+'" y1="'+groundY+'" x2="'+(x0+Wpx).toFixed(1)+'" y2="'+groundY+'" stroke="#334155" stroke-width="1.5"/>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),860)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal del muro">'+out+'</svg>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal del muro">'+out+'</svg>';
 }
 
 // Alzado "todo escalonado": base y remate bajan; los tramos contiguos se solapan y traban
@@ -512,7 +512,7 @@ function croquisPerfilEscalonado(tramos){
   let maxE=-1e9, minE=1e9;
   tramos.forEach((t,i)=>{ maxE=Math.max(maxE, base[i]+t.H); minE=Math.min(minE, base[i]); });
   const span=maxE-minE;
-  const xs=Math.max(2, Math.min(16, 840/totalL)), ys=Math.max(10, Math.min(24, 200/span));
+  const sc=Math.max(6, Math.min(20, 200/span)), xs=sc, ys=sc;   // MISMA escala X/Y
   const padL=18,padR=18,padT=16,padB=32;
   const Wpx=totalL*xs, vbW=padL+Wpx+padR, vbH=padT+span*ys+padB;
   const Y=e=>padT+(maxE-e)*ys;
@@ -540,7 +540,7 @@ function croquisPerfilEscalonado(tramos){
   }
   // línea de terreno bajo cada tramo
   let gx=x0; tramos.forEach(function(t,i){ const w=t.L*xs, by=Y(base[i]); out+='<line x1="'+gx.toFixed(1)+'" y1="'+by.toFixed(1)+'" x2="'+(gx+w).toFixed(1)+'" y2="'+by.toFixed(1)+'" stroke="#8a6d3b" stroke-width="1.4"/>'; gx+=w; });
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),860)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal escalonado del muro">'+out+'</svg>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal escalonado del muro">'+out+'</svg>';
 }
 
 // (croquisTrabado/croquisSeccion/croquis3D antiguos sustituidos por croquisCaraC/croquisSeccionC/croquis3DC)
