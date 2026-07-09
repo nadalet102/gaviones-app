@@ -44,22 +44,49 @@ function muroLeyenda(){
     chip(muroColorPieza(2),'2 m')+' &nbsp; '+chip(muroColorPieza(1.5),'1,5 m')+' &nbsp; '+chip(muroColorPieza(1),'1 m')+'</div>';
 }
 
-// Modelo del muro: filas por hilada (con sus bandas de ancho) + totales de piezas.
-function muroCalculo(H, L){
-  var perfil = muroPerfilAnchos(H);
-  var tot = { a1:{p2:0,p15:0,p1:0}, a05:{p2:0,p15:0,p1:0} };
-  var filas = [];
-  perfil.forEach(function(w, idx){
-    var course = idx+1, offset = (course % 2 === 0);
-    var nFull = Math.floor(w + 1e-9), hasHalf = (w - nFull) > 0.4;
-    var pat = muroTramo(L, offset);
-    for(var b=0;b<nFull;b++) pat.forEach(function(p){ muroAddPieza(tot.a1, p); });
-    if(hasHalf) pat.forEach(function(p){ muroAddPieza(tot.a05, p); });
-    filas.push({ course:course, ancho:w, nFull:nFull, hasHalf:hasHalf, pat:pat });
+// Hiladas del muro (abajo→arriba): ancho (w), alto (h) y offset de trabado de cada una.
+// Escalonado (ancho=null): usa el perfil del prontuario del entero SUPERIOR (ceil) y
+//   remata el 0,5 sobrante con una hilada de 0,5 m de alto (gaviones 200×100×50 y comb.).
+// Recto (ancho dado): hiladas de ancho uniforme.
+function muroCourses(H, ancho){
+  var courses=[], recto=(ancho!=null);
+  if(H < 1){ courses.push({w: recto?ancho:1, h:H}); }
+  else {
+    var full=Math.floor(H+1e-9), half=(H-full)>0.25;
+    var widths = recto ? null : muroPerfilAnchos(Math.ceil(H-1e-9));
+    for(var k=0;k<full;k++) courses.push({w: recto?ancho:widths[k], h:1});
+    if(half) courses.push({w: recto?ancho:widths[full], h:0.5});
+  }
+  courses.forEach(function(c,i){ c.offset=(i%2===1); });
+  return courses;
+}
+// Bandas de ancho de una hilada (en profundidad): 1 m + resto (0,5/0,3)
+function muroBandas(w){
+  if(w <= 0.55) return [w];
+  var n=Math.floor(w+1e-9), rem=w-n, b=[];
+  for(var i=0;i<n;i++) b.push(1);
+  if(rem>0.05) b.push(Math.round(rem*100)/100);
+  return b;
+}
+// Despiece unificado: piezas por (largo,ancho,alto), filas por hilada, granular, base.
+function muroDespiece(H, L, ancho){
+  var courses = muroCourses(H, ancho), map={}, filas=[], granular=0;
+  courses.forEach(function(c, idx){
+    var bandas = muroBandas(c.w), pat = muroTramo(L, c.offset);
+    bandas.forEach(function(bw){ pat.forEach(function(p){
+      var key=p+'|'+bw+'|'+c.h;
+      if(!map[key]) map[key]={largo:p, ancho:bw, alto:c.h, n:0};
+      map[key].n++;
+    }); });
+    granular += c.w * c.h;
+    filas.push({course:idx+1, w:c.w, h:c.h, offset:c.offset, pat:pat, bandas:bandas});
   });
-  tot.a1.total = tot.a1.p2+tot.a1.p15+tot.a1.p1;
-  tot.a05.total = tot.a05.p2+tot.a05.p15+tot.a05.p1;
-  return { perfil:perfil, filas:filas, tot:tot };
+  granular *= L;
+  var piezas = Object.keys(map).map(function(k){return map[k];})
+    .sort(function(a,b){ return (b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo); });
+  return { courses:courses, filas:filas, piezas:piezas, granular:granular,
+    base: courses.length?courses[0].w:0, total: piezas.reduce(function(s,p){return s+p.n;},0),
+    tipo: (ancho!=null||H<2)?'recto':'escalonado', designH: (ancho!=null||H<2)?null:Math.ceil(H-1e-9) };
 }
 
 let calcModo = 'simple';   // 'simple' = un muro · 'tramos' = muro en pendiente
@@ -68,10 +95,10 @@ function calcSetModo(m){ calcModo = m; renderCalculador(); }
 function renderCalculador(){
   const el = document.getElementById('calculador-container');
   if(!el) return;
-  const optsPront = Object.keys(MURO_TABLA).map(h => '<option value="'+h+'">'+h+' metros</option>').join('');
+  let optsPront=''; for(let k=4;k<=20;k++){ const H=k/2; optsPront+='<option value="'+H+'">'+String(H).replace('.',',')+' m</option>'; }
   const opts =
     '<optgroup label="Muros escalonados (prontuario)">'+optsPront+'</optgroup>'+
-    '<optgroup label="Muros bajos (rectos)"><option value="1">1 metro</option><option value="0.5">0,50 m</option><option value="0.3">0,30 m</option></optgroup>';
+    '<optgroup label="Muros bajos (rectos)"><option value="1.5">1,5 m</option><option value="1">1 metro</option><option value="0.5">0,50 m</option><option value="0.3">0,30 m</option></optgroup>';
   const btn = (m,txt) => '<button class="btn btn-sm '+(calcModo===m?'btn-primary':'btn-outline')+'" onclick="calcSetModo(\''+m+'\')">'+txt+'</button>';
   const toggle =
     '<div style="display:flex;gap:8px;margin-bottom:14px">'+btn('simple','<i class="ti ti-wall"></i> Un muro')+btn('tramos','<i class="ti ti-stairs"></i> Por tramos (pendiente)')+'</div>';
@@ -148,40 +175,44 @@ function calcularMuro(){
   const res = document.getElementById('calc-result');
   if(!h || L<=0){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-ruler-measure"></i><p>Introduce la longitud del muro</p></div>'; return; }
   const av = document.getElementById('calc-ancho') ? document.getElementById('calc-ancho').value : '';
-  if(h < 2 || !MURO_TABLA[h]) return calcularMuroRecto(h, L, parseFloat(av)||0.5, res);   // muros bajos rectos
-  if(h === 2 && av && av !== 'pront') return calcularMuroRecto(2, L, parseFloat(av)||0.5, res); // 2 m recto a 0,50
-  const t = MURO_TABLA[h];
-  const m = muroCalculo(h, L);
-  const granular = t.granular * L;
-  const totalGav = m.tot.a1.total + m.tot.a05.total;
+  if(h < 2) return renderMuroResult(h, L, parseFloat(av)||0.5, res);                          // muros bajos rectos
+  if(h === 2 && av && av !== 'pront') return renderMuroResult(2, L, parseFloat(av)||0.5, res); // 2 m recto a 0,50
+  return renderMuroResult(h, L, null, res);                                                    // escalonado (incl. ½ m)
+}
+// Compat: otros caminos aún llaman calcularMuroRecto
+function calcularMuroRecto(H, L, ancho, res){ return renderMuroResult(H, L, ancho, res); }
 
-  // ── Despiece resumen (tabla clara por pieza) ──
-  function filaDespiece(ancho, largo, n){
-    return n>0 ? '<tr><td>Gavión <strong>'+String(largo).replace('.',',')+' m</strong></td><td>'+ancho+' m de ancho</td><td class="r mono" style="font-weight:600">'+fmtN(n)+'</td></tr>' : '';
-  }
-  const despiece =
-    '<table class="tbl"><thead><tr><th>Pieza</th><th>Tipo</th><th class="r">Unidades</th></tr></thead><tbody>'+
-      filaDespiece('1', 2, m.tot.a1.p2)+ filaDespiece('1', 1.5, m.tot.a1.p15)+ filaDespiece('1', 1, m.tot.a1.p1)+
-      filaDespiece('0,5', 2, m.tot.a05.p2)+ filaDespiece('0,5', 1.5, m.tot.a05.p15)+ filaDespiece('0,5', 1, m.tot.a05.p1)+
-      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones</td><td class="r mono" style="font-weight:700">'+fmtN(totalGav)+'</td></tr>'+
-    '</tbody></table>';
+// Render unificado de un muro (escalonado o recto), alturas en pasos de 0,5 m
+function renderMuroResult(H, L, ancho, res){
+  const d = muroDespiece(H, L, ancho);
+  const esc = (d.tipo==='escalonado');
+  const fmtm = x=>String(x).replace('.',',');
+  const hStr=fmtm(H), aStr=(ancho!=null?fmtm(ancho):null), anchoArg=(ancho!=null?ancho:'null');
+  const nH = d.courses.length;
 
-  // ── Despiece por hilada (de arriba abajo, como se ve) ──
-  function patStr(pat){ return pat.map(function(p){return String(p).replace('.',',');}).join(' · '); }
-  const porFila = m.filas.slice().reverse().map(function(f){
-    const bandas = f.nFull+' de 1 m'+(f.hasHalf?' + 1 de 0,5 m':'');
-    return '<tr><td class="mono">'+f.course+(f.course===1?' (base)':'')+'</td><td>'+String(f.ancho).replace('.',',')+' m</td>'+
-      '<td class="mono">'+patStr(f.pat)+'</td><td class="dim">'+bandas+'</td></tr>';
+  const despiece = '<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+
+    d.piezas.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('')+
+    '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones</td><td class="r mono" style="font-weight:700">'+fmtN(d.total)+'</td></tr></tbody></table>';
+
+  const porFila = d.filas.slice().reverse().map(function(f){
+    const bandas = f.bandas.map(b=>fmtm(b)).join(' + ')+' m';
+    const patStr = f.pat.map(p=>fmtm(p)).join(' · ');
+    return '<tr><td class="mono">'+f.course+(f.course===1?' (base)':'')+'</td><td>'+fmtm(f.w)+' m'+(f.h!==1?(' <span class="dim">(h '+fmtm(f.h)+')</span>'):'')+'</td><td class="mono">'+patStr+'</td><td class="dim">'+bandas+'</td></tr>';
   }).join('');
+
+  const titulo = esc ? ('Muro '+hStr+' m alto × '+fmtN(L)+' m largo') : ('Muro recto '+hStr+' m alto × '+aStr+' m ancho × '+fmtN(L)+' m largo');
+  const badge = esc ? ('base ≈ '+fmtm(d.base)+' m · talud 5°') : (nH>1?('recto · '+nH+' hiladas'):'muro bajo · 1 hilada');
+  const notaRedondeo = (esc && d.designH && Math.abs(H-d.designH)>1e-9)
+    ? '<div class="card-body" style="padding:8px 16px 12px;font-size:11.5px;color:var(--amber)"><i class="ti ti-info-circle"></i> Altura '+hStr+' m: se aplica la sección del prontuario de '+d.designH+' m (redondeo al alza) rematada con una hilada de 0,5 m.</div>' : '';
 
   res.innerHTML =
     '<div class="card">'+
-      '<div class="card-hdr"><div class="card-title"><i class="ti ti-building-bridge"></i> Muro '+h+' m alto × '+fmtN(L)+' m largo</div>'+
-        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">base ≈ '+String(t.base).replace('.',',')+' m · talud 5°</span>'+
-        '<button class="btn btn-outline btn-sm" onclick="fichaSingle('+h+','+L+',null)"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
-      despiece+
+      '<div class="card-hdr"><div class="card-title"><i class="ti '+(esc?'ti-building-bridge':'ti-wall')+'"></i> '+titulo+'</div>'+
+        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">'+badge+'</span>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaSingle('+H+','+L+','+anchoArg+')"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
+      despiece+ notaRedondeo+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular</span> '+
-        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+fmtN(granular)+' m³</strong></div>'+
+        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+d.granular.toLocaleString('es-ES',{maximumFractionDigits:2})+' m³</strong></div>'+
     '</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-numbers"></i> Despiece por hilada</div>'+
       '<span class="dim" style="font-size:11px">de arriba abajo · patrón a lo largo</span></div>'+
@@ -189,118 +220,72 @@ function calcularMuro(){
     '</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-grid"></i> Trabado de la cara</div>'+
       '<span class="dim" style="font-size:11px">juntas desfasadas</span></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisTrabado(h, L)+muroLeyenda()+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisCaraC(d.courses, L)+muroLeyenda()+
     '</div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-box-model"></i> Sección y vista 3D</div>'+
-      '<button class="btn btn-primary btn-sm" onclick="muro3dSingle('+h+','+L+',null)"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dSingle('+H+','+L+','+anchoArg+')"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end">'+
-        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sección (ancho × alto)</div>'+croquisSeccion(h)+'</div>'+
-        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Vista 3D</div>'+croquis3D(h, L)+'</div>'+
+        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sección (ancho × alto)</div>'+croquisSeccionC(d.courses)+'</div>'+
+        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Vista 3D</div>'+croquis3DC(d.courses, L)+'</div>'+
       '</div>'+
     '</div>';
 }
 
-// ── MUROS RECTOS (ancho uniforme elegible): bajos <2 m (1 hilada) y 2 m (2 hiladas trabadas) ──
-function calcularMuroRecto(H, L, ancho, res){
-  const courseH = (H >= 1) ? 1 : H;              // alto de cada gavión/hilada
-  const nCourses = (H >= 1) ? Math.round(H) : 1; // nº de hiladas
-  const cnt = {p2:0,p15:0,p1:0};
-  for(var c=0;c<nCourses;c++) muroTramo(L, c%2===1).forEach(function(p){ muroAddPieza(cnt, p); });
-  const total = cnt.p2+cnt.p15+cnt.p1;
-  const granular = L * ancho * H;
-  const granStr = granular.toLocaleString('es-ES', {maximumFractionDigits:2});
-  const aStr = String(ancho).replace('.',','), hStr = String(H).replace('.',','), chStr = String(courseH).replace('.',',');
-  const subt = nCourses>1 ? ('muro recto · '+nCourses+' hiladas trabadas') : 'muro bajo · 1 hilada';
-
-  function fila(largo, n){
-    return n>0 ? '<tr><td>Gavión <strong>'+String(largo).replace('.',',')+' m</strong></td><td>'+String(largo).replace('.',',')+' × '+aStr+' × '+chStr+' m</td><td class="r mono" style="font-weight:600">'+fmtN(n)+'</td></tr>' : '';
-  }
-  const despiece =
-    '<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+
-      fila(2, cnt.p2)+ fila(1.5, cnt.p15)+ fila(1, cnt.p1)+
-      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr>'+
-    '</tbody></table>';
-
-  res.innerHTML =
-    '<div class="card">'+
-      '<div class="card-hdr"><div class="card-title"><i class="ti ti-wall"></i> Muro recto '+hStr+' m alto × '+aStr+' m ancho × '+fmtN(L)+' m largo</div>'+
-        '<div style="display:flex;gap:8px;align-items:center"><span class="badge b-steel">'+subt+'</span>'+
-        '<button class="btn btn-outline btn-sm" onclick="fichaSingle('+H+','+L+','+ancho+')"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
-      despiece+
-      '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular</span> '+
-        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+granStr+' m³</strong></div>'+
-    '</div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-grid"></i> '+(nCourses>1?'Trabado de la cara':'Reparto de piezas a lo largo')+'</div>'+
-      '<span class="dim" style="font-size:11px">'+(nCourses>1?'juntas desfasadas':'a lo largo')+'</span></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisRectoAlzado(L, nCourses, courseH)+muroLeyenda()+
-    '</div></div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-box-model"></i> Sección y vista 3D</div>'+
-      '<button class="btn btn-primary btn-sm" onclick="muro3dSingle('+H+','+L+','+ancho+')"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
-      '<div class="card-body" style="padding:14px 16px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end">'+
-        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sección (ancho × alto)</div>'+croquisSeccionBaja(ancho, H)+'</div>'+
-        '<div><div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Vista 3D</div>'+croquis3DRecto(L, ancho, H, nCourses, courseH)+'</div>'+
-      '</div>'+
-    '</div>';
-}
-
-// Alzado del muro recto: nCourses hiladas trabadas, cada una courseH de alto
-function croquisRectoAlzado(L, nCourses, courseH){
-  var uW=Math.max(6, Math.min(26, 640/L)), uH=Math.max(16, courseH*44), gap=1.5;
-  var w=Math.ceil(L*uW), hpx=nCourses*uH, rects='';
-  for(var c=0;c<nCourses;c++){
-    var y=(nCourses-1-c)*uH, x=0;
-    muroTramo(L, c%2===1).forEach(function(p){
-      var pw=p*uW, col=muroColorPieza(p);
-      rects+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(uH-gap)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>';
-      x+=pw;
-    });
-  }
-  return '<svg viewBox="0 0 '+w+' '+Math.ceil(hpx)+'" width="'+Math.min(w,660)+'" style="max-width:100%;border:1px solid var(--border);border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reparto de piezas a lo largo">'+rects+'</svg>';
-}
-
-// (compat) alzado de una sola fila
-function croquisBajoAlzado(L, alto){
-  var uW=Math.max(6, Math.min(26, 640/L)), uH=Math.max(16, alto*44), gap=1.5;
-  var w=Math.ceil(L*uW), x=0, rects='';
-  muroTramo(L, false).forEach(function(p){
-    var pw=p*uW, c=muroColorPieza(p);
-    rects+='<rect x="'+x.toFixed(1)+'" y="0" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(uH-gap)+'" fill="'+c.f+'" stroke="'+c.s+'" stroke-width="0.6"/>';
-    x+=pw;
+// ── CROQUIS UNIFICADOS (aceptan hiladas: ancho y alto variables) ──
+// Alzado de la cara (trabado): largo × alto, cada hilada con su alto (0,5 el remate)
+function croquisCaraC(courses, L){
+  var uW=Math.max(6, Math.min(26, 640/L)), pxM=22, gap=1.5;
+  var H=courses.reduce(function(s,c){return s+c.h;},0);
+  var w=Math.ceil(L*uW), hpx=H*pxM, rects='', yAcc=0;
+  courses.forEach(function(c){
+    var chh=c.h*pxM, y=hpx-(yAcc+c.h)*pxM, x=0;
+    muroTramo(L, c.offset).forEach(function(p){ var pw=p*uW, col=muroColorPieza(p);
+      rects+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(chh-gap).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; x+=pw; });
+    yAcc+=c.h;
   });
-  return '<svg viewBox="0 0 '+w+' '+Math.ceil(uH)+'" width="'+Math.min(w,660)+'" style="max-width:100%;border:1px solid var(--border);border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reparto de piezas a lo largo">'+rects+'</svg>';
+  return '<svg viewBox="0 0 '+w+' '+Math.ceil(hpx)+'" width="'+Math.min(w,660)+'" style="max-width:100%;border:1px solid var(--border);border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Trabado de la cara">'+rects+'</svg>';
 }
-
-// Sección del muro bajo: rectángulo ancho × alto
-function croquisSeccionBaja(ancho, alto){
-  var sc=64, padL=54, padR=40, padT=14, padB=26;
-  var Wpx=ancho*sc, Hpx=alto*sc, x0=padL, groundY=padT+Hpx;
-  var vbW=x0+Wpx+padR, vbH=Hpx+padT+padB, out='';
-  out+='<rect x="'+x0+'" y="'+padT+'" width="'+Wpx+'" height="'+Hpx+'" fill="#d8ccb0" stroke="#8a7a5c" stroke-width="1.2"/>';
-  out+='<line x1="'+x0+'" y1="'+(padT+Hpx/2)+'" x2="'+(x0+Wpx)+'" y2="'+(padT+Hpx/2)+'" stroke="#b3a67f" stroke-width="0.5" opacity="0.6"/>';
-  out+='<line x1="'+(x0-14)+'" y1="'+groundY+'" x2="'+(x0+Wpx+14)+'" y2="'+groundY+'" stroke="#9c855c" stroke-width="2"/>';
-  out+='<text x="'+(padL-38)+'" y="'+(padT+Hpx/2)+'" font-size="11" fill="#334155" text-anchor="middle" transform="rotate(-90 '+(padL-38)+' '+(padT+Hpx/2)+')">'+String(alto).replace('.',',')+' m</text>';
-  out+='<text x="'+(x0+Wpx/2)+'" y="'+(groundY+16)+'" font-size="11" fill="#334155" text-anchor="middle">'+String(ancho).replace('.',',')+' m</text>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),240)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sección del muro bajo">'+out+'</svg>';
+// Sección transversal (ancho × alto): frente a la izquierda, escalones al terreno
+function croquisSeccionC(courses){
+  var sc=34, padL=64, padR=64, padT=14, padB=26;
+  var base=Math.max.apply(null, courses.map(function(c){return c.w;}));
+  var H=courses.reduce(function(s,c){return s+c.h;},0);
+  var Wpx=base*sc, Hpx=H*sc, x0=padL, groundY=padT+Hpx, vbW=x0+Wpx+padR, vbH=Hpx+padT+padB, out='', yAcc=0;
+  courses.forEach(function(c){
+    var y=groundY-(yAcc+c.h)*sc, ww=c.w*sc, hh=c.h*sc;
+    out+='<rect x="'+x0+'" y="'+y.toFixed(1)+'" width="'+ww+'" height="'+(hh-1).toFixed(1)+'" fill="#d8ccb0" stroke="#8a7a5c" stroke-width="1"/>';
+    out+='<line x1="'+x0+'" y1="'+(y+hh/2).toFixed(1)+'" x2="'+(x0+ww)+'" y2="'+(y+hh/2).toFixed(1)+'" stroke="#b3a67f" stroke-width="0.5" opacity="0.6"/>';
+    if(c.w>1){ out+='<rect x="'+(x0+sc)+'" y="'+y.toFixed(1)+'" width="'+((c.w-1)*sc)+'" height="'+(hh-1).toFixed(1)+'" fill="#fcd34d" opacity="0.35"/>'; }
+    yAcc+=c.h;
+  });
+  out+='<line x1="'+(x0-16)+'" y1="'+groundY+'" x2="'+(x0+Wpx+16)+'" y2="'+groundY+'" stroke="#9c855c" stroke-width="2"/>';
+  out+='<text x="'+(padL-42)+'" y="'+(padT+Hpx/2)+'" font-size="11" fill="#334155" text-anchor="middle" transform="rotate(-90 '+(padL-42)+' '+(padT+Hpx/2)+')">FRENTE · '+String(H).replace('.',',')+' m</text>';
+  out+='<text x="'+(x0+Wpx+6)+'" y="'+(padT+12)+'" font-size="10" fill="#7c6a45">terreno</text>';
+  out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="11" fill="#334155">base '+String(base).replace('.',',')+' m</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),360)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sección del ancho del muro">'+out+'</svg>';
 }
-
-// Vista 3D isométrica del muro recto (caja de ancho uniforme, nCourses hiladas trabadas)
-function croquis3DRecto(L, ancho, H, nCourses, courseH){
+// Vista 3D isométrica del muro (hiladas con ancho/alto variables)
+function croquis3DC(courses, L){
   var dcos=0.58, dsin=0.32, padT=14, padR=26, padL=16, padB=24;
-  var scW=(640-padL-padR)/(L + ancho*dcos);
-  var scH=(240-padT-padB)/(H + ancho*dsin);
-  var sc=Math.max(6, Math.min(80, scW, scH));
-  var Lpx=L*sc, Hpx=H*sc, chpx=courseH*sc, dx=ancho*sc*dcos, dy=-ancho*sc*dsin;
-  var vbW=padL+Lpx+ancho*sc*dcos+padR, vbH=padT+Hpx+ancho*sc*dsin+padB;
-  var x0=padL, groundY=padT+Hpx+ancho*sc*dsin, topY=groundY-Hpx, out='';
-  out+='<polygon points="'+x0+','+groundY+' '+(x0+Lpx)+','+groundY+' '+(x0+Lpx+dx)+','+(groundY+dy)+' '+(x0+dx)+','+(groundY+dy)+'" fill="#e2d3b3" opacity="0.5"/>';
-  out+='<polygon points="'+x0+','+topY+' '+(x0+Lpx)+','+topY+' '+(x0+Lpx+dx)+','+(topY+dy)+' '+(x0+dx)+','+(topY+dy)+'" fill="#cabf9d" stroke="#8a7a5c" stroke-width="0.6"/>';
-  out+='<polygon points="'+(x0+Lpx)+','+topY+' '+(x0+Lpx)+','+(topY+Hpx)+' '+(x0+Lpx+dx)+','+(topY+Hpx+dy)+' '+(x0+Lpx+dx)+','+(topY+dy)+'" fill="#b3a67f" stroke="#8a7a5c" stroke-width="0.6"/>';
-  for(var c=0;c<nCourses;c++){
-    var rowTop=groundY-(c+1)*chpx, px=x0;
-    muroTramo(L, c%2===1).forEach(function(p){ var pw=p*sc, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+rowTop.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+chpx.toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.8"/>'; px+=pw; });
-  }
-  out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="10" fill="#7c6a45">'+fmtN(L)+' m largo · '+String(H).replace('.',',')+' m alto · '+String(ancho).replace('.',',')+' m ancho</text>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),640)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista 3D del muro recto">'+out+'</svg>';
+  var maxW=Math.max.apply(null, courses.map(function(c){return c.w;}));
+  var H=courses.reduce(function(s,c){return s+c.h;},0);
+  var scW=(640-padL-padR)/(L+maxW*dcos), scH=(300-padT-padB)/(H+maxW*dsin);
+  var sc=Math.max(4, Math.min(48, scW, scH));
+  var Lpx=L*sc, depthMax=maxW*sc;
+  var vbW=padL+Lpx+depthMax*dcos+padR, vbH=padT+H*sc+depthMax*dsin+padB;
+  var x0=padL, groundY=padT+H*sc+depthMax*dsin, out='';
+  var bw=courses[0].w*sc, bdx=bw*dcos, bdy=-bw*dsin;
+  out+='<polygon points="'+x0+','+groundY+' '+(x0+Lpx)+','+groundY+' '+(x0+Lpx+bdx)+','+(groundY+bdy)+' '+(x0+bdx)+','+(groundY+bdy)+'" fill="#e2d3b3" opacity="0.5"/>';
+  var yAcc=0;
+  courses.forEach(function(c){
+    var ww=c.w*sc, chpx=c.h*sc, dx=ww*dcos, dy=-ww*dsin, topY=groundY-(yAcc+c.h)*sc;
+    out+='<polygon points="'+x0+','+topY+' '+(x0+Lpx)+','+topY+' '+(x0+Lpx+dx)+','+(topY+dy)+' '+(x0+dx)+','+(topY+dy)+'" fill="#cabf9d" stroke="#8a7a5c" stroke-width="0.6"/>';
+    out+='<polygon points="'+(x0+Lpx)+','+topY+' '+(x0+Lpx)+','+(topY+chpx)+' '+(x0+Lpx+dx)+','+(topY+chpx+dy)+' '+(x0+Lpx+dx)+','+(topY+dy)+'" fill="#b3a67f" stroke="#8a7a5c" stroke-width="0.6"/>';
+    var px=x0; muroTramo(L, c.offset).forEach(function(p){ var pw=p*sc, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+topY.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+chpx.toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"/>'; px+=pw; });
+    yAcc+=c.h;
+  });
+  out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="10" fill="#7c6a45">'+fmtN(L)+' m largo · '+String(H).replace('.',',')+' m alto</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),640)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista 3D del muro">'+out+'</svg>';
 }
 
 // ── MURO POR TRAMOS (en pendiente): cada tramo con su largo y altura ──
@@ -315,9 +300,9 @@ function tramoAdd(){
   document.getElementById('tr-largo').focus();
 }
 
+function muroAlturaValida(H){ return H===0.3 || (H>=0.5 && H<=10 && Math.abs(H*2 - Math.round(H*2))<1e-9); }
 function parseTramos(text, defDrop){
   const tramos=[], errores=[];
-  const allowed={}; Object.keys(MURO_TABLA).forEach(k=>allowed[k]=1); [1,0.5,0.3].forEach(k=>allowed[k]=1);
   const dd = (defDrop>=0) ? defDrop : 1;
   (text||'').split(/\n/).forEach(function(line, i){
     const s=line.trim(); if(!s) return;
@@ -328,7 +313,7 @@ function parseTramos(text, defDrop){
     const L=nums[0], H=nums[1], ancho=nums.length>=3?nums[2]:null;
     const desnivel=dropNums.length ? dropNums[0] : dd;
     if(!(L>0)){ errores.push('Línea '+(i+1)+': largo inválido'); return; }
-    if(!allowed[H]){ errores.push('Línea '+(i+1)+': altura '+String(H).replace('.',',')+' no válida (0,3 / 0,5 / 1 / 2…10)'); return; }
+    if(!muroAlturaValida(H)){ errores.push('Línea '+(i+1)+': altura '+String(H).replace('.',',')+' no válida (0,3 o de 0,5 en 0,5 hasta 10)'); return; }
     if(ancho!=null && !(ancho===0.3||ancho===0.5||ancho===1)){ errores.push('Línea '+(i+1)+': ancho '+String(ancho).replace('.',',')+' no válido (0,3 / 0,5 / 1)'); return; }
     tramos.push({L:L, H:H, ancho:ancho, desnivel:desnivel, raw:s});
   });
@@ -343,26 +328,8 @@ function tramoTogglePerfil(){
 
 // Piezas de un tramo (reutiliza el motor: prontuario si ≥2 m y sin ancho; recto en caso contrario)
 function muroPiezasTramo(t){
-  const recto = (t.ancho!=null) || t.H<2;
-  if(!recto){
-    const m=muroCalculo(t.H, t.L), piezas=[];
-    [[1, m.tot.a1],[0.5, m.tot.a05]].forEach(function(b){
-      const a=b[0], acc=b[1];
-      if(acc.p2) piezas.push({largo:2, ancho:a, alto:1, n:acc.p2});
-      if(acc.p15) piezas.push({largo:1.5, ancho:a, alto:1, n:acc.p15});
-      if(acc.p1) piezas.push({largo:1, ancho:a, alto:1, n:acc.p1});
-    });
-    return {tipo:'escalonado', piezas:piezas, granular: MURO_TABLA[t.H].granular*t.L};
-  }
-  const ancho = t.ancho!=null ? t.ancho : 0.5;
-  const courseH = (t.H>=1)?1:t.H, nCourses=(t.H>=1)?Math.round(t.H):1;
-  const cnt={p2:0,p15:0,p1:0};
-  for(var c=0;c<nCourses;c++) muroTramo(t.L, c%2===1).forEach(function(p){ muroAddPieza(cnt,p); });
-  const piezas=[];
-  if(cnt.p2) piezas.push({largo:2, ancho:ancho, alto:courseH, n:cnt.p2});
-  if(cnt.p15) piezas.push({largo:1.5, ancho:ancho, alto:courseH, n:cnt.p15});
-  if(cnt.p1) piezas.push({largo:1, ancho:ancho, alto:courseH, n:cnt.p1});
-  return {tipo:'recto', piezas:piezas, granular: t.L*ancho*t.H};
+  const d = muroDespiece(t.H, t.L, (t.ancho!=null ? t.ancho : (t.H<2 ? 0.5 : null)));
+  return {tipo:d.tipo, piezas:d.piezas, granular:d.granular};
 }
 
 function calcularTramos(){
@@ -442,11 +409,12 @@ function croquisPerfilEscalonado(tramos){
   const x0=padL; let out='', x=x0; const xend=[];
   // gaviones por tramo (piezas 2/1,5/1 m coloreadas, trabadas por hilada)
   tramos.forEach(function(t,i){
-    const w=t.L*xs, nC=(t.H>=1)?Math.round(t.H):1, cH=(t.H>=1)?1:t.H;
-    for(let c=0;c<nC;c++){
-      const yTop=Y(base[i]+(c+1)*cH); let px=x;
-      muroTramo(t.L, c%2===1).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+(cH*ys).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; px+=pw; });
-    }
+    const w=t.L*xs; let yc=0;
+    muroCourses(t.H, t.ancho).forEach(function(c){
+      const yTop=Y(base[i]+yc+c.h); let px=x;
+      muroTramo(t.L, c.offset).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+(c.h*ys).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; px+=pw; });
+      yc+=c.h;
+    });
     out+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(Y(base[i]+t.H)-5).toFixed(1)+'" font-size="10" fill="#111827" text-anchor="middle">'+String(t.H).replace('.',',')+' m</text>';
     out+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(Y(minE)+14).toFixed(1)+'" font-size="9" fill="#64748b" text-anchor="middle">'+fmtN(t.L)+' m</text>';
     xend.push(x+w); x+=w;
@@ -464,61 +432,4 @@ function croquisPerfilEscalonado(tramos){
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),860)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perfil longitudinal escalonado del muro">'+out+'</svg>';
 }
 
-function croquisTrabado(H, L){
-  const uW = Math.max(6, Math.min(26, 640/L)), uH = 20, gap = 1.5;
-  const w = Math.ceil(L*uW), hpx = H*uH;
-  let rects = '';
-  for(let c=0;c<H;c++){
-    const pieces = muroTramo(L, c%2===1);
-    let x=0; const y=(H-1-c)*uH;
-    pieces.forEach(function(p){
-      const pw = p*uW, c = muroColorPieza(p);
-      rects += '<rect x="'+x.toFixed(1)+'" y="'+y+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(uH-gap)+'" fill="'+c.f+'" stroke="'+c.s+'" stroke-width="0.6"/>';
-      x += pw;
-    });
-  }
-  return '<svg viewBox="0 0 '+w+' '+hpx+'" width="'+Math.min(w,660)+'" style="max-width:100%;border:1px solid var(--border);border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Trabado de la cara">'+rects+'</svg>';
-}
-
-// Sección transversal (ancho × alto): frente a la izquierda, escalones al terreno
-function croquisSeccion(H){
-  var w=muroPerfilAnchos(H), sc=34, padL=64, padR=64, padT=14, padB=26;
-  var base=Math.max.apply(null,w), Wpx=base*sc, Hpx=H*sc;
-  var x0=padL, groundY=padT+Hpx, vbW=x0+Wpx+padR, vbH=Hpx+padT+padB, out='';
-  for(var i=0;i<H;i++){
-    var y=groundY-(i+1)*sc, ww=w[i]*sc;
-    out+='<rect x="'+x0+'" y="'+y+'" width="'+ww+'" height="'+(sc-1)+'" fill="#d8ccb0" stroke="#8a7a5c" stroke-width="1"/>';
-    out+='<line x1="'+x0+'" y1="'+(y+sc/2)+'" x2="'+(x0+ww)+'" y2="'+(y+sc/2)+'" stroke="#b3a67f" stroke-width="0.5" opacity="0.6"/>';
-    if(w[i]>1){ out+='<rect x="'+(x0+sc)+'" y="'+y+'" width="'+((w[i]-1)*sc)+'" height="'+(sc-1)+'" fill="#fcd34d" opacity="0.35"/>'; }
-  }
-  out+='<line x1="'+(x0-16)+'" y1="'+groundY+'" x2="'+(x0+Wpx+16)+'" y2="'+groundY+'" stroke="#9c855c" stroke-width="2"/>';
-  out+='<text x="'+(padL-42)+'" y="'+(padT+Hpx/2)+'" font-size="11" fill="#334155" text-anchor="middle" transform="rotate(-90 '+(padL-42)+' '+(padT+Hpx/2)+')">FRENTE · '+H+' m</text>';
-  out+='<text x="'+(x0+Wpx+6)+'" y="'+(padT+12)+'" font-size="10" fill="#7c6a45">terreno</text>';
-  out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="11" fill="#334155">base '+String(base).replace('.',',')+' m</text>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),360)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sección del ancho del muro">'+out+'</svg>';
-}
-
-// Vista 3D isométrica del muro completo escalonado (con malla, juntas y terreno)
-function croquis3D(H, L){
-  var w=muroPerfilAnchos(H), dcos=0.58, dsin=0.32;
-  var maxW=Math.max.apply(null,w), padT=14, padR=26, padL=16, padB=24;
-  // escala dinámica: encaja el muro completo (largo + profundidad) en el lienzo
-  var scW=(640-padL-padR)/(L + maxW*dcos);
-  var scH=(300-padT-padB)/(H + maxW*dsin);
-  var sc=Math.max(4, Math.min(26, scW, scH));
-  var Lpx=L*sc, depthMax=maxW*sc;
-  var vbW=padL+Lpx+depthMax*dcos+padR, vbH=padT+H*sc+depthMax*dsin+padB;
-  var x0=padL, groundY=padT+H*sc+depthMax*dsin, out='';
-  var bw=w[0]*sc, bdx=bw*dcos, bdy=-bw*dsin;
-  out+='<polygon points="'+x0+','+groundY+' '+(x0+Lpx)+','+groundY+' '+(x0+Lpx+bdx)+','+(groundY+bdy)+' '+(x0+bdx)+','+(groundY+bdy)+'" fill="#e2d3b3" opacity="0.5"/>';
-  for(var i=0;i<H;i++){
-    var ww=w[i]*sc, topY=groundY-(i+1)*sc, dx=ww*dcos, dy=-ww*dsin;
-    out+='<polygon points="'+x0+','+topY+' '+(x0+Lpx)+','+topY+' '+(x0+Lpx+dx)+','+(topY+dy)+' '+(x0+dx)+','+(topY+dy)+'" fill="#cabf9d" stroke="#8a7a5c" stroke-width="0.6"/>';
-    out+='<polygon points="'+(x0+Lpx)+','+topY+' '+(x0+Lpx)+','+(topY+sc)+' '+(x0+Lpx+dx)+','+(topY+sc+dy)+' '+(x0+Lpx+dx)+','+(topY+dy)+'" fill="#b3a67f" stroke="#8a7a5c" stroke-width="0.6"/>';
-    // cara frontal: una pieza por color de medida (2/1,5/1 m), según el trabado
-    var pat=muroTramo(L, (i+1)%2===0), px=x0;
-    pat.forEach(function(p){ var pw=p*sc, c=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+topY+'" width="'+pw.toFixed(1)+'" height="'+sc+'" fill="'+c.f+'" stroke="'+c.s+'" stroke-width="0.8"/>'; px+=pw; });
-  }
-  out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="10" fill="#7c6a45">muro completo · '+fmtN(L)+' m largo · '+H+' m alto</text>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),640)+'" style="max-width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista 3D del muro completo">'+out+'</svg>';
-}
+// (croquisTrabado/croquisSeccion/croquis3D antiguos sustituidos por croquisCaraC/croquisSeccionC/croquis3DC)

@@ -15,28 +15,17 @@ async function muro3dEnsure(){
 // Genera las cajas (gaviones) de un muro con origen en (0,0,0): x=largo, y=alto, z=profundidad
 function genWallBoxes(H, L, anchoOverride){
   const boxes=[];
-  const recto = (anchoOverride!=null) || H<2;
-  if(!recto){
-    const perfil = muroPerfilAnchos(H);
-    perfil.forEach(function(w, k){
-      const offset = (k%2===1);
-      const nFull = Math.floor(w+1e-9), hasHalf = (w-nFull)>0.4;
-      const bands=[]; for(var b=0;b<nFull;b++) bands.push(1); if(hasHalf) bands.push(0.5);
-      let z=0;
-      bands.forEach(function(bw){
-        let x=0;
-        muroTramo(L, offset).forEach(function(p){ boxes.push({x:x, y:k, z:z, l:p, a:bw, h:1, largo:p}); x+=p; });
-        z+=bw;
-      });
-    });
-  } else {
-    const ancho = anchoOverride!=null ? anchoOverride : 0.5;
-    const courseH = (H>=1)?1:H, nCourses = (H>=1)?Math.round(H):1;
-    for(var c=0;c<nCourses;c++){
+  const courses = muroCourses(H, anchoOverride!=null ? anchoOverride : (H<2 ? 0.5 : null));
+  let yAcc=0;
+  courses.forEach(function(c){
+    let z=0;
+    muroBandas(c.w).forEach(function(bw){
       let x=0;
-      muroTramo(L, c%2===1).forEach(function(p){ boxes.push({x:x, y:c*courseH, z:0, l:p, a:ancho, h:courseH, largo:p}); x+=p; });
-    }
-  }
+      muroTramo(L, c.offset).forEach(function(p){ boxes.push({x:x, y:yAcc, z:z, l:p, a:bw, h:c.h, largo:p}); x+=p; });
+      z+=bw;
+    });
+    yAcc+=c.h;
+  });
   return boxes;
 }
 

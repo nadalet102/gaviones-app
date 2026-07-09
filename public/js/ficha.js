@@ -99,22 +99,18 @@ function fichaNota(){
 
 // ── Ficha de un muro simple (escalonado prontuario o recto) ──
 function fichaSingle(H, L, ancho){
-  const r = muroPiezasTramo({L:L, H:H, ancho:ancho});
-  const totalGav = r.piezas.reduce((s,p)=>s+p.n,0);
+  const d = muroDespiece(H, L, (ancho!=null ? ancho : (H<2 ? 0.5 : null)));
+  const r = {tipo:d.tipo, piezas:d.piezas, granular:d.granular};
+  const totalGav = d.total;
   const areaMl = r.granular/L;
   const s = fichaSolic(H, areaMl, L);
   const esc = (r.tipo==='escalonado');
-  const hStr=String(H).replace('.',','), aBase = esc ? (MURO_TABLA[H].base) : (ancho!=null?ancho:0.5);
+  const hStr=String(H).replace('.',','), aBase = d.base;
 
-  let seccionBloque;
-  if(esc){
-    const perfil = muroPerfilAnchos(H);
-    const filasPerfil = perfil.map((w,i)=>'<tr><td>'+(i+1)+(i===0?' (base)':'')+'</td><td class="r">'+String(w).replace('.',',')+' m</td></tr>').reverse().join('');
-    seccionBloque = '<div class="fk-draw">'+croquisSeccion(H)+croquis3D(H, Math.min(L,8))+'</div>'+
-      '<table class="fk-tbl" style="margin-top:12px"><thead><tr><th>Hilada</th><th class="r">Ancho</th></tr></thead><tbody>'+filasPerfil+'</tbody></table>';
-  } else {
-    seccionBloque = '<div class="fk-draw">'+croquisSeccionBaja(ancho!=null?ancho:0.5, H)+'</div>';
-  }
+  const filasPerfil = d.courses.map((c,i)=>({c:c,i:i})).reverse()
+    .map(o=>'<tr><td>'+(o.i+1)+(o.i===0?' (base)':'')+'</td><td class="r">'+String(o.c.w).replace('.',',')+' m</td><td class="r">'+String(o.c.h).replace('.',',')+' m</td></tr>').join('');
+  const seccionBloque = '<div class="fk-draw">'+croquisSeccionC(d.courses)+croquis3DC(d.courses, Math.min(L,8))+'</div>'+
+    '<table class="fk-tbl" style="margin-top:12px"><thead><tr><th>Hilada</th><th class="r">Ancho</th><th class="r">Alto</th></tr></thead><tbody>'+filasPerfil+'</tbody></table>';
 
   const sheet =
     fichaHead('Muro de gaviones · '+hStr+' m de altura', (esc?'Sección escalonada según prontuario':'Muro recto de ancho uniforme')+' · longitud '+fnum(L)+' m')+
