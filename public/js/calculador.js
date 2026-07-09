@@ -135,7 +135,7 @@ function renderCalculador(){
           '<div class="field" style="margin:0"><label>Cota máx. (m)</label><input type="number" id="ct-max" step="0.1" placeholder="Ej. 106"></div>'+
           '<div class="field" style="margin:0"><label>Longitud (m)</label><input type="number" id="ct-long" min="1" step="0.5" placeholder="Ej. 80"></div>'+
           '<div class="field" style="margin:0"><label>Altura muro (m)</label><input type="number" id="ct-alt" min="0.5" step="0.5" placeholder="Ej. 3"></div>'+
-          '<div class="field" style="margin:0"><label>Escalón</label><select id="ct-esc"><option value="auto">Auto (peldaños largos)</option><option value="0.5">0,5 m</option><option value="1">1 m</option><option value="1.5">1,5 m</option><option value="2">2 m</option><option value="3">3 m</option></select></div>'+
+          '<div class="field" style="margin:0"><label>Escalón</label><select id="ct-esc"><option value="0.5" selected>0,5 m</option><option value="auto">Auto (peldaños largos)</option><option value="1">1 m</option><option value="1.5">1,5 m</option><option value="2">2 m</option><option value="3">3 m</option></select></div>'+
           '<div class="field" style="margin:0"><label>Sentido</label><select id="ct-sent"><option value="baja">Solo baja</option><option value="sube">Solo sube</option><option value="valle">Baja y sube (valle)</option><option value="monte">Sube y baja (monte)</option></select></div>'+
           '<button class="btn btn-primary btn-sm" onclick="generarPorCotas()"><i class="ti ti-wand"></i> Generar</button>'+
         '</div>'+
@@ -498,6 +498,7 @@ function croquisPerfilEscalonado(tramos){
   // gaviones por tramo (piezas 2/1,5/1 m coloreadas, trabadas por hilada)
   tramos.forEach(function(t,i){
     const w=t.L*xs; let yc=0;
+    // el desfase medio metro entre peldaños (escalón) ya traba las hiladas con el vecino
     muroCourses(t.H, t.ancho).forEach(function(c){
       const yTop=Y(base[i]+yc+c.h); let px=x;
       muroTramo(t.L, c.offset).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+(c.h*ys).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; px+=pw; });
