@@ -127,7 +127,20 @@ function renderCalculador(){
 
   const formTramos =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
-      '<div class="dim" style="font-size:12px;margin-bottom:10px">Un tramo por línea: <span class="mono">largo x alto</span> (opcional 3er nº = ancho recto; y <span class="mono">/ desnivel</span> = lo que baja al siguiente). Ej. <span class="mono">20 x 4</span>, <span class="mono">16 x 3 / 1</span>, <span class="mono">12 x 2 x 0.5 / 1</span>.</div>'+
+      '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;background:var(--bg2,#f8fafc)">'+
+        '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-mountain"></i> Generar escalonado por cotas</div>'+
+        '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Cimentación entre dos cotas de terreno; altura de muro constante. Calculo los peldaños y relleno los tramos.</div>'+
+        '<div class="frow3" style="gap:10px;align-items:flex-end;flex-wrap:wrap">'+
+          '<div class="field" style="margin:0"><label>Cota mín. (m)</label><input type="number" id="ct-min" step="0.1" placeholder="Ej. 100"></div>'+
+          '<div class="field" style="margin:0"><label>Cota máx. (m)</label><input type="number" id="ct-max" step="0.1" placeholder="Ej. 106"></div>'+
+          '<div class="field" style="margin:0"><label>Longitud (m)</label><input type="number" id="ct-long" min="1" step="0.5" placeholder="Ej. 80"></div>'+
+          '<div class="field" style="margin:0"><label>Altura muro (m)</label><input type="number" id="ct-alt" min="0.5" step="0.5" placeholder="Ej. 3"></div>'+
+          '<div class="field" style="margin:0"><label>Escalón (m)</label><select id="ct-esc"><option value="1">1 m</option><option value="0.5">0,5 m</option></select></div>'+
+          '<div class="field" style="margin:0"><label>Sentido</label><select id="ct-sent"><option value="baja">Solo baja</option><option value="valle">Baja y sube (valle)</option><option value="monte">Sube y baja (monte)</option></select></div>'+
+          '<button class="btn btn-primary btn-sm" onclick="generarPorCotas()"><i class="ti ti-wand"></i> Generar</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="dim" style="font-size:12px;margin-bottom:10px">O un tramo por línea: <span class="mono">largo x alto</span> (opcional 3er nº = ancho recto; y <span class="mono">/ desnivel</span> = lo que baja al siguiente). Ej. <span class="mono">20 x 4</span>, <span class="mono">16 x 3 / 1</span>, <span class="mono">12 x 2 x 0.5 / 1</span>.</div>'+
       '<div class="frow3" style="gap:10px;align-items:flex-end;margin-bottom:10px">'+
         '<div class="field" style="margin:0"><label>Perfil</label><select id="tr-perfil" onchange="tramoTogglePerfil()"><option value="base">Base corrida</option><option value="esc">Todo escalonado</option></select></div>'+
         '<div class="field" style="margin:0;display:none" id="tr-esc-wrap"><label>Escalón por defecto (m)</label><input type="number" id="tr-esc" min="0" step="0.5" value="1"></div>'+
@@ -318,7 +331,7 @@ function parseTramos(text, defDrop){
     const s=line.trim(); if(!s) return;
     const parts=s.replace(/,/g,'.').split('/');           // "/ desnivel" al final (opcional)
     const nums=(parts[0].match(/\d+(\.\d+)?/g)||[]).map(Number);
-    const dropNums=parts.length>1 ? (parts[1].match(/\d+(\.\d+)?/g)||[]).map(Number) : [];
+    const dropNums=parts.length>1 ? (parts[1].match(/-?\d+(\.\d+)?/g)||[]).map(Number) : [];  // desnivel puede ser negativo (sube)
     if(nums.length<2){ errores.push('Línea '+(i+1)+' ("'+s+'"): falta largo o alto'); return; }
     const L=nums[0], H=nums[1], ancho=nums.length>=3?nums[2]:null;
     const desnivel=dropNums.length ? dropNums[0] : dd;
@@ -334,6 +347,36 @@ function parseTramos(text, defDrop){
 function tramoTogglePerfil(){
   const sel=document.getElementById('tr-perfil'), w=document.getElementById('tr-esc-wrap');
   if(sel && w) w.style.display = (sel.value==='esc') ? '' : 'none';
+}
+
+// Genera tramos escalonados a partir de cotas: altura constante que escalona con el terreno
+function generarPorCotas(){
+  const res=document.getElementById('calc-result');
+  const cMin=parseFloat(document.getElementById('ct-min').value);
+  const cMax=parseFloat(document.getElementById('ct-max').value);
+  const L=parseFloat(document.getElementById('ct-long').value);
+  const H=parseFloat(document.getElementById('ct-alt').value);
+  const esc=parseFloat(document.getElementById('ct-esc').value)||1;
+  const sent=document.getElementById('ct-sent').value;
+  if(!(L>0)||!(H>0)||isNaN(cMin)||isNaN(cMax)){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-mountain"></i><p>Rellena cota mín/máx, longitud y altura de muro</p></div>'; return; }
+  const desnivel=Math.abs(cMax-cMin);
+  const setText = (txt, perfil)=>{ document.getElementById('tr-text').value=txt; document.getElementById('tr-perfil').value=perfil; document.getElementById('tr-esc').value=String(esc); tramoTogglePerfil(); calcularTramos(); };
+  const fmt = x=>String(Math.round(x*100)/100).replace('.',',');
+  // terreno casi plano → un solo tramo
+  if(desnivel < esc*0.5){ setText(fmt(L)+' x '+fmt(H), 'esc'); return; }
+  const nDrop=Math.max(1, Math.round(desnivel/esc));
+  // secuencia de desniveles según sentido (+ baja el terreno, − sube)
+  let drops=[];
+  if(sent==='baja'){ for(let i=0;i<nDrop;i++) drops.push(esc); drops.push(0); }
+  else { const s1=(sent==='valle')?esc:-esc; for(let i=0;i<nDrop;i++) drops.push(s1); for(let i=0;i<nDrop;i++) drops.push(-s1); drops.push(0); }
+  const n=drops.length;
+  // repartir L en peldaños de igual longitud (múltiplos de 0,5), cuadrando el último
+  let lp=Math.max(1, Math.round((L/n)*2)/2), lens=[], acc=0;
+  for(let i=0;i<n;i++){ lens.push(lp); acc+=lp; }
+  lens[n-1]=Math.max(1, Math.round((lens[n-1]+(L-acc))*2)/2);
+  const lines=[];
+  for(let i=0;i<n;i++){ let ln=fmt(lens[i])+' x '+fmt(H); if(Math.abs(drops[i])>1e-9) ln+=' / '+fmt(drops[i]); lines.push(ln); }
+  setText(lines.join('\n'), 'esc');
 }
 
 // Piezas de un tramo (reutiliza el motor: prontuario si ≥2 m y sin ancho; recto en caso contrario)
