@@ -135,7 +135,7 @@ function renderCalculador(){
           '<div class="field" style="margin:0"><label>Cota máx. (m)</label><input type="number" id="ct-max" step="0.1" placeholder="Ej. 106"></div>'+
           '<div class="field" style="margin:0"><label>Longitud (m)</label><input type="number" id="ct-long" min="1" step="0.5" placeholder="Ej. 80"></div>'+
           '<div class="field" style="margin:0"><label>Altura muro (m)</label><input type="number" id="ct-alt" min="0.5" step="0.5" placeholder="Ej. 3"></div>'+
-          '<div class="field" style="margin:0"><label>Escalón (m)</label><select id="ct-esc"><option value="1">1 m</option><option value="0.5">0,5 m</option></select></div>'+
+          '<div class="field" style="margin:0"><label>Escalón</label><select id="ct-esc"><option value="auto">Auto (peldaños largos)</option><option value="0.5">0,5 m</option><option value="1">1 m</option><option value="1.5">1,5 m</option><option value="2">2 m</option><option value="3">3 m</option></select></div>'+
           '<div class="field" style="margin:0"><label>Sentido</label><select id="ct-sent"><option value="baja">Solo baja</option><option value="sube">Solo sube</option><option value="valle">Baja y sube (valle)</option><option value="monte">Sube y baja (monte)</option></select></div>'+
           '<button class="btn btn-primary btn-sm" onclick="generarPorCotas()"><i class="ti ti-wand"></i> Generar</button>'+
         '</div>'+
@@ -349,35 +349,69 @@ function tramoTogglePerfil(){
   if(sel && w) w.style.display = (sel.value==='esc') ? '' : 'none';
 }
 
-// Genera tramos escalonados a partir de cotas: altura constante que escalona con el terreno
+// Genera tramos escalonados a partir de cotas: altura constante que escalona con el terreno.
+// Peldaños LARGOS y en múltiplos de 2 m (gaviones completos). Escalón "auto" o fijo.
 function generarPorCotas(){
   const res=document.getElementById('calc-result');
   const cMin=parseFloat(document.getElementById('ct-min').value);
   const cMax=parseFloat(document.getElementById('ct-max').value);
   const L=parseFloat(document.getElementById('ct-long').value);
   const H=parseFloat(document.getElementById('ct-alt').value);
-  const esc=parseFloat(document.getElementById('ct-esc').value)||1;
+  const escSel=document.getElementById('ct-esc').value;
   const sent=document.getElementById('ct-sent').value;
   if(!(L>0)||!(H>0)||isNaN(cMin)||isNaN(cMax)){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-mountain"></i><p>Rellena cota mín/máx, longitud y altura de muro</p></div>'; return; }
-  const desnivel=Math.abs(cMax-cMin);
-  const setText = (txt, perfil)=>{ document.getElementById('tr-text').value=txt; document.getElementById('tr-perfil').value=perfil; document.getElementById('tr-esc').value=String(esc); tramoTogglePerfil(); calcularTramos(); };
   const fmt = x=>String(Math.round(x*100)/100).replace('.',',');
-  // terreno casi plano → un solo tramo
-  if(desnivel < esc*0.5){ setText(fmt(L)+' x '+fmt(H), 'esc'); return; }
-  const nDrop=Math.max(1, Math.round(desnivel/esc));
+  const desnivel=Math.abs(cMax-cMin);
+  const PELDANO_OBJ = 15;   // longitud objetivo de peldaño (m) para el modo auto
+
+  function pintar(lines, esc){
+    document.getElementById('tr-text').value=lines.join('\n');
+    document.getElementById('tr-perfil').value='esc';
+    document.getElementById('tr-esc').value=String(esc);
+    tramoTogglePerfil(); calcularTramos();
+  }
+  // terreno casi plano → un solo tramo largo
+  if(desnivel < 0.25){ pintar([fmt(L)+' x '+fmt(H)], 1); return; }
+
+  // nº de escalones (nSteps) y escalón vertical
+  let esc, nSteps;
+  if(escSel==='auto'){
+    // elige el escalón (0,5..alt) cuyos peldaños queden lo más cerca del objetivo (largos)
+    const doble = (sent==='valle'||sent==='monte');
+    let best=null;
+    for(let e=0.5; e<=Math.min(H,4)+1e-9; e+=0.5){
+      const ns=Math.max(1, Math.round(desnivel/e));
+      const nPc=doble ? (2*ns+1) : (ns+1);
+      const peld=L/nPc;
+      const score=Math.abs(peld-PELDANO_OBJ) + (peld<4?100:0);   // penaliza peldaños diminutos
+      if(!best || score<best.score) best={esc:e, ns:ns, score:score};
+    }
+    esc=best.esc; nSteps=best.ns;
+  } else {
+    esc=parseFloat(escSel)||1;
+    nSteps=Math.max(1, Math.round(desnivel/esc));
+  }
+
   // secuencia de desniveles según sentido (+ baja el terreno, − sube)
   let drops=[];
-  if(sent==='baja'){ for(let i=0;i<nDrop;i++) drops.push(esc); drops.push(0); }
-  else if(sent==='sube'){ for(let i=0;i<nDrop;i++) drops.push(-esc); drops.push(0); }
-  else { const s1=(sent==='valle')?esc:-esc; for(let i=0;i<nDrop;i++) drops.push(s1); for(let i=0;i<nDrop;i++) drops.push(-s1); drops.push(0); }
-  const n=drops.length;
-  // repartir L en peldaños de igual longitud (múltiplos de 0,5), cuadrando el último
-  let lp=Math.max(1, Math.round((L/n)*2)/2), lens=[], acc=0;
-  for(let i=0;i<n;i++){ lens.push(lp); acc+=lp; }
-  lens[n-1]=Math.max(1, Math.round((lens[n-1]+(L-acc))*2)/2);
+  if(sent==='baja'){ for(let i=0;i<nSteps;i++) drops.push(esc); drops.push(0); }
+  else if(sent==='sube'){ for(let i=0;i<nSteps;i++) drops.push(-esc); drops.push(0); }
+  else { const s1=(sent==='valle')?esc:-esc; for(let i=0;i<nSteps;i++) drops.push(s1); for(let i=0;i<nSteps;i++) drops.push(-s1); drops.push(0); }
+  let nP=drops.length;
+  // no permitir peldaños < 2 m
+  const maxNP=Math.max(1, Math.floor(L/2));
+  if(nP>maxNP){ drops=drops.slice(0,maxNP); nP=maxNP; drops[nP-1]=0; }
+
+  // longitudes en múltiplos de 2 m (gaviones completos), repartiendo el resto
+  let lp=Math.max(2, Math.floor((L/nP)/2)*2);
+  const lens=new Array(nP).fill(lp);
+  let rem=Math.round((L-lp*nP)*2)/2, k=0;
+  while(rem>=2-1e-9){ lens[k%nP]+=2; rem-=2; k++; }
+  if(rem>0.01) lens[nP-1]=Math.round((lens[nP-1]+rem)*2)/2;   // resto < 2 m al último
+
   const lines=[];
-  for(let i=0;i<n;i++){ let ln=fmt(lens[i])+' x '+fmt(H); if(Math.abs(drops[i])>1e-9) ln+=' / '+fmt(drops[i]); lines.push(ln); }
-  setText(lines.join('\n'), 'esc');
+  for(let i=0;i<nP;i++){ let ln=fmt(lens[i])+' x '+fmt(H); if(Math.abs(drops[i])>1e-9) ln+=' / '+fmt(drops[i]); lines.push(ln); }
+  pintar(lines, esc);
 }
 
 // Piezas de un tramo (reutiliza el motor: prontuario si ≥2 m y sin ancho; recto en caso contrario)
