@@ -133,16 +133,12 @@ function renderCalculador(){
   const formTramos =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
       '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;background:var(--bg2,#f8fafc)">'+
-        '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-mountain"></i> Generar escalonado por cotas</div>'+
-        '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Cimentación entre dos cotas de terreno; altura de muro constante. Calculo los peldaños y relleno los tramos.</div>'+
-        '<div class="frow3" style="gap:10px;align-items:flex-end;flex-wrap:wrap">'+
-          '<div class="field" style="margin:0"><label>Cota mín. (m)</label><input type="number" id="ct-min" step="0.1" placeholder="Ej. 100"></div>'+
-          '<div class="field" style="margin:0"><label>Cota máx. (m)</label><input type="number" id="ct-max" step="0.1" placeholder="Ej. 106"></div>'+
-          '<div class="field" style="margin:0"><label>Longitud (m)</label><input type="number" id="ct-long" min="1" step="0.5" placeholder="Ej. 80"></div>'+
-          '<div class="field" style="margin:0"><label>Altura muro (m)</label><input type="number" id="ct-alt" min="0.5" step="0.5" placeholder="Ej. 3"></div>'+
-          '<div class="field" style="margin:0"><label>Escalón</label><select id="ct-esc"><option value="0.5" selected>0,5 m</option><option value="auto">Auto (peldaños largos)</option><option value="1">1 m</option><option value="1.5">1,5 m</option><option value="2">2 m</option><option value="3">3 m</option></select></div>'+
-          '<div class="field" style="margin:0"><label>Sentido</label><select id="ct-sent"><option value="baja">Solo baja</option><option value="sube">Solo sube</option><option value="valle">Baja y sube (valle)</option><option value="monte">Sube y baja (monte)</option></select></div>'+
-          '<button class="btn btn-primary btn-sm" onclick="generarPorCotas()"><i class="ti ti-wand"></i> Generar</button>'+
+        '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-mountain"></i> Generar por perfil (rasante + terreno)</div>'+
+        '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Da puntos <span class="mono">distancia cota</span> (uno por línea) de la <span style="color:#dc2626">rasante (calle, arriba)</span> y del <span style="color:#8a6d3b">terreno (cimentación, abajo)</span>. Trazo las dos líneas y relleno el hueco con gaviones (0,5 m, trabados).</div>'+
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'+
+          '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Rasante (calle) · dist cota</label><textarea id="tp-rasante" rows="4" placeholder="0 8&#10;88 12" style="width:100%;font-family:var(--mono,monospace);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea></div>'+
+          '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Terreno (cimentación) · dist cota</label><textarea id="tp-terreno" rows="4" placeholder="0 5&#10;44 3&#10;88 9" style="width:100%;font-family:var(--mono,monospace);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea></div>'+
+          '<button class="btn btn-primary btn-sm" onclick="generarPorPerfil()"><i class="ti ti-wand"></i> Generar</button>'+
         '</div>'+
       '</div>'+
       '<div class="dim" style="font-size:12px;margin-bottom:10px">O un tramo por línea: <span class="mono">largo x alto</span> (opcional 3er nº = ancho recto; y <span class="mono">/ desnivel</span> = lo que baja al siguiente). Ej. <span class="mono">20 x 4</span>, <span class="mono">16 x 3 / 1</span>, <span class="mono">12 x 2 x 0.5 / 1</span>.</div>'+
@@ -355,6 +351,62 @@ function tramoTogglePerfil(){
   if(sel && w) w.style.display = (sel.value==='esc') ? '' : 'none';
 }
 
+// ── POR PERFIL: rasante (arriba) + terreno (abajo) por puntos "distancia cota" ──
+function parsePerfil(text){
+  const pts=[];
+  (text||'').split(/\n/).forEach(function(l){ const s=l.trim(); if(!s) return; const n=(s.replace(/,/g,'.').match(/-?\d+(\.\d+)?/g)||[]).map(Number); if(n.length>=2) pts.push({d:n[0], c:n[1]}); });
+  pts.sort(function(a,b){return a.d-b.d;});
+  return pts;
+}
+function interpPerfil(pts, x){
+  if(!pts.length) return 0;
+  if(x<=pts[0].d) return pts[0].c;
+  if(x>=pts[pts.length-1].d) return pts[pts.length-1].c;
+  for(var i=1;i<pts.length;i++){ if(x<=pts[i].d){ const a=pts[i-1],b=pts[i]; return a.c+(b.c-a.c)*(x-a.d)/(b.d-a.d); } }
+  return pts[pts.length-1].c;
+}
+function generarPorPerfil(){
+  const res=document.getElementById('calc-result');
+  const ras=parsePerfil(document.getElementById('tp-rasante').value);
+  const ter=parsePerfil(document.getElementById('tp-terreno').value);
+  if(ras.length<2 || ter.length<2){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-mountain"></i><p>Da al menos 2 puntos "distancia cota" en la rasante y en el terreno</p></div>'; return; }
+  const cell=2, L=Math.max(ras[ras.length-1].d, ter[ter.length-1].d), N=Math.max(1, Math.round(L/cell));
+  let rasReal=[], terReal=[], base=[], crown=[];
+  for(let j=0;j<N;j++){ const x=(j+0.5)*cell; const r=interpPerfil(ras,x), t=interpPerfil(ter,x);
+    rasReal.push(r); terReal.push(t);
+    let b=Math.floor(t/0.5+1e-6)*0.5, cr=Math.ceil(r/0.5-1e-6)*0.5; if(cr<b+0.5) cr=b+0.5;
+    base.push(b); crown.push(cr);
+  }
+  const minB=Math.min.apply(null,base);
+  base=base.map(b=>b-minB); crown=crown.map(c=>c-minB);
+  const rr=rasReal.map(v=>v-minB), tt=terReal.map(v=>v-minB);
+  const m=porCotasModelo(base, crown, cell, N);
+  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const tramos=[]; let j=0;
+  while(j<N){ let k=j; while(k<N && Math.abs(base[k]-base[j])<1e-9 && Math.abs(crown[k]-crown[j])<1e-9) k++; tramos.push({L:(k-j)*cell, H:crown[j]-base[j], ancho:null, desnivel:base[j]-((k<N)?base[k]:base[j])}); j=k; }
+  window.__muroTramos={tramos:tramos, perfil:'esc'};
+  const filaDesp = m.piezas.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
+  res.innerHTML =
+    '<div class="card">'+
+      '<div class="card-hdr"><div class="card-title"><i class="ti ti-mountain"></i> Muro por perfil · '+fmtN(L)+' m · relleno rasante–terreno</div>'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge b-steel">'+m.piezas.length+' tipos de pieza</span>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaTramos()"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
+      '<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+filaDesp+
+        '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones (cara frontal)</td><td class="r mono" style="font-weight:700">'+fmtN(m.total)+'</td></tr>'+
+      '</tbody></table>'+
+      '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular (cara 1 m ancho)</span> '+
+        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+fmtN(m.granular)+' m³</strong></div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado (relleno entre rasante y terreno)</div>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotas(base, crown, cell, rr, tt)+
+      '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> 1 m alto &nbsp; '+
+      '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> 0,5 m &nbsp; '+
+      '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #dc2626;vertical-align:middle"></span> rasante &nbsp; '+
+      '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno</div>'+
+    '</div></div>';
+}
+
 // Escalonado por cotas: muro CONTINUO trabado. Cimentación (base) con floor y coronación
 // con ceil sobre la rejilla de 0,5 → la altura oscila 3/3,5 y sólo hace falta un 0,5 por
 // transición. Se cuenta pieza a pieza como se traba (aparecen 1 m de remate = 1×1×1).
@@ -418,7 +470,7 @@ function porCotasModelo(base, crown, cell, N){
 }
 
 // Alzado continuo por cotas: hiladas continuas trabadas; base (floor) y coronación (ceil)
-function croquisPorCotas(base, crown, cell){
+function croquisPorCotas(base, crown, cell, rasReal, terReal){
   const N=base.length;
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), Lm=N*cell;
@@ -431,12 +483,24 @@ function croquisPorCotas(base, crown, cell){
   const halfBands=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; band(j*cell,k*cell,v,0.5,'#f59e0b','#b45309',false); j=k; } else j++; } };
   halfBands(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfBands(j=>ct[j],   j=>ct[j]<crown[j]-1e-6);
-  let gp=''; for(let j=0;j<N;j++){ gp+=(j?'L':'M')+X(j*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' L'+X((j+1)*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' '; }
-  out+='<path d="'+gp+'" fill="none" stroke="#8a6d3b" stroke-width="1.4"/>';
-  // rasante (calle): línea recta de punta a punta = altura del muro a cubrir
-  const rL=crown[0], rR=crown[N-1];
-  out+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(rL).toFixed(1)+'" x2="'+X(Lm).toFixed(1)+'" y2="'+Y(rR).toFixed(1)+'" stroke="#dc2626" stroke-width="2"/>';
-  out+='<text x="'+X(Lm/2).toFixed(1)+'" y="'+(Y((rL+rR)/2)-4).toFixed(1)+'" font-size="10" fill="#dc2626" text-anchor="middle" font-family="system-ui">rasante (calle)</text>';
+  // línea de terreno (marrón): real (por puntos) si se da, si no la base escalonada
+  const cx=j=>(j+0.5)*cell;
+  if(terReal){
+    let tp=''; for(let j=0;j<N;j++){ tp+=(j?'L':'M')+X(cx(j)).toFixed(1)+' '+Y(terReal[j]).toFixed(1)+' '; }
+    out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.8"/>';
+  } else {
+    let gp=''; for(let j=0;j<N;j++){ gp+=(j?'L':'M')+X(j*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' L'+X((j+1)*cell).toFixed(1)+' '+Y(base[j]).toFixed(1)+' '; }
+    out+='<path d="'+gp+'" fill="none" stroke="#8a6d3b" stroke-width="1.4"/>';
+  }
+  // rasante (calle, roja): real (por puntos) si se da, si no recta de punta a punta
+  if(rasReal){
+    let rp=''; for(let j=0;j<N;j++){ rp+=(j?'L':'M')+X(cx(j)).toFixed(1)+' '+Y(rasReal[j]).toFixed(1)+' '; }
+    out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="2"/>';
+  } else {
+    out+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(crown[0]).toFixed(1)+'" x2="'+X(Lm).toFixed(1)+'" y2="'+Y(crown[N-1]).toFixed(1)+'" stroke="#dc2626" stroke-width="2"/>';
+  }
+  const rMid = rasReal ? rasReal[Math.floor(N/2)] : (crown[0]+crown[N-1])/2;
+  out+='<text x="'+X(Lm/2).toFixed(1)+'" y="'+(Y(rMid)-4).toFixed(1)+'" font-size="10" fill="#dc2626" text-anchor="middle" font-family="system-ui">rasante (calle)</text>';
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado continuo del muro por cotas">'+out+'</svg>';
 }
 
