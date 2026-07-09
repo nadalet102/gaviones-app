@@ -19,9 +19,9 @@ function genWallBoxes(H, L, anchoOverride){
   let yAcc=0;
   courses.forEach(function(c){
     let z=0;
-    muroBandas(c.w).forEach(function(bw){
-      let x=0;
-      muroTramo(L, c.offset).forEach(function(p){ boxes.push({x:x, y:yAcc, z:z, l:p, a:bw, h:c.h, largo:p}); x+=p; });
+    muroBandas(c.w).forEach(function(bw, bi){
+      let x=0; const off=(c.offset!==(bi%2===1));   // trabado también en profundidad
+      muroTramo(L, off).forEach(function(p){ boxes.push({x:x, y:yAcc, z:z, l:p, a:bw, h:c.h, largo:p}); x+=p; });
       z+=bw;
     });
     yAcc+=c.h;
