@@ -182,7 +182,7 @@ function fichaTramos(){
 // ── PLANO POR HILADAS (cómo va cada fila por dentro, con las bandas de profundidad) ──
 // Vista en planta (desde arriba) de una hilada: largo → , profundidad ↓; bandas trabadas.
 function croquisPlantaHilada(c, L){
-  const xs=Math.max(6, Math.min(22, 660/L)), ys=28, gap=1;
+  const sc=Math.max(4, Math.min(26, 640/L)), xs=sc, ys=sc, gap=1;   // MISMA escala X/Y (proporción real)
   const w=c.w, Wpx=L*xs, Dpx=w*ys;
   const padL=58, padT=16, padR=16, padB=30, x0=padL, y0=padT;
   const vbW=x0+Wpx+padR, vbH=y0+Dpx+padB; let out='';
