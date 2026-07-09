@@ -182,19 +182,35 @@ function fichaTramos(){
 // ── PLANO POR HILADAS (cómo va cada fila por dentro, con las bandas de profundidad) ──
 // Vista en planta (desde arriba) de una hilada: largo → , profundidad ↓; bandas trabadas.
 function croquisPlantaHilada(c, L){
-  const xs=Math.max(4, Math.min(18, 720/L)), ys=24, gap=1;
-  const w=c.w, Wpx=L*xs, Dpx=w*ys, padL=8,padT=8,padR=8,padB=6;
-  const vbW=padL+Wpx+padR, vbH=padT+Dpx+padB; let out='';
+  const xs=Math.max(6, Math.min(22, 660/L)), ys=28, gap=1;
+  const w=c.w, Wpx=L*xs, Dpx=w*ys;
+  const padL=58, padT=16, padR=16, padB=30, x0=padL, y0=padT;
+  const vbW=x0+Wpx+padR, vbH=y0+Dpx+padB; let out='';
   const bandas=muroBandas(w); let z=0;
   bandas.forEach(function(bw,bi){
-    const off=(c.offset!==(bi%2===1)); let x=0; const y=padT+z*ys;
+    const off=(c.offset!==(bi%2===1)); let x=0; const yb=y0+z*ys;
     muroTramo(L,off).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p);
-      out+='<rect x="'+(padL+x*xs).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(bw*ys-gap).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>';
+      out+='<rect x="'+(x0+x*xs).toFixed(1)+'" y="'+yb.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(bw*ys-gap).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"/>';
+      if(pw>=13) out+='<text x="'+(x0+x*xs+pw/2).toFixed(1)+'" y="'+(yb+bw*ys/2+3.5).toFixed(1)+'" font-size="9.5" fill="#0f172a" text-anchor="middle" font-family="system-ui">'+String(p).replace('.',',')+'</text>';
       x+=p;
     });
+    out+='<text x="'+(x0-8)+'" y="'+(yb+bw*ys/2+3).toFixed(1)+'" font-size="9" fill="#475569" text-anchor="end" font-family="system-ui">'+String(bw).replace('.',',')+' m</text>';
     z+=bw;
   });
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),740)+'" style="max-width:100%;background:#fff" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta de la hilada">'+out+'</svg>';
+  // cota de ancho total (izquierda)
+  const dx=x0-34;
+  out+='<line x1="'+dx+'" y1="'+y0+'" x2="'+dx+'" y2="'+(y0+Dpx)+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<line x1="'+(dx-3)+'" y1="'+y0+'" x2="'+(dx+3)+'" y2="'+y0+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<line x1="'+(dx-3)+'" y1="'+(y0+Dpx)+'" x2="'+(dx+3)+'" y2="'+(y0+Dpx)+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<text x="'+(dx-5)+'" y="'+(y0+Dpx/2)+'" font-size="10" fill="#334155" text-anchor="middle" transform="rotate(-90 '+(dx-5)+' '+(y0+Dpx/2)+')" font-family="system-ui">ancho '+String(w).replace('.',',')+' m</text>';
+  // cota de largo total (abajo) con marcas en las juntas de la banda frontal
+  const ly=y0+Dpx+14;
+  out+='<line x1="'+x0+'" y1="'+ly+'" x2="'+(x0+Wpx)+'" y2="'+ly+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<line x1="'+x0+'" y1="'+(ly-3)+'" x2="'+x0+'" y2="'+(ly+3)+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<line x1="'+(x0+Wpx)+'" y1="'+(ly-3)+'" x2="'+(x0+Wpx)+'" y2="'+(ly+3)+'" stroke="#94a3b8" stroke-width="1"/>';
+  var acc=0; muroTramo(L, c.offset).forEach(function(p){ acc+=p; if(acc<L-1e-6){ const tx=x0+acc*xs; out+='<line x1="'+tx.toFixed(1)+'" y1="'+(ly-2)+'" x2="'+tx.toFixed(1)+'" y2="'+(ly+2)+'" stroke="#cbd5e1" stroke-width="0.8"/>'; } });
+  out+='<text x="'+(x0+Wpx/2)+'" y="'+(ly+13)+'" font-size="10" fill="#334155" text-anchor="middle" font-family="system-ui">largo '+fmtN(L)+' m</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),740)+'" style="max-width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta acotada de la hilada">'+out+'</svg>';
 }
 function planoFilas(H, L, ancho){
   const d=muroDespiece(H, L, (ancho!=null?ancho:(H<2?0.5:null)));
