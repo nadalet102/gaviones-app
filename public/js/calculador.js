@@ -414,20 +414,24 @@ function muroPorPerfil(ras, ter, res){
   const piezas=porCotasPiezas(base, crown, cell, N);
   window.__perfil={base:base, crown:crown, cell:cell, N:N, L:L, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
   window.__perfilRes=res;
+  window.__perfilInput={ras:ras, ter:ter, res:res};   // para recalcular al cambiar de modo
   renderPerfilResult();
 }
+// Interruptor Trabar / Todo 2 m: recalcula el mismo perfil con el otro modo
+function perfilSetTrabar(v){ window.__perfilTrabar=v; const i=window.__perfilInput; if(i) muroPorPerfil(i.ras, i.ter, i.res); }
 // Lista de piezas del relleno: tabicado EXACTO (sin solapes). Running bond: las hiladas
 // alternan el desfase; el 1 m sale solo de remate en los extremos de cada hilada. Nunca
 // se monta una pieza encima de otra.
 function porCotasPiezas(base, crown, cell, N){
+  const trabar = window.__perfilTrabar!==false;   // true = matajunta (con remates 1 m) · false = todo 2 m alineado
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), piezas=[];
-  // Hiladas de 1 m: SIEMPRE trabadas a matajunta (fase global por paridad de y → las
-  // pares alineadas y las impares desfasadas 1 m). Los únicos 1 m son las medias-piezas
-  // del borde inclinado, que son precisamente las que traban (como un muro de ladrillo).
-  // Franjas medias (0,5): alineadas de 2 m → sin piezas naranjas pequeñas.
+  // Trabado (trabar=true): hiladas de 1 m con fase global por paridad de y (pares alineadas,
+  // impares desfasadas 1 m) → matajunta; los únicos 1 m son las medias-piezas del borde.
+  // Todo 2 m (trabar=false): todas las hiladas alineadas → CERO piezas de 1 m (pero juntas
+  // verticales seguidas). Franjas medias (0,5): siempre alineadas de 2 m.
   const addBand=(x0,x1,ym,alto,off)=>{ let x=x0; muroTramo(x1-x0, off).forEach(p=>{ piezas.push({x:x, y:ym, largo:p, alto:alto}); x+=p; }); };
-  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1,(Math.floor(y)%2===1)); j=k; } else j++; } }
+  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1,(trabar&&Math.floor(y)%2===1)); j=k; } else j++; } }
   const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,false); j=k; } else j++; } };
   halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
@@ -437,7 +441,7 @@ function porCotasPiezas(base, crown, cell, N){
   // piezas (el sobrante del tramo par reaparece como un 0,5 al final del escalón), pero deja
   // el rincón con pieza entera —como pidió el usuario—. Sin huecos ni solapes (verificado).
   const vec=(x,y,d)=>piezas.some(q=>q&&q.alto===1&&Math.abs(q.y-y)<1e-6&&(d>0?Math.abs(q.x-(x+1))<1e-6:Math.abs((q.x+q.largo)-x)<1e-6));
-  piezas.filter(p=>p&&p.largo===1&&p.alto===1).forEach(P=>{
+  if(trabar) piezas.filter(p=>p&&p.largo===1&&p.alto===1).forEach(P=>{
     const x=P.x, y=P.y, izq=vec(x,y,-1), der=vec(x,y,1);
     let dir=0; if(izq&&!der) dir=1; else if(der&&!izq) dir=-1; else return;   // remate de un solo lado
     const medios=piezas.filter(q=>q&&q.alto===0.5&&Math.abs(q.y-(y+0.5))<1e-6);
@@ -469,7 +473,11 @@ function renderPerfilResult(){
         '<strong id="perfil-gran" style="font-size:18px;color:var(--blue);margin-left:6px">—</strong></div>'+
     '</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado · clic en un gavión para quitarlo o ponerlo</div>'+
-      '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+        '<div class="dim" style="font-size:11px">Junta:</div>'+
+        '<button class="btn btn-sm '+(window.__perfilTrabar!==false?'btn-primary':'btn-outline')+'" onclick="perfilSetTrabar(true)" title="Matajunta: traba, con medias piezas de 1 m en los bordes"><i class="ti ti-wall"></i> Trabado</button>'+
+        '<button class="btn btn-sm '+(window.__perfilTrabar===false?'btn-primary':'btn-outline')+'" onclick="perfilSetTrabar(false)" title="Todo gaviones de 2 m enteros; juntas verticales alineadas (no traba)"><i class="ti ti-grid-dots"></i> Todo 2 m</button>'+
+        '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div></div>'+
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotasInter(st)+
       '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> 1 m alto &nbsp; '+
       '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> 0,5 m &nbsp; '+
