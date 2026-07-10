@@ -516,9 +516,20 @@ function perfilEditCerrar(){ window.__perfilSel=null; renderPerfilResult(); }
 function perfilRestablecerTodo(){ const st=window.__perfil; if(!st) return; st.removed.clear(); window.__perfilSel=null; renderPerfilResult(); }
 function perfilEditEliminar(){ const st=window.__perfil, i=window.__perfilSel; if(!st||i==null) return; if(st.removed.has(i)) st.removed.delete(i); else st.removed.add(i); renderPerfilResult(); }
 function perfilEditAplicar(){ const st=window.__perfil, i=window.__perfilSel; if(!st||i==null||!st.piezas[i]) return;
-  const l=parseFloat(document.getElementById('ed-largo').value), a=parseFloat(document.getElementById('ed-alto').value);
-  if(l>0) st.piezas[i].largo=Math.round(l*2)/2;                 // ajustado a 0,5 m
-  if(Math.abs(a-1)<1e-6||Math.abs(a-0.5)<1e-6) st.piezas[i].alto=a;
+  const p=st.piezas[i];
+  let l=parseFloat(document.getElementById('ed-largo').value), a=parseFloat(document.getElementById('ed-alto').value);
+  if(Math.abs(a-1)<1e-6||Math.abs(a-0.5)<1e-6) p.alto=a;
+  if(l>0){ l=Math.round(l*2)/2; const delta=l-p.largo;
+    if(delta>1e-6){   // al crecer se extiende hacia el LADO LIBRE (sin pisar al vecino)
+      const ov=(r,q)=>Math.min(r.x+r.largo,q.x+q.largo)-Math.max(r.x,q.x)>1e-6 && Math.min(r.y+r.alto,q.y+q.alto)-Math.max(r.y,q.y)>1e-6;
+      const libre=r=>!st.piezas.some((q,qi)=>qi!==i&&q&&!st.removed.has(qi)&&ov(r,q));
+      const dcha={x:p.x+p.largo, y:p.y, largo:delta, alto:p.alto};   // hueco a la derecha
+      const izda={x:p.x-delta,   y:p.y, largo:delta, alto:p.alto};   // hueco a la izquierda
+      if(libre(dcha)) p.largo=l;                                     // derecha libre → crece a la derecha
+      else if(p.x-delta>=-1e-6 && libre(izda)){ p.x=p.x-delta; p.largo=l; }   // si no, izquierda libre → crece a la izquierda
+      else p.largo=l;                                               // ambos ocupados → crece a la derecha
+    } else p.largo=l;   // al encoger mantiene el borde izquierdo
+  }
   renderPerfilResult();
 }
 function perfilActualizarTotales(){
