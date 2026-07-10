@@ -74,8 +74,8 @@ function muroCourses(H, ancho){
 function muroBandas(w){
   if(w <= 0.55) return [w];
   var n=Math.floor(w+1e-9), rem=w-n, b=[];
-  for(var i=0;i<n;i++) b.push(1);
-  if(rem>0.05) b.push(Math.round(rem*100)/100);
+  if(rem>0.05) b.push(Math.round(rem*100)/100);   // banda estrecha (0,5/0,3) DELANTE
+  for(var i=0;i<n;i++) b.push(1);                   // gaviones de 1 m DETRÁS (traban con ella)
   return b;
 }
 // Despiece unificado: piezas por (largo,ancho,alto), filas por hilada, granular, base.
@@ -404,7 +404,8 @@ function muroPorPerfil(ras, ter, res){
   let rasReal=[], terReal=[], base=[], crown=[];
   for(let j=0;j<N;j++){ const x=(j+0.5)*cell; const r=interpPerfil(ras,x), t=interpPerfil(ter,x);
     rasReal.push(r); terReal.push(t);
-    let b=Math.floor(t/0.5+1e-6)*0.5, cr=Math.ceil(r/0.5-1e-6)*0.5; if(cr<b+0.5) cr=b+0.5;
+    // Pass de 7 cm: si por ≤7 cm no se llega al siguiente medio metro, NO se sube de hilada.
+    let b=Math.floor(t/0.5+1e-6)*0.5, cr=Math.ceil((r-0.07)/0.5-1e-6)*0.5; if(cr<b+0.5) cr=b+0.5;
     base.push(b); crown.push(cr);
   }
   const minB=Math.min.apply(null,base);
@@ -523,7 +524,8 @@ function generarPorCotas(){
   const desnivel=Math.abs(cMax-cMin);
   const terr=f=>{ if(sent==='sube')return desnivel*f; if(sent==='valle')return desnivel*(1-Math.abs(2*f-1)); if(sent==='monte')return desnivel*Math.abs(2*f-1); return desnivel*(1-f); };
   let base=[], crown=[];
-  for(let j=0;j<N;j++){ const t=terr((j+0.5)/N); base.push(Math.floor(t/esc+1e-6)*esc); crown.push(Math.ceil((t+H)/esc-1e-6)*esc); }
+  // Pass de 7 cm: si por ≤7 cm no se alcanza el siguiente medio metro, no se añade hilada.
+  for(let j=0;j<N;j++){ const t=terr((j+0.5)/N); const b=Math.floor(t/esc+1e-6)*esc; let cr=Math.ceil((t+H-0.07)/esc-1e-6)*esc; if(cr<b+esc)cr=b+esc; base.push(b); crown.push(cr); }
   const minB=Math.min.apply(null,base); base=base.map(b=>b-minB); crown=crown.map(c=>c-minB);
   const m=porCotasModelo(base, crown, cell, N);   // conteo pieza a pieza + volumen
   const fmtm=x=>String(x).replace('.',',');
