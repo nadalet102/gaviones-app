@@ -419,11 +419,12 @@ function muroPorPerfil(ras, ter, res){
 function porCotasPiezas(base, crown, cell, N){
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), piezas=[];
-  // MAXIMIZAR piezas de 2 m: tabicado sin desfase (los tramos son múltiplos de 2 m → todo 2 m).
-  // El trabado lo da el escalón de 0,5 m; las de 1/1,5 m solo salen de remate al inicio/fin.
-  const addBand=(x0,x1,ym,alto)=>{ let x=x0; muroTramo(x1-x0, false).forEach(p=>{ piezas.push({x:x, y:ym, largo:p, alto:alto}); x+=p; }); };
-  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1); j=k; } else j++; } }
-  const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5); j=k; } else j++; } };
+  // TRABADO (running bond): las hiladas alternan el desfase → juntas verticales desfasadas.
+  // Los 2 m van en el centro; la pieza de 1 m sale SOLO en los extremos de cada hilada
+  // (inevitable para trabar). Los que sobren se quitan con clic.
+  const addBand=(x0,x1,ym,alto,off)=>{ let x=x0; muroTramo(x1-x0, off).forEach(p=>{ piezas.push({x:x, y:ym, largo:p, alto:alto}); x+=p; }); };
+  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1,(Math.floor(y)%2===1)); j=k; } else j++; } }
+  const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,(Math.floor(v+1e-6)%2===1)); j=k; } else j++; } };
   halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
   return piezas;
