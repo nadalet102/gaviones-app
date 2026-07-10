@@ -133,13 +133,22 @@ function renderCalculador(){
   const formTramos =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
       '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;background:var(--bg2,#f8fafc)">'+
-        '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-mountain"></i> Generar por perfil (rasante + terreno)</div>'+
-        '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Da puntos <span class="mono">distancia cota</span> (uno por línea) de la <span style="color:#dc2626">rasante (calle, arriba)</span> y del <span style="color:#8a6d3b">terreno (cimentación, abajo)</span>. Trazo las dos líneas y relleno el hueco con gaviones (0,5 m, trabados).</div>'+
-        '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'+
-          '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Rasante (calle) · dist cota</label><textarea id="tp-rasante" rows="4" placeholder="0 8&#10;88 12" style="width:100%;font-family:var(--mono,monospace);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea></div>'+
-          '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Terreno (cimentación) · dist cota</label><textarea id="tp-terreno" rows="4" placeholder="0 5&#10;44 3&#10;88 9" style="width:100%;font-family:var(--mono,monospace);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea></div>'+
-          '<button class="btn btn-primary btn-sm" onclick="generarPorPerfil()"><i class="ti ti-wand"></i> Generar</button>'+
+        '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-mountain"></i> Generar muro escalonado</div>'+
+        '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Da la cota del terreno al inicio y al final, el largo y la altura del muro. Yo trazo las líneas y relleno el hueco con gaviones (0,5 m, trabados).</div>'+
+        '<div class="frow3" style="gap:10px;align-items:flex-end;flex-wrap:wrap">'+
+          '<div class="field" style="margin:0"><label>Cota inicio (m)</label><input type="number" id="cs-ini" step="0.1" placeholder="0"></div>'+
+          '<div class="field" style="margin:0"><label>Cota fin (m)</label><input type="number" id="cs-fin" step="0.1" placeholder="10"></div>'+
+          '<div class="field" style="margin:0"><label>Longitud (m)</label><input type="number" id="cs-long" min="1" step="0.5" placeholder="88"></div>'+
+          '<div class="field" style="margin:0"><label>Altura muro (m)</label><input type="number" id="cs-alt" min="0.5" step="0.5" placeholder="3"></div>'+
+          '<button class="btn btn-primary btn-sm" onclick="generarPorCotasSimple()"><i class="ti ti-wand"></i> Generar</button>'+
         '</div>'+
+        '<details style="margin-top:10px"><summary style="font-size:11.5px;cursor:pointer;color:var(--text2)">Perfil personalizado (terreno con vaguadas/montículos)</summary>'+
+          '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">'+
+            '<div class="field" style="margin:0;flex:1;min-width:170px"><label>Rasante (calle) · dist cota</label><textarea id="tp-rasante" rows="3" placeholder="0 3&#10;88 13" style="width:100%;font-family:var(--mono,monospace);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea></div>'+
+            '<div class="field" style="margin:0;flex:1;min-width:170px"><label>Terreno (cimentación) · dist cota</label><textarea id="tp-terreno" rows="3" placeholder="0 0&#10;44 -3&#10;88 10" style="width:100%;font-family:var(--mono,monospace);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea></div>'+
+            '<button class="btn btn-outline btn-sm" onclick="generarPorPerfil()"><i class="ti ti-wand"></i> Generar perfil</button>'+
+          '</div>'+
+        '</details>'+
       '</div>'+
       '<div class="dim" style="font-size:12px;margin-bottom:10px">O un tramo por línea: <span class="mono">largo x alto</span> (opcional 3er nº = ancho recto; y <span class="mono">/ desnivel</span> = lo que baja al siguiente). Ej. <span class="mono">20 x 4</span>, <span class="mono">16 x 3 / 1</span>, <span class="mono">12 x 2 x 0.5 / 1</span>.</div>'+
       '<div class="frow3" style="gap:10px;align-items:flex-end;margin-bottom:10px">'+
@@ -365,11 +374,28 @@ function interpPerfil(pts, x){
   for(var i=1;i<pts.length;i++){ if(x<=pts[i].d){ const a=pts[i-1],b=pts[i]; return a.c+(b.c-a.c)*(x-a.d)/(b.d-a.d); } }
   return pts[pts.length-1].c;
 }
+// Forma sencilla: cota inicio, cota fin, longitud, altura → crea las dos líneas rectas
+function generarPorCotasSimple(){
+  const res=document.getElementById('calc-result');
+  const ci=parseFloat(document.getElementById('cs-ini').value);
+  const cf=parseFloat(document.getElementById('cs-fin').value);
+  const L=parseFloat(document.getElementById('cs-long').value);
+  const H=parseFloat(document.getElementById('cs-alt').value);
+  if(isNaN(ci)||isNaN(cf)||!(L>0)||!(H>0)){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-mountain"></i><p>Rellena cota inicio, cota fin, longitud y altura</p></div>'; return; }
+  const ter=[{d:0,c:ci},{d:L,c:cf}];              // terreno recto inicio→fin
+  const ras=[{d:0,c:ci+H},{d:L,c:cf+H}];          // rasante = terreno + altura
+  muroPorPerfil(ras, ter, res);
+}
+// Forma avanzada: perfil por puntos (rasante y terreno)
 function generarPorPerfil(){
   const res=document.getElementById('calc-result');
   const ras=parsePerfil(document.getElementById('tp-rasante').value);
   const ter=parsePerfil(document.getElementById('tp-terreno').value);
   if(ras.length<2 || ter.length<2){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-mountain"></i><p>Da al menos 2 puntos "distancia cota" en la rasante y en el terreno</p></div>'; return; }
+  muroPorPerfil(ras, ter, res);
+}
+// Núcleo: interpola las dos líneas, rellena el hueco con gaviones y dibuja
+function muroPorPerfil(ras, ter, res){
   const cell=2, L=Math.max(ras[ras.length-1].d, ter[ter.length-1].d), N=Math.max(1, Math.round(L/cell));
   let rasReal=[], terReal=[], base=[], crown=[];
   for(let j=0;j<N;j++){ const x=(j+0.5)*cell; const r=interpPerfil(ras,x), t=interpPerfil(ter,x);
