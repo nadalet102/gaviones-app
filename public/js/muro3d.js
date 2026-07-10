@@ -51,42 +51,35 @@ function muro3dTramos(){
 // Muro en L / U: cada tramo (piezas de su alzado) se coloca y gira 90° según la planta.
 // Encastre de esquina: por cada hilada, un brazo CRUZA la esquina (se alarga 0,5 m) y el otro
 // se RECORTA 0,5 m, alternando de brazo hilada a hilada → encastra sin huecos ni solapes.
+// Coloca una pieza (arm-local x, largo pl, altura y..y+alto) en el mundo según brazo y huella.
+function elePlace(s, r, x, pl, y, alto, w, arm){
+  if(s.dx>0)      return {x:s.p0.x+x,        y:y, z:r.ry,          l:pl, a:w,  h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
+  if(s.dx<0)      return {x:s.p0.x-x-pl,     y:y, z:r.ry,          l:pl, a:w,  h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
+  if(s.dy>0)      return {x:r.rx,            y:y, z:s.p0.y+x,      l:w,  a:pl, h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
+  return                 {x:r.rx,            y:y, z:s.p0.y-x-pl,   l:w,  a:pl, h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
+}
 function eleBoxes(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return [];
-  const w=1, boxes=[];
-  const R = (typeof eleFootprint==='function') ? eleFootprint(data.segs, w) : null;   // huella hacia dentro (medidas exteriores)
-  data.segs.forEach(function(s, si){ const st=data.estados[si]; if(!st) return;
-    const r = R ? R[si] : {rx:s.p0.x-w/2, ry:s.p0.y-w/2};
-    st.piezas.forEach(function(p){ let b;
-      if(s.dx>0)      b={x:s.p0.x+p.x,          y:p.y, z:r.ry,               l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
-      else if(s.dx<0) b={x:s.p0.x-p.x-p.largo,  y:p.y, z:r.ry,               l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
-      else if(s.dy>0) b={x:r.rx,                y:p.y, z:s.p0.y+p.x,          l:w,       a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
-      else            b={x:r.rx,                y:p.y, z:s.p0.y-p.x-p.largo,   l:w,      a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
-      boxes.push(b);
-    });
-  });
-  for(let ci=0; ci<data.segs.length-1; ci++){
-    const a=ci, b=ci+1;
-    // cuadro de esquina = intersección de las huellas de los dos brazos
-    let Sx0, Sx1, Sz0, Sz1;
-    if(R){ const ra=R[ci], rb=R[ci+1];
-      Sx0=Math.max(ra.rx, rb.rx); Sx1=Math.min(ra.rx+ra.rw, rb.rx+rb.rw);
-      Sz0=Math.max(ra.ry, rb.ry); Sz1=Math.min(ra.ry+ra.rh, rb.ry+rb.rh);
-    } else { const V={x:data.segs[ci].p1.x, z:data.segs[ci].p1.y}; Sx0=V.x-w/2; Sx1=V.x+w/2; Sz0=V.z-w/2; Sz1=V.z+w/2; }
-    if(!(Sx1>Sx0+1e-6 && Sz1>Sz0+1e-6)) continue;
-    boxes.forEach(function(bx){ if(bx.arm!==a && bx.arm!==b) return;
-      const ox=Math.min(bx.x+bx.l,Sx1)-Math.max(bx.x,Sx0), oz=Math.min(bx.z+bx.a,Sz1)-Math.max(bx.z,Sz0);
-      if(ox<=1e-6 || oz<=1e-6) return;   // esta caja no toca el cuadro de esquina
-      const owner=(Math.floor(bx.y+1e-6)%2===0)?a:b, ext=(bx.arm===owner);   // dueño alterna por hilada
-      if(bx.dx!==0){ const end=bx.x+bx.l;
-        if(bx.x < Sx0-1e-6) bx.l=(ext?Sx1:Sx0)-bx.x;                 // extremo derecho dentro de S
-        else if(end > Sx1+1e-6){ const nx=(ext?Sx0:Sx1); bx.x=nx; bx.l=end-nx; }   // extremo izquierdo dentro
-        else bx.l=(ext?Sx1:Sx0)-bx.x;
-      } else { const end=bx.z+bx.a;
-        if(bx.z < Sz0-1e-6) bx.a=(ext?Sz1:Sz0)-bx.z;
-        else if(end > Sz1+1e-6){ const nz=(ext?Sz0:Sz1); bx.z=nz; bx.a=end-nz; }
-        else bx.a=(ext?Sz1:Sz0)-bx.z;
-      }
+  const w=1, segs=data.segs, n=segs.length, boxes=[];
+  const R = (typeof eleFootprint==='function') ? eleFootprint(segs, w) : null;
+  for(let i=0;i<n;i++){ const s=segs[i], st=data.estados[i]; if(!st) continue;
+    const r = R ? R[i] : {rx:s.p0.x-w/2, ry:s.p0.y-w/2}, Lext=s.largo;
+    const flat = st.base.every(b=>Math.abs(b-st.base[0])<1e-6) && st.crown.every(c=>Math.abs(c-st.crown[0])<1e-6);
+    if(!flat){   // tramo en pendiente: colocación por pieza (sin encastre fino, caso poco común)
+      st.piezas.forEach(function(p){ boxes.push(elePlace(s, r, p.x, p.largo, p.y, p.alto, w, i)); });
+      continue;
+    }
+    // tramo PLANO: re-tabicar cada hilada con piezas ENTERAS; el brazo dueño CRUZA la esquina y
+    // el otro TOPA (1 m más corto), alternando por hilada. Nunca se corta un gavión.
+    const H=st.crown[0]-st.base[0], full=Math.floor(H+1e-9), half=(H-full)>0.25;
+    const hasStart=i>0, hasEnd=i<n-1;
+    const courses=[]; for(let k=0;k<full;k++) courses.push({y:k, alto:1}); if(half) courses.push({y:full, alto:0.5});
+    courses.forEach(function(c){ const par=(Math.floor(c.y+1e-6)%2===0);
+      const buttStart = hasStart && ((par?(i-1):i)!==i);   // ¿este brazo TOPA en la esquina de inicio?
+      const buttEnd   = hasEnd   && ((par?i:(i+1))!==i);   // ¿TOPA en la esquina de fin?
+      const startX = buttStart ? w : 0, tileLen = Lext - startX - (buttEnd? w : 0);
+      if(tileLen < 0.99) return;
+      let x=startX; muroTramo(tileLen, !par).forEach(function(pl){ boxes.push(elePlace(s, r, x, pl, c.y, c.alto, w, i)); x+=pl; });
     });
   }
   return boxes.filter(function(b){ return b.l>1e-6 && b.a>1e-6 && b.h>1e-6; });
