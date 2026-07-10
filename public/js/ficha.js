@@ -69,7 +69,7 @@ function fichaOpen(sheetHtml, fileName){
 function fichaHead(titulo, sub){
   const hoy = new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'long', year:'numeric'});
   return '<div class="fk-head"><div class="brand">GavControl · Muros de gaviones</div><h1>'+titulo+'</h1><div class="sub">'+sub+'</div></div>'+
-    '<div class="fk-meta"><div>Fecha: <b>'+hoy+'</b></div><div>Prontuario: <b>ARISAC (A. Bedia)</b></div><div>Documento: <b>Ficha técnica orientativa</b></div></div>';
+    '<div class="fk-meta"><div>Fecha: <b>'+hoy+'</b></div><div>Prontuario: <b>ARISAC</b></div><div>Documento: <b>Ficha técnica orientativa</b></div></div>';
 }
 
 function fichaDespieceTabla(piezas, totalGav){
@@ -94,7 +94,7 @@ function fichaCondiciones(){
 
 function fichaNota(){
   return '<div class="fk-note"><strong>Nota:</strong> Documento orientativo para presupuesto y composición del muro, basado en el prontuario ARISAC para las condiciones indicadas. El empuje y el peso se calculan según dichos parámetros (empuje activo de Rankine). No sustituye al proyecto de ejecución ni al cálculo geotécnico firmado; el trabado y el reparto de piezas se ajustan en obra.</div>'+
-    '<div class="fk-foot"><span>GavControl — Cálculo de muros de gaviones</span><span>Prontuario ARISAC · A. Bedia</span></div>';
+    '<div class="fk-foot"><span>GavControl — Cálculo de muros de gaviones</span><span>Prontuario ARISAC</span></div>';
 }
 
 // ── Ficha de un muro simple (escalonado prontuario o recto) ──
@@ -187,20 +187,31 @@ function fichaPerfil(){
   st.piezas.forEach(function(p,i){ if(st.removed.has(i)) return; const k=p.largo+'|'+p.alto; cnt[k]=(cnt[k]||0)+1; vol+=p.largo*p.alto; total++; });
   const piezas=Object.keys(cnt).map(k=>{ const pp=k.split('|'); return {largo:+pp[0], ancho:1, alto:+pp[1], n:cnt[k]}; }).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
   const peso=vol*FICHA_PARAM.densRelleno;
-  let hMax=0; for(let j=0;j<st.N;j++) hMax=Math.max(hMax, st.crown[j]-st.base[j]);
+  let hMax=0, hMin=1e9; for(let j=0;j<st.N;j++){ const h=st.crown[j]-st.base[j]; hMax=Math.max(hMax,h); hMin=Math.min(hMin,h); }
+  const desnivel=st.tt? Math.abs(st.tt[st.N-1]-st.tt[0]) : 0;
   const Ea=0.5*FICHA_PARAM.Ka*FICHA_PARAM.gamma*hMax*hMax;
   const kv=(k,v,hi)=>'<div class="fk-kv'+(hi?' fk-hi':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  const leyenda='<div style="font-size:11.5px;color:#475569;margin-top:8px">'+
+    '<span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> gavión 2×1×1 (1 m alto) &nbsp; '+
+    '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> gavión 2×1×0,5 &nbsp; '+
+    '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #dc2626;vertical-align:middle"></span> rasante (calle) &nbsp; '+
+    '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno</div>';
   const sheet=
-    fichaHead('Muro de gaviones por perfil', 'Relleno entre rasante y terreno · '+fnum(st.L)+' m'+(st.removed.size?(' · '+st.removed.size+' gaviones retirados'):''))+
+    fichaHead('Muro de gaviones · alzado por perfil', 'Relleno entre rasante y terreno · '+fnum(st.L)+' m de longitud'+(st.removed.size?(' · '+st.removed.size+' gaviones ajustados a mano'):''))+
     '<div class="fk-body">'+
-      '<div class="fk-sec"><h2><i class="ti ti-ruler-2"></i> Resumen</h2><div class="fk-grid">'+
-        kv('Total gaviones', fnum(total), true)+ kv('Relleno granular', fnum(vol,1)+' <small>m³</small>', true)+
-        kv('Peso aprox.', fnum(peso,1)+' <small>t</small>', true)+ kv('Altura máx.', fmtm(hMax)+' <small>m</small>')+
-      '</div>'+(st.removed.size?'<div class="dim" style="font-size:11.5px;margin-top:8px;color:#92400e">Se han retirado '+st.removed.size+' gaviones respecto al relleno automático.</div>':'')+'</div>'+
-      '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Alzado (relleno entre rasante y terreno)</h2><div class="fk-draw" style="overflow-x:auto">'+croquisPorCotasInter(st, true)+'</div></div>'+
-      '<div class="fk-sec"><h2><i class="ti ti-stack-2"></i> Materiales</h2>'+fichaDespieceTabla(piezas, total)+'</div>'+
-      '<div class="fk-sec"><h2><i class="ti ti-arrow-bar-to-left"></i> Solicitaciones (altura máxima)</h2><div class="fk-grid">'+
+      '<div class="fk-sec"><h2><i class="ti ti-ruler-2"></i> Datos del muro</h2><div class="fk-grid">'+
+        kv('Longitud', fnum(st.L)+' <small>m</small>')+ kv('Altura mín.', fmtm(hMin)+' <small>m</small>')+
+        kv('Altura máx.', fmtm(hMax)+' <small>m</small>')+ kv('Desnivel del terreno', fmtm(desnivel)+' <small>m</small>')+
+      '</div></div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Alzado del muro (plano completo)</h2><div class="fk-draw" style="display:block">'+croquisPorCotasInter(st, true)+leyenda+'</div></div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-stack-2"></i> Mediciones y materiales</h2>'+
+        '<div class="fk-grid" style="margin-bottom:12px">'+
+          kv('Total gaviones', fnum(total), true)+ kv('Relleno granular', fnum(vol,1)+' <small>m³</small>', true)+ kv('Peso aprox. del muro', fnum(peso,1)+' <small>t</small>', true)+
+        '</div>'+ fichaDespieceTabla(piezas, total)+
+        (st.removed.size?'<div class="dim" style="font-size:11.5px;margin-top:6px;color:#92400e">Se han ajustado (retirado) '+st.removed.size+' gaviones respecto al relleno automático.</div>':'')+'</div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-arrow-bar-to-left"></i> Solicitaciones (en la altura máxima)</h2><div class="fk-grid">'+
         kv('Empuje activo del terreno', fnum(Ea,1)+' <small>kN/m</small>')+ kv('Punto de aplicación', fnum(hMax/3,2)+' <small>m sobre base</small>')+
+        kv('Coef. empuje activo (Ka)', fmtm(FICHA_PARAM.Ka))+
       '</div></div>'+
       fichaCondiciones()+ fichaNota()+
     '</div>';
