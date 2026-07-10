@@ -431,28 +431,7 @@ function porCotasPiezas(base, crown, cell, N){
   const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,false); j=k; } else j++; } };
   halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
-  // Promoción de remates a 2 m: cada 1×1 de trabado se pasa a un gavión de 2 m (200×100×100)
-  // que sobresale hacia el lado BAJO del escalón, quitando el medio (0,5) que pisaría. Es más
-  // rentable (gaviones enteros) y "es lo mismo". Sólo si queda soportado, no hay que excavar
-  // la ladera y no pisa otra pieza entera; nunca se monta una encima de otra. Los 1 m que no
-  // cumplen (puntas del muro, o que se meterían en el terreno) se dejan.
-  const Lw=N*cell;
-  const ov=(a,b)=>{const ox=Math.min(a.x+a.largo,b.x+b.largo)-Math.max(a.x,b.x), oy=Math.min(a.y+a.alto,b.y+b.alto)-Math.max(a.y,b.y); return ox>1e-6&&oy>1e-6;};
-  const baseAtX=cx=>base[Math.max(0,Math.min(N-1,Math.floor(cx/cell)))];
-  for(let i=0;i<piezas.length;i++){ const p=piezas[i]; if(!p||p.largo!==1||p.alto!==1) continue;
-    const leftN=piezas.some(q=>q&&q.alto===1&&Math.abs((q.x+q.largo)-p.x)<1e-6&&Math.abs(q.y-p.y)<1e-6);
-    const dir=leftN?1:-1;                                          // hacia el lado sin vecino (el bajo)
-    const tooth=dir<0?{x:p.x-1,y:p.y,largo:2,alto:1}:{x:p.x,y:p.y,largo:2,alto:1};
-    const overCx=dir<0?p.x-0.5:p.x+1.5;
-    if(tooth.x<-1e-6 || tooth.x+tooth.largo>Lw+1e-6) continue;     // no salir del muro
-    if(baseAtX(overCx)>p.y+1e-6) continue;                          // no excavar (suelo por encima)
-    const support=p.y<0.5||piezas.some(q=>q&&q.x-1e-6<=overCx&&overCx<=q.x+q.largo+1e-6&&Math.abs((q.y+q.alto)-p.y)<1e-6);
-    if(!support) continue;                                          // no dejar el 2 m flotando
-    if(piezas.some(q=>q&&q!==p&&q.alto===1&&ov(tooth,q))) continue; // no pisar pieza entera
-    for(let k=0;k<piezas.length;k++){ const q=piezas[k]; if(q&&q.alto===0.5&&ov(tooth,q)) piezas[k]=null; } // quita el medio pisado
-    piezas[i]=tooth;
-  }
-  return piezas.filter(Boolean);
+  return piezas;
 }
 function renderPerfilResult(){
   const st=window.__perfil, res=window.__perfilRes; if(!st||!res) return;
