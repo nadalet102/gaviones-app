@@ -426,7 +426,24 @@ function porCotasPiezas(base, crown, cell, N){
   const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,(Math.floor(v+1e-6)%2===1)); j=k; } else j++; } };
   halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
-  return piezas;
+  // Fusión de remates: donde un 1 m de remate (1×1) queda pegado a un medio (1×0,5)
+  // en el mismo nivel —borde de escalón—, se sustituyen ambos por un único 2×1
+  // (200×100×100), maximizando el gavión de 2 m. Sólo si el cuarto superior que se
+  // añade está libre: nunca se monta una pieza encima de otra.
+  const ocupa=(cx,cy)=>piezas.some(q=>q&&cx>q.x+1e-6&&cx<q.x+q.largo-1e-6&&cy>q.y+1e-6&&cy<q.y+q.alto-1e-6);
+  for(let i=0;i<piezas.length;i++){ const p=piezas[i]; if(!p||p.largo!==1||p.alto!==1) continue;
+    let hIdx=-1, mergeX=null, addCx=null;
+    for(let k=0;k<piezas.length;k++){ const h=piezas[k];
+      if(!h||h.largo!==1||h.alto!==0.5||Math.abs(h.y-p.y)>1e-6) continue;
+      if(Math.abs(h.x-(p.x-1))<1e-6){ hIdx=k; mergeX=p.x-1; addCx=p.x-0.5; break; }   // medio a la izquierda
+      if(Math.abs(h.x-(p.x+1))<1e-6){ hIdx=k; mergeX=p.x;   addCx=p.x+1.5; break; }   // medio a la derecha
+    }
+    if(hIdx<0) continue;
+    if(ocupa(addCx, p.y+0.75)) continue;              // el 1×0,5 que se añadiría arriba debe estar vacío
+    piezas[i]={x:mergeX, y:p.y, largo:2, alto:1};      // 2×1 que cubre ambos
+    piezas[hIdx]=null;                                  // se elimina el 100×100×50
+  }
+  return piezas.filter(Boolean);
 }
 function renderPerfilResult(){
   const st=window.__perfil, res=window.__perfilRes; if(!st||!res) return;
