@@ -636,6 +636,14 @@ function eleCalcular(){
   // despiece total (suma de tramos)
   const cnt={}; let vol=0, total=0;
   estados.forEach(st=>st.piezas.forEach(p=>{ const k=p.largo+'|'+p.alto; cnt[k]=(cnt[k]||0)+1; vol+=p.largo*p.alto; total++; }));
+  // TRABA DE ESQUINA: por cada esquina, un gavión de 1,5 m por hilada (200×100×100 → 1,5 m =
+  // 1 m de ancho del otro muro + 0,5 m dentro del suyo). Alternan de brazo hilada a hilada.
+  const nEsq0=Math.max(0,T.length-1); let esqN=0, esqVol=0;
+  for(let i=0;i<seg.length-1;i++){ const hc=Math.min(seg[i].H, seg[i+1].H); const full=Math.floor(hc+1e-9), half=(hc-full)>0.25;
+    for(let k=0;k<full;k++){ cnt['1.5|1']=(cnt['1.5|1']||0)+1; esqN++; esqVol+=1.5; }
+    if(half){ cnt['1.5|0.5']=(cnt['1.5|0.5']||0)+1; esqN++; esqVol+=0.75; }
+  }
+  vol+=esqVol; total+=esqN;
   const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
   const lista=Object.keys(cnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],alto:+pp[1],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
   const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
@@ -649,7 +657,7 @@ function eleCalcular(){
       '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones (cara)</span></div>'+
       '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
       '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
-      '<div class="dim" style="font-size:11px;margin-top:6px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Suma de los '+T.length+' tramos. El solape de gaviones en cada esquina (trabado) se ajusta a continuación; dímelo y afinamos el conteo.</div></div></div>'+
+      '<div class="dim" style="font-size:11px;margin-top:6px">Incluye <strong>'+fmtN(esqN)+'</strong> gaviones de <strong>1,5 m</strong> de traba en '+nEsq+' esquina(s) — uno por hilada, alternando de brazo (1,5 m = 1 m del ancho del otro muro + 0,5 m dentro del suyo).</div></div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por tramo</div></div>'+
       '<div class="card-body" style="padding:14px 16px">'+
         estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Tramo '+(i+1)+' · '+fmtN(T[i].largo)+' m · '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt '+fmtN(T[i].H)+' m</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
