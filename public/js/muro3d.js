@@ -48,6 +48,21 @@ function muro3dTramos(){
   muro3dOpen(boxes, 'Muro por tramos · '+fmtN(xoff)+' m');
 }
 
+// Muro en L / U: cada tramo (piezas de su alzado) se coloca y gira 90° según la planta.
+function muro3dEle(){
+  const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return;
+  const w=1, boxes=[];   // w = ancho/profundidad del muro en planta
+  data.segs.forEach(function(s, si){ const st=data.estados[si]; if(!st) return;
+    st.piezas.forEach(function(p){
+      if(s.dx>0)      boxes.push({x:s.p0.x+p.x,           y:p.y, z:s.p0.y-w/2,          l:p.largo, a:w,       h:p.alto, largo:p.largo});
+      else if(s.dx<0) boxes.push({x:s.p0.x-p.x-p.largo,   y:p.y, z:s.p0.y-w/2,          l:p.largo, a:w,       h:p.alto, largo:p.largo});
+      else if(s.dy>0) boxes.push({x:s.p0.x-w/2,           y:p.y, z:s.p0.y+p.x,          l:w,       a:p.largo, h:p.alto, largo:p.largo});
+      else            boxes.push({x:s.p0.x-w/2,           y:p.y, z:s.p0.y-p.x-p.largo,  l:w,       a:p.largo, h:p.alto, largo:p.largo});
+    });
+  });
+  muro3dOpen(boxes, 'Muro en L/U · '+data.T.length+' tramos');
+}
+
 function muro3dInjectCSS(){
   if(document.getElementById('muro3d-css')) return;
   const s=document.createElement('style'); s.id='muro3d-css';

@@ -116,7 +116,27 @@ function renderCalculador(){
     '<optgroup label="Muros bajos (rectos)"><option value="1.5">1,5 m</option><option value="1">1 metro</option><option value="0.5">0,50 m</option><option value="0.3">0,30 m</option></optgroup>';
   const btn = (m,txt) => '<button class="btn btn-sm '+(calcModo===m?'btn-primary':'btn-outline')+'" onclick="calcSetModo(\''+m+'\')">'+txt+'</button>';
   const toggle =
-    '<div style="display:flex;gap:8px;margin-bottom:14px">'+btn('simple','<i class="ti ti-wall"></i> Un muro')+btn('tramos','<i class="ti ti-stairs"></i> Por tramos (pendiente)')+'</div>';
+    '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+btn('simple','<i class="ti ti-wall"></i> Un muro')+btn('tramos','<i class="ti ti-stairs"></i> Por tramos (pendiente)')+btn('ele','<i class="ti ti-vector-triangle"></i> En L / U (esquinas)')+'</div>';
+
+  const formEle =
+    '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
+      '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-vector-triangle"></i> Muro en L / U (varios tramos con esquinas)</div>'+
+      '<div class="dim" style="font-size:11.5px;margin-bottom:12px">Añade cada tramo con su cota de terreno (inicio/fin), largo y altura. En cada tramo (menos el 1º) indica el giro respecto al anterior. Yo trazo la planta, cada alzado y traba las esquinas a 90°.</div>'+
+      '<div class="frow3" style="gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">'+
+        '<div class="field" style="margin:0"><label>Giro</label><select id="el-giro"><option value="recto">Recto / 1er tramo</option><option value="izq">↰ Izquierda</option><option value="der">↱ Derecha</option></select></div>'+
+        '<div class="field" style="margin:0"><label>Cota inicio (m)</label><input type="number" id="el-ci" step="0.1" placeholder="0"></div>'+
+        '<div class="field" style="margin:0"><label>Cota fin (m)</label><input type="number" id="el-cf" step="0.1" placeholder="0"></div>'+
+        '<div class="field" style="margin:0"><label>Largo (m)</label><input type="number" id="el-largo" min="1" step="0.5" placeholder="20"></div>'+
+        '<div class="field" style="margin:0"><label>Altura (m)</label><input type="number" id="el-alt" min="0.5" step="0.5" placeholder="3"></div>'+
+        '<button class="btn btn-outline btn-sm" onclick="eleAdd()"><i class="ti ti-plus"></i> Añadir tramo</button>'+
+      '</div>'+
+      '<div id="ele-list"></div>'+
+      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-primary" onclick="eleCalcular()"><i class="ti ti-calculator"></i> Calcular muro en L/U</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="eleEjemploL()">Ejemplo L</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="eleEjemploU()">Ejemplo U</button>'+
+      '</div>'+
+    '</div></div>';
 
   const formSimple =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
@@ -178,7 +198,7 @@ function renderCalculador(){
       '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Cliente (para la ficha)</label><input id="fk-cliente" value="'+((window.__fichaMeta&&window.__fichaMeta.cliente)||'')+'" oninput="fichaSetMeta()" placeholder="Nombre del cliente"></div>'+
     '</div>'+
     toggle+
-    (calcModo==='tramos' ? formTramos : formSimple)+
+    (calcModo==='ele' ? formEle : calcModo==='tramos' ? formTramos : formSimple)+
     '<div id="calc-result"></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-body" style="padding:14px 16px;font-size:12px;color:var(--text2)">'+
       '<div style="font-weight:600;color:var(--text);margin-bottom:6px"><i class="ti ti-info-circle"></i> Condiciones de diseño del prontuario</div>'+
@@ -186,7 +206,7 @@ function renderCalculador(){
       'Cimentación 5° sobre hormigón de limpieza · Relleno 1.600 kg/m³ · Talud 5°.'+
       '<div style="margin-top:8px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Estimación orientativa; el trabado y el reparto se ajustan en obra.</div>'+
     '</div></div>';
-  if(calcModo==='tramos') tramoTogglePerfil(); else muroToggleAncho();
+  if(calcModo==='tramos') tramoTogglePerfil(); else if(calcModo==='ele') eleRenderList(); else muroToggleAncho();
 }
 
 // Selector de ancho: muros bajos (<2 m, ancho recto) y 2 m (prontuario o 0,50 recto)
@@ -399,7 +419,8 @@ function generarPorPerfil(){
   muroPorPerfil(ras, ter, res);
 }
 // Núcleo: interpola las dos líneas, rellena el hueco con gaviones (con estado editable)
-function muroPorPerfil(ras, ter, res){
+// Motor puro: de las dos líneas (rasante/terreno) devuelve el estado del muro (sin tocar globals)
+function perfilCalc(ras, ter){
   const cell=2, L=Math.max(ras[ras.length-1].d, ter[ter.length-1].d), N=Math.max(1, Math.round(L/cell));
   let rasReal=[], terReal=[], base=[], crown=[];
   for(let j=0;j<N;j++){ const x=(j+0.5)*cell; const r=interpPerfil(ras,x), t=interpPerfil(ter,x);
@@ -412,7 +433,10 @@ function muroPorPerfil(ras, ter, res){
   base=base.map(b=>b-minB); crown=crown.map(c=>c-minB);
   const rr=rasReal.map(v=>v-minB), tt=terReal.map(v=>v-minB);
   const piezas=porCotasPiezas(base, crown, cell, N, L);
-  window.__perfil={base:base, crown:crown, cell:cell, N:N, L:L, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
+  return {base:base, crown:crown, cell:cell, N:N, L:L, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
+}
+function muroPorPerfil(ras, ter, res){
+  window.__perfil=perfilCalc(ras, ter);
   window.__perfilSel=null;
   window.__perfilRes=res;
   window.__perfilInput={ras:ras, ter:ter, res:res};   // para recalcular al cambiar de modo
@@ -552,6 +576,82 @@ function perfilToggle(i){
     el.setAttribute('fill', rem?'#e5e7eb':col[0]); el.setAttribute('stroke', rem?'#cbd5e1':col[1]);
     if(rem) el.setAttribute('stroke-dasharray','2 2'); else el.removeAttribute('stroke-dasharray'); }
   perfilActualizarTotales();
+}
+// ---------- Muro en L / U (varios tramos con esquinas) ----------
+function eleAdd(){
+  if(!window.__eleTramos) window.__eleTramos=[];
+  const g=document.getElementById('el-giro').value;
+  const ci=parseFloat(document.getElementById('el-ci').value), cf=parseFloat(document.getElementById('el-cf').value);
+  const largo=parseFloat(document.getElementById('el-largo').value), H=parseFloat(document.getElementById('el-alt').value);
+  if(isNaN(ci)||isNaN(cf)||!(largo>0)||!(H>0)){ alert('Rellena cotas, largo y altura del tramo'); return; }
+  window.__eleTramos.push({giro:(window.__eleTramos.length===0?'recto':g), ci:ci, cf:cf, largo:largo, H:H});
+  document.getElementById('el-largo').value=''; document.getElementById('el-ci').value=cf; document.getElementById('el-cf').value='';
+  eleRenderList();
+}
+function eleDel(i){ if(window.__eleTramos) window.__eleTramos.splice(i,1); eleRenderList(); }
+function eleRenderList(){
+  const box=document.getElementById('ele-list'); if(!box) return;
+  const T=window.__eleTramos||[];
+  if(!T.length){ box.innerHTML='<div class="dim" style="font-size:12px">Aún no hay tramos. Añade el primero con giro «Recto».</div>'; return; }
+  const gtxt=g=>g==='izq'?'↰ Izq':g==='der'?'↱ Der':'— recto';
+  box.innerHTML='<table class="tbl"><thead><tr><th>#</th><th>Giro</th><th>Cotas ini→fin</th><th>Largo</th><th>Altura</th><th></th></tr></thead><tbody>'+
+    T.map((t,i)=>'<tr><td>'+(i+1)+'</td><td>'+gtxt(i===0?'recto':t.giro)+'</td><td>'+fmtN(t.ci)+' → '+fmtN(t.cf)+' m</td><td>'+fmtN(t.largo)+' m</td><td>'+fmtN(t.H)+' m</td><td class="r"><button class="btn btn-outline btn-sm" onclick="eleDel('+i+')"><i class="ti ti-trash"></i></button></td></tr>').join('')+
+    '</tbody></table>';
+}
+function eleEjemploL(){ window.__eleTramos=[{giro:'recto',ci:0,cf:2,largo:20,H:3},{giro:'der',ci:2,cf:2,largo:12,H:3}]; eleRenderList(); }
+function eleEjemploU(){ window.__eleTramos=[{giro:'recto',ci:0,cf:1,largo:16,H:3},{giro:'der',ci:1,cf:1,largo:10,H:3},{giro:'der',ci:1,cf:0,largo:16,H:3}]; eleRenderList(); }
+function eleCalcular(){
+  const res=document.getElementById('calc-result'); if(!res) return;
+  const T=window.__eleTramos||[];
+  if(!T.length){ res.innerHTML='<div class="empty"><i class="ti ti-vector-triangle"></i><p>Añade al menos un tramo</p></div>'; return; }
+  const estados=T.map(t=>{ const ras=[{d:0,c:t.ci+t.H},{d:t.largo,c:t.cf+t.H}], ter=[{d:0,c:t.ci},{d:t.largo,c:t.cf}]; return perfilCalc(ras,ter); });
+  // planta: arranca en (0,0) hacia +X (este); giro izq=+90°, der=−90°
+  let ang=0, x=0, y=0; const segs=[];
+  T.forEach((t,i)=>{ if(i>0) ang += (t.giro==='izq'?90:t.giro==='der'?-90:0);
+    const rad=ang*Math.PI/180, dx=Math.round(Math.cos(rad)), dy=Math.round(Math.sin(rad));
+    segs.push({p0:{x:x,y:y}, p1:{x:x+dx*t.largo,y:y+dy*t.largo}, dx:dx, dy:dy, largo:t.largo, H:t.H, i:i});
+    x+=dx*t.largo; y+=dy*t.largo; });
+  window.__muroEle={T:T, estados:estados, segs:segs};
+  // despiece total (suma de tramos)
+  const cnt={}; let vol=0, total=0;
+  estados.forEach(st=>st.piezas.forEach(p=>{ const k=p.largo+'|'+p.alto; cnt[k]=(cnt[k]||0)+1; vol+=p.largo*p.alto; total++; }));
+  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const lista=Object.keys(cnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],alto:+pp[1],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
+  const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
+  const nEsq=Math.max(0,T.length-1);
+  res.innerHTML=
+    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+T.length+' tramos, '+nEsq+' esquina(s)</div>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button></div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs)+
+      '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro).</div></div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-details"></i> Despiece total</div>'+
+      '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones (cara)</span></div>'+
+      '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
+      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
+      '<div class="dim" style="font-size:11px;margin-top:6px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Suma de los '+T.length+' tramos. El solape de gaviones en cada esquina (trabado) se ajusta a continuación; dímelo y afinamos el conteo.</div></div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por tramo</div></div>'+
+      '<div class="card-body" style="padding:14px 16px">'+
+        estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Tramo '+(i+1)+' · '+fmtN(T[i].largo)+' m · '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt '+fmtN(T[i].H)+' m</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
+      '</div></div>';
+}
+function croquisPlantaLU(segs){
+  const w=1;   // ancho del muro en planta (m)
+  let xs=[], ys=[]; segs.forEach(s=>{ xs.push(s.p0.x,s.p1.x); ys.push(s.p0.y,s.p1.y); });
+  const minX=Math.min.apply(null,xs)-w, maxX=Math.max.apply(null,xs)+w, minY=Math.min.apply(null,ys)-w, maxY=Math.max.apply(null,ys)+w;
+  const Wm=maxX-minX, Hm=maxY-minY, sc=Math.max(3, Math.min(10, 520/Math.max(Wm,Hm)));
+  const pad=26, vbW=pad*2+Wm*sc, vbH=pad*2+Hm*sc;
+  const X=xm=>pad+(xm-minX)*sc, Y=ym=>pad+(maxY-ym)*sc;   // Y hacia arriba
+  let out='';
+  segs.forEach(s=>{ let rx,ry,rw,rh;
+    if(s.dx!==0){ rx=Math.min(s.p0.x,s.p1.x); rw=s.largo; ry=s.p0.y-w/2; rh=w; }
+    else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=s.p0.x-w/2; rw=w; }
+    out+='<rect x="'+X(rx).toFixed(1)+'" y="'+Y(ry+rh).toFixed(1)+'" width="'+(rw*sc).toFixed(1)+'" height="'+(rh*sc).toFixed(1)+'" fill="#3b82f6" fill-opacity="0.45" stroke="#1d4ed8" stroke-width="1.2"/>';
+    const mx=(s.p0.x+s.p1.x)/2, my=(s.p0.y+s.p1.y)/2;
+    out+='<text x="'+X(mx).toFixed(1)+'" y="'+Y(my).toFixed(1)+'" font-size="11" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" style="paint-order:stroke;stroke:#fff;stroke-width:3px">T'+(s.i+1)+' · '+fmtN(s.largo)+'m</text>';
+  });
+  for(let i=0;i<segs.length-1;i++){ const c=segs[i].p1;
+    out+='<rect x="'+X(c.x-w/2).toFixed(1)+'" y="'+Y(c.y+w/2).toFixed(1)+'" width="'+(w*sc).toFixed(1)+'" height="'+(w*sc).toFixed(1)+'" fill="none" stroke="#dc2626" stroke-width="1.6" stroke-dasharray="3 2"/>'; }
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block;max-width:100%;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta del muro en L/U">'+out+'</svg>';
 }
 function croquisPorCotasInter(st, ficha){
   const crown=st.crown, N=st.N, cell=st.cell, rr=st.rr, tt=st.tt, piezas=st.piezas, removed=st.removed;
