@@ -106,8 +106,12 @@ function eleBoxes(){
       const anchos = (typeof seccionAnchos==='function') ? seccionAnchos(H) : [w];
       const dep = anchos[Math.min(Math.floor(c.y+1e-6), anchos.length-1)];
       const bandas = (typeof muroBandas==='function') ? muroBandas(dep) : [w];
-      eleTileGrid(a, b, yp).forEach(function(pc){ let dOff=0;
-        bandas.forEach(function(bw){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, c.y, c.alto, dOff, bw, i)); dOff+=bw; }); });
+      // cada banda de profundidad se traba con la de al lado (fase alternada por banda) y con la
+      // hilada de arriba/abajo (fase por paridad de y): trabado en las dos direcciones.
+      let dOff=0;
+      bandas.forEach(function(bw, bi){ const fase=(yp+bi)%2;
+        eleTileGrid(a, b, fase).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, c.y, c.alto, dOff, bw, i)); });
+        dOff+=bw; });
     });
   }
   // HEADERS de esquina: por hilada, una pieza de 2 m que CRUZA la esquina y entra 1 m en un brazo,
