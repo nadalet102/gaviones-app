@@ -435,25 +435,34 @@ function porCotasPiezas(base, crown, cell, N){
   const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,false); j=k; } else j++; } };
   halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
-  // Rincón de escalón con gavión ENTERO: el remate de 1 m (1×1) que cierra una hilada en un
-  // escalón de base se convierte en 2×1 (profundizando 0,5 m la cimentación bajo el metro que
-  // sobresale) y los medios (0,5) de ese escalón se re-tabican desplazados. No baja el nº de
-  // piezas (el sobrante del tramo par reaparece como un 0,5 al final del escalón), pero deja
-  // el rincón con pieza entera —como pidió el usuario—. Sin huecos ni solapes (verificado).
+  // Rincón de escalón con gavión ENTERO (modo trabado): el remate de 1 m (1×1) que cierra una
+  // hilada en un escalón —de base (abajo) o de coronación (arriba)— se convierte en 2×1 y los
+  // medios (0,5) de ese escalón se re-tabican desplazados. En base se profundiza 0,5 m la
+  // cimentación; en coronación se sube 0,5 m por encima de la rasante. Los remates de las
+  // PUNTAS del muro (inicio/final) se dejan en 1 m (el 2 m se saldría del muro). Sin huecos ni
+  // solapes (verificado). No baja el nº de piezas, pero deja los rincones con pieza entera.
+  const Lw=N*cell;
   const vec=(x,y,d)=>piezas.some(q=>q&&q.alto===1&&Math.abs(q.y-y)<1e-6&&(d>0?Math.abs(q.x-(x+1))<1e-6:Math.abs((q.x+q.largo)-x)<1e-6));
   if(trabar) piezas.filter(p=>p&&p.largo===1&&p.alto===1).forEach(P=>{
     const x=P.x, y=P.y, izq=vec(x,y,-1), der=vec(x,y,1);
     let dir=0; if(izq&&!der) dir=1; else if(der&&!izq) dir=-1; else return;   // remate de un solo lado
-    const medios=piezas.filter(q=>q&&q.alto===0.5&&Math.abs(q.y-(y+0.5))<1e-6);
-    const chain=[];
-    if(dir>0){ let e=x+1; medios.filter(q=>q.x>=x+1-1e-6).sort((a,b)=>a.x-b.x).forEach(q=>{ if(Math.abs(q.x-e)<1e-6){ chain.push(q); e=q.x+q.largo; } });
-      if(!chain.length) return; const end=e; piezas[piezas.indexOf(P)]={x:x, y:y, largo:2, alto:1};
-      chain.forEach(q=>{ piezas[piezas.indexOf(q)]=null; });
-      let xx=x+2; while(end-xx>1e-6){ const lg=(end-xx>=2-1e-6)?2:1; piezas.push({x:xx, y:y+0.5, largo:lg, alto:0.5}); xx+=lg; }
-    } else { let s=x; medios.filter(q=>q.x+q.largo<=x+1e-6).sort((a,b)=>b.x-a.x).forEach(q=>{ if(Math.abs((q.x+q.largo)-s)<1e-6){ chain.push(q); s=q.x; } });
-      if(!chain.length) return; const st=s; piezas[piezas.indexOf(P)]={x:x-1, y:y, largo:2, alto:1};
-      chain.forEach(q=>{ piezas[piezas.indexOf(q)]=null; });
-      let xx=x-1; while(xx-st>1e-6){ const lg=(xx-st>=2-1e-6)?2:1; piezas.push({x:xx-lg, y:y+0.5, largo:lg, alto:0.5}); xx-=lg; }
+    if(dir<0 && x-1<-1e-6) return;            // remate de INICIO del muro → se deja en 1 m
+    if(dir>0 && x+2>Lw+1e-6) return;          // remate de FINAL del muro → se deja en 1 m
+    // run de medios contiguos en el lado abierto, a nivel y+0,5 (escalón de base) o y (coronación)
+    for(const lvl of [y+0.5, y]){
+      const medios=piezas.filter(q=>q&&q.alto===0.5&&Math.abs(q.y-lvl)<1e-6);
+      const chain=[];
+      if(dir>0){ let e=x+1; medios.filter(q=>q.x>=x+1-1e-6).sort((a,b)=>a.x-b.x).forEach(q=>{ if(Math.abs(q.x-e)<1e-6){ chain.push(q); e=q.x+q.largo; } });
+        if(!chain.length) continue; const end=e; piezas[piezas.indexOf(P)]={x:x, y:y, largo:2, alto:1};
+        chain.forEach(q=>{ piezas[piezas.indexOf(q)]=null; });
+        let xx=x+2; while(end-xx>1e-6){ const lg=(end-xx>=2-1e-6)?2:1; piezas.push({x:xx, y:lvl, largo:lg, alto:0.5}); xx+=lg; }
+        return;
+      } else { let s=x; medios.filter(q=>q.x+q.largo<=x+1e-6).sort((a,b)=>b.x-a.x).forEach(q=>{ if(Math.abs((q.x+q.largo)-s)<1e-6){ chain.push(q); s=q.x; } });
+        if(!chain.length) continue; const st=s; piezas[piezas.indexOf(P)]={x:x-1, y:y, largo:2, alto:1};
+        chain.forEach(q=>{ piezas[piezas.indexOf(q)]=null; });
+        let xx=x-1; while(xx-st>1e-6){ const lg=(xx-st>=2-1e-6)?2:1; piezas.push({x:xx-lg, y:lvl, largo:lg, alto:0.5}); xx-=lg; }
+        return;
+      }
     }
   });
   return piezas.filter(Boolean);
