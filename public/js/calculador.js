@@ -120,22 +120,17 @@ function renderCalculador(){
 
   const formEle =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
-      '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-vector-triangle"></i> Muro en L / U (varios tramos con esquinas)</div>'+
-      '<div class="dim" style="font-size:11.5px;margin-bottom:12px">Añade cada tramo con su cota de terreno (inicio/fin), largo y altura. En cada tramo (menos el 1º) indica el giro respecto al anterior. Yo trazo la planta, cada alzado y traba las esquinas a 90°.</div>'+
-      '<div class="frow3" style="gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">'+
-        '<div class="field" style="margin:0"><label>Giro</label><select id="el-giro"><option value="recto">Recto / 1er tramo</option><option value="izq">↰ Izquierda</option><option value="der">↱ Derecha</option></select></div>'+
-        '<div class="field" style="margin:0"><label>Cota inicio (m)</label><input type="number" id="el-ci" step="0.1" placeholder="0"></div>'+
-        '<div class="field" style="margin:0"><label>Cota fin (m)</label><input type="number" id="el-cf" step="0.1" placeholder="0"></div>'+
-        '<div class="field" style="margin:0"><label>Largo (m)</label><input type="number" id="el-largo" min="1" step="0.5" placeholder="20"></div>'+
-        '<div class="field" style="margin:0"><label>Altura (m)</label><input type="number" id="el-alt" min="0.5" step="0.5" placeholder="3"></div>'+
-        '<button class="btn btn-outline btn-sm" onclick="eleAdd()"><i class="ti ti-plus"></i> Añadir tramo</button>'+
-      '</div>'+
-      '<div id="ele-list"></div>'+
-      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
-        '<button class="btn btn-primary" onclick="eleCalcular()"><i class="ti ti-calculator"></i> Calcular muro en L/U</button>'+
+      '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-vector-triangle"></i> Muro en L / U — dibuja el recorrido</div>'+
+      '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Haz <strong>clic en la cuadrícula</strong> para ir extendiendo el muro (las esquinas salen a 90° solas). Luego ajusta largo, cotas y altura de cada tramo en la tabla.</div>'+
+      '<div id="ele-grid"></div>'+
+      '<div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline btn-sm" onclick="eleUndo()"><i class="ti ti-arrow-back-up"></i> Deshacer</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="eleClear()"><i class="ti ti-eraser"></i> Vaciar</button>'+
         '<button class="btn btn-outline btn-sm" onclick="eleEjemploL()">Ejemplo L</button>'+
         '<button class="btn btn-outline btn-sm" onclick="eleEjemploU()">Ejemplo U</button>'+
       '</div>'+
+      '<div id="ele-seg"></div>'+
+      '<div style="margin-top:12px"><button class="btn btn-primary" onclick="eleCalcular()"><i class="ti ti-calculator"></i> Calcular muro en L/U</button></div>'+
     '</div></div>';
 
   const formSimple =
@@ -206,7 +201,7 @@ function renderCalculador(){
       'Cimentación 5° sobre hormigón de limpieza · Relleno 1.600 kg/m³ · Talud 5°.'+
       '<div style="margin-top:8px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Estimación orientativa; el trabado y el reparto se ajustan en obra.</div>'+
     '</div></div>';
-  if(calcModo==='tramos') tramoTogglePerfil(); else if(calcModo==='ele') eleRenderList(); else muroToggleAncho();
+  if(calcModo==='tramos') tramoTogglePerfil(); else if(calcModo==='ele') eleGridRedraw(); else muroToggleAncho();
 }
 
 // Selector de ancho: muros bajos (<2 m, ancho recto) y 2 m (prontuario o 0,50 recto)
@@ -577,40 +572,66 @@ function perfilToggle(i){
     if(rem) el.setAttribute('stroke-dasharray','2 2'); else el.removeAttribute('stroke-dasharray'); }
   perfilActualizarTotales();
 }
-// ---------- Muro en L / U (varios tramos con esquinas) ----------
-function eleAdd(){
-  if(!window.__eleTramos) window.__eleTramos=[];
-  const g=document.getElementById('el-giro').value;
-  const ci=parseFloat(document.getElementById('el-ci').value), cf=parseFloat(document.getElementById('el-cf').value);
-  const largo=parseFloat(document.getElementById('el-largo').value), H=parseFloat(document.getElementById('el-alt').value);
-  if(isNaN(ci)||isNaN(cf)||!(largo>0)||!(H>0)){ alert('Rellena cotas, largo y altura del tramo'); return; }
-  window.__eleTramos.push({giro:(window.__eleTramos.length===0?'recto':g), ci:ci, cf:cf, largo:largo, H:H});
-  document.getElementById('el-largo').value=''; document.getElementById('el-ci').value=cf; document.getElementById('el-cf').value='';
-  eleRenderList();
+// ---------- Muro en L / U — dibujo sobre cuadrícula ----------
+// Estado: window.__eleDraw={seg:[{dx,dy,largo,ci,cf,H}]}. Cada clic añade un tramo ortogonal
+// (esquina 90° automática); la tabla ajusta largo/cotas/altura; la planta se recalcula sola.
+const ELG={sc:9, Xmin:-4, Xmax:44, Ymin:-20, Ymax:20, cx0:36, cy0:180, vbW:432, vbH:360};
+function eleVertices(){ const D=window.__eleDraw||(window.__eleDraw={seg:[]}); let x=0,y=0; const v=[{x:0,y:0}]; D.seg.forEach(s=>{ x+=s.dx*s.largo; y+=s.dy*s.largo; v.push({x:x,y:y}); }); return v; }
+function eleGridClick(evt){
+  const svg=evt.currentTarget, rect=svg.getBoundingClientRect();
+  const vx=(evt.clientX-rect.left)*(ELG.vbW/rect.width), vy=(evt.clientY-rect.top)*(ELG.vbH/rect.height);
+  const wx=Math.round((vx-ELG.cx0)/ELG.sc), wy=Math.round((ELG.cy0-vy)/ELG.sc);
+  const D=window.__eleDraw||(window.__eleDraw={seg:[]});
+  const last=eleVertices().slice(-1)[0];
+  let dx0=wx-last.x, dy0=wy-last.y; if(Math.abs(dx0)<1&&Math.abs(dy0)<1) return;
+  let dx,dy,largo; if(Math.abs(dx0)>=Math.abs(dy0)){ dx=dx0>0?1:-1; dy=0; largo=Math.abs(dx0); } else { dx=0; dy=dy0>0?1:-1; largo=Math.abs(dy0); }
+  const prev=D.seg[D.seg.length-1];
+  D.seg.push({dx:dx, dy:dy, largo:largo, ci:(prev?prev.cf:0), cf:(prev?prev.cf:0), H:(prev?prev.H:3)});
+  eleGridRedraw();
 }
-function eleDel(i){ if(window.__eleTramos) window.__eleTramos.splice(i,1); eleRenderList(); }
-function eleRenderList(){
-  const box=document.getElementById('ele-list'); if(!box) return;
-  const T=window.__eleTramos||[];
-  if(!T.length){ box.innerHTML='<div class="dim" style="font-size:12px">Aún no hay tramos. Añade el primero con giro «Recto».</div>'; return; }
-  const gtxt=g=>g==='izq'?'↰ Izq':g==='der'?'↱ Der':'— recto';
-  box.innerHTML='<table class="tbl"><thead><tr><th>#</th><th>Giro</th><th>Cotas ini→fin</th><th>Largo</th><th>Altura</th><th></th></tr></thead><tbody>'+
-    T.map((t,i)=>'<tr><td>'+(i+1)+'</td><td>'+gtxt(i===0?'recto':t.giro)+'</td><td>'+fmtN(t.ci)+' → '+fmtN(t.cf)+' m</td><td>'+fmtN(t.largo)+' m</td><td>'+fmtN(t.H)+' m</td><td class="r"><button class="btn btn-outline btn-sm" onclick="eleDel('+i+')"><i class="ti ti-trash"></i></button></td></tr>').join('')+
-    '</tbody></table>';
+function eleGridRedraw(){
+  const g=document.getElementById('ele-grid'); if(!g) return;
+  const D=window.__eleDraw||(window.__eleDraw={seg:[]}); const G=ELG;
+  const SX=wx=>G.cx0+wx*G.sc, SY=wy=>G.cy0-wy*G.sc; let grid='';
+  for(let x=G.Xmin;x<=G.Xmax;x+=2){ const m=(x%10===0); grid+='<line x1="'+SX(x)+'" y1="0" x2="'+SX(x)+'" y2="'+G.vbH+'" stroke="'+(m?'#cbd5e1':'#eef2f7')+'" stroke-width="'+(m?1:0.7)+'"/>'; }
+  for(let y=G.Ymin;y<=G.Ymax;y+=2){ const m=(y%10===0); grid+='<line x1="0" y1="'+SY(y)+'" x2="'+G.vbW+'" y2="'+SY(y)+'" stroke="'+(m?'#cbd5e1':'#eef2f7')+'" stroke-width="'+(m?1:0.7)+'"/>'; }
+  grid+='<line x1="0" y1="'+SY(0)+'" x2="'+G.vbW+'" y2="'+SY(0)+'" stroke="#94a3b8"/><line x1="'+SX(0)+'" y1="0" x2="'+SX(0)+'" y2="'+G.vbH+'" stroke="#94a3b8"/>';
+  const V=eleVertices(); let path='M'+SX(0)+' '+SY(0)+' ', verts='<circle cx="'+SX(0)+'" cy="'+SY(0)+'" r="4.5" fill="#16a34a"/>', labels='';
+  D.seg.forEach((s,i)=>{ const a=V[i], b=V[i+1]; path+='L'+SX(b.x)+' '+SY(b.y)+' ';
+    labels+='<text x="'+((SX(a.x)+SX(b.x))/2)+'" y="'+((SY(a.y)+SY(b.y))/2-5)+'" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1d4ed8" style="paint-order:stroke;stroke:#fff;stroke-width:3px">T'+(i+1)+' '+fmtN(s.largo)+'m</text>';
+    verts+='<circle cx="'+SX(b.x)+'" cy="'+SY(b.y)+'" r="4" fill="#1d4ed8"/>'; });
+  const wall=D.seg.length?'<path d="'+path+'" fill="none" stroke="#3b82f6" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" opacity="0.8" pointer-events="none"/>':'';
+  g.innerHTML='<svg viewBox="0 0 '+G.vbW+' '+G.vbH+'" width="100%" style="display:block;max-width:'+G.vbW+'px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:crosshair;touch-action:manipulation" onclick="eleGridClick(event)" xmlns="http://www.w3.org/2000/svg">'+grid+wall+labels+verts+'</svg>'+
+    '<div class="dim" style="font-size:11px;margin-top:4px">'+(D.seg.length? D.seg.length+' tramo(s) · clic para añadir otro. El punto verde es el inicio.' : 'Punto verde = inicio. Haz clic para dibujar el primer tramo.')+'</div>';
+  eleSegTable();
 }
-function eleEjemploL(){ window.__eleTramos=[{giro:'recto',ci:0,cf:2,largo:20,H:3},{giro:'der',ci:2,cf:2,largo:12,H:3}]; eleRenderList(); }
-function eleEjemploU(){ window.__eleTramos=[{giro:'recto',ci:0,cf:1,largo:16,H:3},{giro:'der',ci:1,cf:1,largo:10,H:3},{giro:'der',ci:1,cf:0,largo:16,H:3}]; eleRenderList(); }
+function eleSegTable(){
+  const box=document.getElementById('ele-seg'); if(!box) return;
+  const D=window.__eleDraw||{seg:[]};
+  if(!D.seg.length){ box.innerHTML=''; return; }
+  const dtxt=s=>s.dx>0?'→':s.dx<0?'←':s.dy>0?'↑':'↓';
+  box.innerHTML='<div style="font-size:12px;font-weight:600;margin-bottom:4px">Tramos</div><div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Dir</th><th>Largo (m)</th><th>Cota ini</th><th>Cota fin</th><th>Altura</th><th></th></tr></thead><tbody>'+
+    D.seg.map((s,i)=>'<tr><td>'+(i+1)+'</td><td style="font-size:15px">'+dtxt(s)+'</td>'+
+      '<td><input type="number" value="'+s.largo+'" min="0.5" step="0.5" style="width:72px" onchange="eleSegSet('+i+',\'largo\',this.value)"></td>'+
+      '<td><input type="number" value="'+s.ci+'" step="0.1" style="width:66px" onchange="eleSegSet('+i+',\'ci\',this.value)"></td>'+
+      '<td><input type="number" value="'+s.cf+'" step="0.1" style="width:66px" onchange="eleSegSet('+i+',\'cf\',this.value)"></td>'+
+      '<td><input type="number" value="'+s.H+'" min="0.5" step="0.5" style="width:66px" onchange="eleSegSet('+i+',\'H\',this.value)"></td>'+
+      '<td class="r"><button class="btn btn-outline btn-sm" onclick="eleSegDel('+i+')"><i class="ti ti-trash"></i></button></td></tr>').join('')+
+    '</tbody></table></div>';
+}
+function eleSegSet(i,f,v){ const D=window.__eleDraw; if(!D||!D.seg[i])return; const n=parseFloat(v); if(isNaN(n))return; D.seg[i][f]=(f==='largo'?Math.max(0.5,Math.round(n*2)/2):(f==='H'?Math.max(0.5,Math.round(n*2)/2):n)); eleGridRedraw(); }
+function eleSegDel(i){ const D=window.__eleDraw; if(!D)return; D.seg.splice(i,1); eleGridRedraw(); }
+function eleUndo(){ const D=window.__eleDraw; if(D&&D.seg.length){ D.seg.pop(); eleGridRedraw(); } }
+function eleClear(){ window.__eleDraw={seg:[]}; eleGridRedraw(); }
+function eleEjemploL(){ window.__eleDraw={seg:[{dx:1,dy:0,largo:20,ci:0,cf:2,H:3},{dx:0,dy:-1,largo:12,ci:2,cf:2,H:3}]}; eleGridRedraw(); }
+function eleEjemploU(){ window.__eleDraw={seg:[{dx:1,dy:0,largo:16,ci:0,cf:1,H:3},{dx:0,dy:-1,largo:10,ci:1,cf:1,H:3},{dx:-1,dy:0,largo:16,ci:1,cf:0,H:3}]}; eleGridRedraw(); }
 function eleCalcular(){
   const res=document.getElementById('calc-result'); if(!res) return;
-  const T=window.__eleTramos||[];
-  if(!T.length){ res.innerHTML='<div class="empty"><i class="ti ti-vector-triangle"></i><p>Añade al menos un tramo</p></div>'; return; }
-  const estados=T.map(t=>{ const ras=[{d:0,c:t.ci+t.H},{d:t.largo,c:t.cf+t.H}], ter=[{d:0,c:t.ci},{d:t.largo,c:t.cf}]; return perfilCalc(ras,ter); });
-  // planta: arranca en (0,0) hacia +X (este); giro izq=+90°, der=−90°
-  let ang=0, x=0, y=0; const segs=[];
-  T.forEach((t,i)=>{ if(i>0) ang += (t.giro==='izq'?90:t.giro==='der'?-90:0);
-    const rad=ang*Math.PI/180, dx=Math.round(Math.cos(rad)), dy=Math.round(Math.sin(rad));
-    segs.push({p0:{x:x,y:y}, p1:{x:x+dx*t.largo,y:y+dy*t.largo}, dx:dx, dy:dy, largo:t.largo, H:t.H, i:i});
-    x+=dx*t.largo; y+=dy*t.largo; });
+  const seg=(window.__eleDraw&&window.__eleDraw.seg)||[];
+  if(!seg.length){ res.innerHTML='<div class="empty"><i class="ti ti-vector-triangle"></i><p>Dibuja el recorrido en la cuadrícula</p></div>'; return; }
+  const T=seg;
+  const estados=seg.map(s=>{ const ras=[{d:0,c:s.ci+s.H},{d:s.largo,c:s.cf+s.H}], ter=[{d:0,c:s.ci},{d:s.largo,c:s.cf}]; return perfilCalc(ras,ter); });
+  let x=0,y=0; const segs=seg.map((s,i)=>{ const p0={x:x,y:y}, p1={x:x+s.dx*s.largo,y:y+s.dy*s.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:s.dx,dy:s.dy,largo:s.largo,H:s.H,i:i}; });
   window.__muroEle={T:T, estados:estados, segs:segs};
   // despiece total (suma de tramos)
   const cnt={}; let vol=0, total=0;
