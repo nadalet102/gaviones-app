@@ -54,11 +54,14 @@ function muroTramo(L, offset){
   var med=0, uno=0, uu=u;
   if(uu % 2 === 1){ med=1; uu-=3; }        // un 1,5 m (3 medios) para el medio metro
   var dos=Math.floor(uu/4), rem=uu-dos*4;  // rem 0 o 2
-  if(rem===2) uno=1;                        // un 1 m
+  if(rem===2) uno=1;                        // sobra 1 m
   var p=[];
   if(med) p.push(1.5);
   for(var i=0;i<dos;i++) p.push(2);
-  if(uno) p.push(1);
+  if(uno){                                  // NO gaviones de 1 m: el 1 m sobrante + un 2 m → dos de 1,5 m
+    if(dos>0){ p[p.length-1]=1.5; p.push(1.5); }   // 2 m + 1 m = 1,5 + 1,5 (sin pieza de 1 m)
+    else p.push(1);                                 // sólo si no hay ningún 2 m (tramo muy corto)
+  }
   if(!offset) return p;
   if(med || uno) return p.slice().reverse();          // hilada impar: al revés (trabado)
   var r=[1]; for(var j=0;j<dos-1;j++) r.push(2); r.push(1); return r; // todo 2 m: 1 m en extremos
