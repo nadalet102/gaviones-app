@@ -66,10 +66,35 @@ function fichaOpen(sheetHtml, fileName){
   document.addEventListener('keydown', function esc(ev){ if(ev.key==='Escape' && document.body.contains(ov)){ ov.remove(); document.removeEventListener('keydown', esc); } });
 }
 
+function fichaSetMeta(){
+  window.__fichaMeta = {
+    obra: ((document.getElementById('fk-obra')||{}).value||'').trim(),
+    cliente: ((document.getElementById('fk-cliente')||{}).value||'').trim()
+  };
+}
+function fkEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// Logo ARISAC (marca tipográfica provisional; sustituible por el logo real)
+function fichaLogoArisac(){
+  return '<svg width="132" height="40" viewBox="0 0 132 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ARISAC">'+
+    '<rect x="1" y="7" width="26" height="26" rx="3" fill="#1e3a5f"/>'+
+    '<g stroke="#7f96b3" stroke-width="1">'+
+      '<line x1="1" y1="15.7" x2="27" y2="15.7"/><line x1="1" y1="24.3" x2="27" y2="24.3"/>'+
+      '<line x1="9.7" y1="7" x2="9.7" y2="33"/><line x1="18.3" y1="7" x2="18.3" y2="33"/></g>'+
+    '<text x="34" y="27" font-family="Arial, system-ui, sans-serif" font-weight="800" font-size="21" letter-spacing="1" fill="#1e3a5f">ARISAC</text>'+
+    '<rect x="34" y="31" width="93" height="3" fill="#f59e0b"/>'+
+  '</svg>';
+}
 function fichaHead(titulo, sub){
   const hoy = new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'long', year:'numeric'});
-  return '<div class="fk-head"><div class="brand">GavControl · Muros de gaviones</div><h1>'+titulo+'</h1><div class="sub">'+sub+'</div></div>'+
-    '<div class="fk-meta"><div>Fecha: <b>'+hoy+'</b></div><div>Prontuario: <b>ARISAC</b></div><div>Documento: <b>Ficha técnica orientativa</b></div></div>';
+  const m = window.__fichaMeta||{};
+  return '<div class="fk-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">'+
+      '<div><div class="brand">GavControl · Muros de gaviones</div><h1>'+titulo+'</h1><div class="sub">'+sub+'</div></div>'+
+      '<div style="flex-shrink:0;background:#fff;border-radius:6px;padding:6px 9px;align-self:center">'+fichaLogoArisac()+'</div>'+
+    '</div>'+
+    '<div class="fk-meta">'+
+      (m.obra?'<div>Obra: <b>'+fkEsc(m.obra)+'</b></div>':'')+
+      (m.cliente?'<div>Cliente: <b>'+fkEsc(m.cliente)+'</b></div>':'')+
+      '<div>Fecha: <b>'+hoy+'</b></div><div>Prontuario: <b>ARISAC</b></div><div>Documento: <b>Ficha técnica orientativa</b></div></div>';
 }
 
 function fichaDespieceTabla(piezas, totalGav){

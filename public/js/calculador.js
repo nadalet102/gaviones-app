@@ -173,6 +173,10 @@ function renderCalculador(){
       '</div>'+
       '<button class="btn btn-outline btn-sm" onclick="switchTab(\'dash\')"><i class="ti ti-arrow-left"></i> Volver al panel</button>'+
     '</div>'+
+    '<div class="frow3" style="gap:10px;margin-bottom:14px;flex-wrap:wrap">'+
+      '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Obra (para la ficha)</label><input id="fk-obra" value="'+((window.__fichaMeta&&window.__fichaMeta.obra)||'')+'" oninput="fichaSetMeta()" placeholder="Ej. Mancomunidad Alto Henares"></div>'+
+      '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Cliente (para la ficha)</label><input id="fk-cliente" value="'+((window.__fichaMeta&&window.__fichaMeta.cliente)||'')+'" oninput="fichaSetMeta()" placeholder="Nombre del cliente"></div>'+
+    '</div>'+
     toggle+
     (calcModo==='tramos' ? formTramos : formSimple)+
     '<div id="calc-result"></div>'+
