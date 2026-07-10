@@ -51,6 +51,17 @@ function muro3dTramos(){
 // Muro en L / U: cada tramo (piezas de su alzado) se coloca y gira 90° según la planta.
 // Encastre de esquina: por cada hilada, un brazo CRUZA la esquina (se alarga 0,5 m) y el otro
 // se RECORTA 0,5 m, alternando de brazo hilada a hilada → encastra sin huecos ni solapes.
+// Tabica [a,b] sobre una rejilla global de 2 m con fase p (0/1): cortes en x≡p (mod 2).
+// Interior de 2 m; los extremos que no alcancen 2 m son remates enteros (1 m). Garantiza que
+// hiladas de distinta paridad desfasen las juntas (trabado). a y b enteros.
+function eleTileGrid(a, b, p){
+  const pieces=[]; const first = a + (((p - a) % 2) + 2) % 2;   // primer corte ≥ a alineado a la fase
+  let x=a;
+  if(first > a + 1e-6){ pieces.push({x0:a, l:first-a}); x=first; }
+  while(x + 2 <= b + 1e-6){ pieces.push({x0:x, l:2}); x+=2; }
+  if(b - x > 1e-6) pieces.push({x0:x, l:b-x});
+  return pieces;
+}
 // Coloca una pieza (arm-local x, largo pl, altura y..y+alto) en el mundo según brazo y huella.
 function elePlace(s, r, x, pl, y, alto, w, arm){
   if(s.dx>0)      return {x:s.p0.x+x,        y:y, z:r.ry,          l:pl, a:w,  h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
@@ -69,17 +80,18 @@ function eleBoxes(){
       st.piezas.forEach(function(p){ boxes.push(elePlace(s, r, p.x, p.largo, p.y, p.alto, w, i)); });
       continue;
     }
-    // tramo PLANO: re-tabicar cada hilada con piezas ENTERAS; el brazo dueño CRUZA la esquina y
-    // el otro TOPA (1 m más corto), alternando por hilada. Nunca se corta un gavión.
+    // tramo PLANO: cada hilada se tabica sobre una REJILLA GLOBAL (fase por paridad de y) para
+    // que las juntas se desfasen SIEMPRE (trabado en todas las caras). El brazo dueño CRUZA la
+    // esquina y el otro TOPA (1 m más corto), alternando por hilada. Piezas enteras, sin cortar.
     const H=st.crown[0]-st.base[0], full=Math.floor(H+1e-9), half=(H-full)>0.25;
     const hasStart=i>0, hasEnd=i<n-1;
     const courses=[]; for(let k=0;k<full;k++) courses.push({y:k, alto:1}); if(half) courses.push({y:full, alto:0.5});
-    courses.forEach(function(c){ const par=(Math.floor(c.y+1e-6)%2===0);
+    courses.forEach(function(c){ const yp=Math.floor(c.y+1e-6)%2, par=(yp===0);
       const buttStart = hasStart && ((par?(i-1):i)!==i);   // ¿este brazo TOPA en la esquina de inicio?
       const buttEnd   = hasEnd   && ((par?i:(i+1))!==i);   // ¿TOPA en la esquina de fin?
-      const startX = buttStart ? w : 0, tileLen = Lext - startX - (buttEnd? w : 0);
-      if(tileLen < 0.99) return;
-      let x=startX; muroTramo(tileLen, !par).forEach(function(pl){ boxes.push(elePlace(s, r, x, pl, c.y, c.alto, w, i)); x+=pl; });
+      const a = buttStart ? w : 0, b = Lext - (buttEnd? w : 0);
+      if(b-a < 0.99) return;
+      eleTileGrid(a, b, yp).forEach(function(pc){ boxes.push(elePlace(s, r, pc.x0, pc.l, c.y, c.alto, w, i)); });
     });
   }
   return boxes.filter(function(b){ return b.l>1e-6 && b.a>1e-6 && b.h>1e-6; });
