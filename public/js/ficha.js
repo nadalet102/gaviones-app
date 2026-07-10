@@ -179,6 +179,34 @@ function fichaTramos(){
   fichaOpen(sheet, 'ficha-muro-tramos');
 }
 
+// ── Ficha del muro por perfil (respeta los gaviones quitados a mano) ──
+function fichaPerfil(){
+  const st=window.__perfil; if(!st){ return; }
+  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const cnt={}; let vol=0, total=0;
+  st.piezas.forEach(function(p,i){ if(st.removed.has(i)) return; const k=p.largo+'|'+p.alto; cnt[k]=(cnt[k]||0)+1; vol+=p.largo*p.alto; total++; });
+  const piezas=Object.keys(cnt).map(k=>{ const pp=k.split('|'); return {largo:+pp[0], ancho:1, alto:+pp[1], n:cnt[k]}; }).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
+  const peso=vol*FICHA_PARAM.densRelleno;
+  let hMax=0; for(let j=0;j<st.N;j++) hMax=Math.max(hMax, st.crown[j]-st.base[j]);
+  const Ea=0.5*FICHA_PARAM.Ka*FICHA_PARAM.gamma*hMax*hMax;
+  const kv=(k,v,hi)=>'<div class="fk-kv'+(hi?' fk-hi':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  const sheet=
+    fichaHead('Muro de gaviones por perfil', 'Relleno entre rasante y terreno · '+fnum(st.L)+' m'+(st.removed.size?(' · '+st.removed.size+' gaviones retirados'):''))+
+    '<div class="fk-body">'+
+      '<div class="fk-sec"><h2><i class="ti ti-ruler-2"></i> Resumen</h2><div class="fk-grid">'+
+        kv('Total gaviones', fnum(total), true)+ kv('Relleno granular', fnum(vol,1)+' <small>m³</small>', true)+
+        kv('Peso aprox.', fnum(peso,1)+' <small>t</small>', true)+ kv('Altura máx.', fmtm(hMax)+' <small>m</small>')+
+      '</div>'+(st.removed.size?'<div class="dim" style="font-size:11.5px;margin-top:8px;color:#92400e">Se han retirado '+st.removed.size+' gaviones respecto al relleno automático.</div>':'')+'</div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Alzado (relleno entre rasante y terreno)</h2><div class="fk-draw" style="overflow-x:auto">'+croquisPorCotasInter(st, true)+'</div></div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-stack-2"></i> Materiales</h2>'+fichaDespieceTabla(piezas, total)+'</div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-arrow-bar-to-left"></i> Solicitaciones (altura máxima)</h2><div class="fk-grid">'+
+        kv('Empuje activo del terreno', fnum(Ea,1)+' <small>kN/m</small>')+ kv('Punto de aplicación', fnum(hMax/3,2)+' <small>m sobre base</small>')+
+      '</div></div>'+
+      fichaCondiciones()+ fichaNota()+
+    '</div>';
+  fichaOpen(sheet, 'ficha-muro-perfil');
+}
+
 // ── PLANO POR HILADAS (cómo va cada fila por dentro, con las bandas de profundidad) ──
 // Vista en planta (desde arriba) de una hilada: largo → , profundidad ↓; bandas trabadas.
 function croquisPlantaHilada(c, L){

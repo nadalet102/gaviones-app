@@ -431,7 +431,7 @@ function renderPerfilResult(){
     '<div class="card">'+
       '<div class="card-hdr"><div class="card-title"><i class="ti ti-mountain"></i> Muro por perfil · '+fmtN(st.L)+' m</div>'+
         '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge b-amber" id="perfil-quitados">0 quitados</span>'+
-        '<button class="btn btn-outline btn-sm" onclick="fichaTramos()"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaPerfil()"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
       '<div id="perfil-desp"></div>'+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular (cara 1 m ancho)</span> '+
         '<strong id="perfil-gran" style="font-size:18px;color:var(--blue);margin-left:6px">—</strong></div>'+
@@ -467,15 +467,17 @@ function perfilToggle(i){
     if(rem) el.setAttribute('stroke-dasharray','2 2'); else el.removeAttribute('stroke-dasharray'); }
   perfilActualizarTotales();
 }
-function croquisPorCotasInter(st){
+function croquisPorCotasInter(st, ficha){
   const crown=st.crown, N=st.N, cell=st.cell, rr=st.rr, tt=st.tt, piezas=st.piezas, removed=st.removed;
   const maxTop=Math.max.apply(null,crown), Lm=N*cell;
   const sc=Math.max(10, Math.min(22, 200/maxTop));
   const padL=16,padR=16,padT=14,padB=28, vbW=padL+Lm*sc+padR, vbH=padT+maxTop*sc+padB, groundY=padT+maxTop*sc;
   const X=xm=>padL+xm*sc, Y=ym=>groundY-ym*sc; let out='';
   const fmtm=x=>String(x).replace('.',',');
-  piezas.forEach(function(p,i){ const rem=removed.has(i), col=(p.alto===1?['#3b82f6','#1d4ed8']:['#f59e0b','#b45309']);
-    out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col[0])+'" stroke="'+(rem?'#cbd5e1':col[1])+'" stroke-width="0.6"'+(rem?' stroke-dasharray="2 2"':'')+' style="cursor:pointer" onclick="perfilToggle('+i+')"><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
+  piezas.forEach(function(p,i){ const rem=removed.has(i); if(ficha&&rem) return;   // en ficha se omiten los quitados
+    const col=(p.alto===1?['#3b82f6','#1d4ed8']:['#f59e0b','#b45309']);
+    const act = ficha ? '' : ' style="cursor:pointer" onclick="perfilToggle('+i+')"';
+    out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col[0])+'" stroke="'+(rem?'#cbd5e1':col[1])+'" stroke-width="0.6"'+(rem?' stroke-dasharray="2 2"':'')+act+'><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
   });
   if(tt){ let tp=''; for(let j=0;j<N;j++){ tp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(tt[j]).toFixed(1)+' '; } out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.8" pointer-events="none"/>'; }
   if(rr){ let rp=''; for(let j=0;j<N;j++){ rp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(rr[j]).toFixed(1)+' '; } out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="2" pointer-events="none"/>'; }
