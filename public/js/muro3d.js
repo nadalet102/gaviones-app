@@ -80,18 +80,41 @@ function eleBoxes(){
       st.piezas.forEach(function(p){ boxes.push(elePlace(s, r, p.x, p.largo, p.y, p.alto, w, i)); });
       continue;
     }
-    // tramo PLANO: cada hilada se tabica sobre una REJILLA GLOBAL (fase por paridad de y) para
-    // que las juntas se desfasen SIEMPRE (trabado en todas las caras). El brazo dueño CRUZA la
-    // esquina y el otro TOPA (1 m más corto), alternando por hilada. Piezas enteras, sin cortar.
+    // tramo PLANO: rejilla global (fase por paridad) para TRABAR todas las caras. En cada esquina,
+    // el brazo del HEADER de esa hilada recede 2 m (le entra el header 1 m) y el otro recede 1 m.
     const H=st.crown[0]-st.base[0], full=Math.floor(H+1e-9), half=(H-full)>0.25;
     const hasStart=i>0, hasEnd=i<n-1;
     const courses=[]; for(let k=0;k<full;k++) courses.push({y:k, alto:1}); if(half) courses.push({y:full, alto:0.5});
     courses.forEach(function(c){ const yp=Math.floor(c.y+1e-6)%2, par=(yp===0);
-      const buttStart = hasStart && ((par?(i-1):i)!==i);   // ¿este brazo TOPA en la esquina de inicio?
-      const buttEnd   = hasEnd   && ((par?i:(i+1))!==i);   // ¿TOPA en la esquina de fin?
-      const a = buttStart ? w : 0, b = Lext - (buttEnd? w : 0);
+      // header de la esquina de inicio (i-1,i): hi = par? i : i-1. Este brazo es hi en inicio si par.
+      const rStart = hasStart ? (par ? 2*w : w) : 0;
+      // header de la esquina de fin (i,i+1): hi = par? i+1 : i. Este brazo es hi en fin si !par.
+      const rEnd   = hasEnd   ? (par ? w : 2*w) : 0;
+      const a = rStart, b = Lext - rEnd;
       if(b-a < 0.99) return;
       eleTileGrid(a, b, yp).forEach(function(pc){ boxes.push(elePlace(s, r, pc.x0, pc.l, c.y, c.alto, w, i)); });
+    });
+  }
+  // HEADERS de esquina: por hilada, una pieza de 2 m que CRUZA la esquina y entra 1 m en un brazo,
+  // alternando de brazo cada hilada → los brazos se meten unos dentro de otros (engranan).
+  if(R) for(let ci=0; ci<n-1; ci++){ const rA=R[ci], rB=R[ci+1];
+    const Sx0=Math.max(rA.rx,rB.rx), Sx1=Math.min(rA.rx+rA.rw, rB.rx+rB.rw);
+    const Sz0=Math.max(rA.ry,rB.ry), Sz1=Math.min(rA.ry+rA.rh, rB.ry+rB.rh);
+    if(!(Sx1>Sx0+1e-6 && Sz1>Sz0+1e-6)) continue;
+    const stA=data.estados[ci], stB=data.estados[ci+1];
+    const Hc=Math.min(stA.crown[0]-stA.base[0], stB.crown[0]-stB.base[0]);
+    const full=Math.floor(Hc+1e-9), half=(Hc-full)>0.25;
+    const cs=[]; for(let k=0;k<full;k++) cs.push({y:k,alto:1}); if(half) cs.push({y:full,alto:0.5});
+    cs.forEach(function(c){ const par=(Math.floor(c.y+1e-6)%2===0);
+      const hi=par? ci+1 : ci, hs=segs[hi], hr=R[hi];
+      let hx0,hx1,hz0,hz1;
+      if(hs.dx!==0){ hz0=Sz0; hz1=Sz1;                            // header a lo largo de X
+        if(hr.rx+hr.rw>Sx1+1e-6){ hx0=Sx0; hx1=Sx1+w; } else { hx0=Sx0-w; hx1=Sx1; }
+      } else { hx0=Sx0; hx1=Sx1;                                  // header a lo largo de Z
+        if(hr.ry+hr.rh>Sz1+1e-6){ hz0=Sz0; hz1=Sz1+w; } else { hz0=Sz0-w; hz1=Sz1; }
+      }
+      const lx=hx1-hx0, lz=hz1-hz0;
+      boxes.push({x:hx0, y:c.y, z:hz0, l:lx, a:lz, h:c.alto, largo:Math.max(lx,lz), arm:hi, dx:hs.dx, dy:hs.dy});
     });
   }
   return boxes.filter(function(b){ return b.l>1e-6 && b.a>1e-6 && b.h>1e-6; });
