@@ -417,13 +417,11 @@ function muroPorPerfil(ras, ter, res){
   window.__perfilInput={ras:ras, ter:ter, res:res};   // para recalcular al cambiar de modo
   renderPerfilResult();
 }
-// Interruptor Trabar / Todo 2 m: recalcula el mismo perfil con el otro modo
-function perfilSetTrabar(v){ window.__perfilTrabar=v; const i=window.__perfilInput; if(i) muroPorPerfil(i.ras, i.ter, i.res); }
 // Lista de piezas del relleno: tabicado EXACTO (sin solapes). Running bond: las hiladas
 // alternan el desfase; el 1 m sale solo de remate en los extremos de cada hilada. Nunca
 // se monta una pieza encima de otra.
 function porCotasPiezas(base, crown, cell, N){
-  const trabar = window.__perfilTrabar===true;   // POR DEFECTO false = todo 2 m (sin gaviones pequeños en medio) · true = matajunta con remates 1 m
+  const trabar = true;   // el muro va SIEMPRE trabado (matajunta); rincones de escalón en 2 m y 1 m solo en las puntas
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), piezas=[];
   // Trabado (trabar=true): hiladas de 1 m con fase global por paridad de y (pares alineadas,
@@ -482,11 +480,7 @@ function renderPerfilResult(){
         '<strong id="perfil-gran" style="font-size:18px;color:var(--blue);margin-left:6px">—</strong></div>'+
     '</div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado · clic en un gavión para quitarlo o ponerlo</div>'+
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
-        '<div class="dim" style="font-size:11px">Junta:</div>'+
-        '<button class="btn btn-sm '+(window.__perfilTrabar===true?'btn-primary':'btn-outline')+'" onclick="perfilSetTrabar(true)" title="Matajunta: traba, con medias piezas de 1 m en los bordes"><i class="ti ti-wall"></i> Trabado</button>'+
-        '<button class="btn btn-sm '+(window.__perfilTrabar!==true?'btn-primary':'btn-outline')+'" onclick="perfilSetTrabar(false)" title="Todo gaviones de 2 m enteros; sin gaviones pequeños en medio (no traba)"><i class="ti ti-grid-dots"></i> Todo 2 m</button>'+
-        '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div></div>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotasInter(st)+
       '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> 1 m alto &nbsp; '+
       '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> 0,5 m &nbsp; '+
