@@ -69,6 +69,16 @@ function elePlace(s, r, x, pl, y, alto, w, arm){
   if(s.dy>0)      return {x:r.rx,            y:y, z:s.p0.y+x,      l:w,  a:pl, h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
   return                 {x:r.rx,            y:y, z:s.p0.y-x-pl,   l:w,  a:pl, h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
 }
+// Como elePlace pero a una banda de profundidad (dOff..dOff+bw) hacia el INTERIOR (según normal de la huella).
+function elePlaceD(s, r, x, pl, y, alto, dOff, bw, arm){
+  if(s.dx!==0){ const xx = s.dx>0? s.p0.x+x : s.p0.x-x-pl;
+    const z0 = (r.ny<0) ? (r.ry+r.rh - dOff - bw) : (r.ry + dOff);
+    return {x:xx, y:y, z:z0, l:pl, a:bw, h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
+  }
+  const zz = s.dy>0? s.p0.y+x : s.p0.y-x-pl;
+  const x0 = (r.nx<0) ? (r.rx+r.rw - dOff - bw) : (r.rx + dOff);
+  return {x:x0, y:y, z:zz, l:bw, a:pl, h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
+}
 function eleBoxes(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return [];
   const w=1, segs=data.segs, n=segs.length, boxes=[];
@@ -92,7 +102,12 @@ function eleBoxes(){
       const rEnd   = hasEnd   ? (par ? w : 2*w) : 0;
       const a = rStart, b = Lext - rEnd;
       if(b-a < 0.99) return;
-      eleTileGrid(a, b, yp).forEach(function(pc){ boxes.push(elePlace(s, r, pc.x0, pc.l, c.y, c.alto, w, i)); });
+      // profundidad del prontuario para esta hilada (base ancha que estrecha hacia arriba)
+      const anchos = (typeof seccionAnchos==='function') ? seccionAnchos(H) : [w];
+      const dep = anchos[Math.min(Math.floor(c.y+1e-6), anchos.length-1)];
+      const bandas = (typeof muroBandas==='function') ? muroBandas(dep) : [w];
+      eleTileGrid(a, b, yp).forEach(function(pc){ let dOff=0;
+        bandas.forEach(function(bw){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, c.y, c.alto, dOff, bw, i)); dOff+=bw; }); });
     });
   }
   // HEADERS de esquina: por hilada, una pieza de 2 m que CRUZA la esquina y entra 1 m en un brazo,
@@ -117,7 +132,15 @@ function eleBoxes(){
       boxes.push({x:hx0, y:c.y, z:hz0, l:lx, a:lz, h:c.alto, largo:Math.max(lx,lz), arm:hi, dx:hs.dx, dy:hs.dy});
     });
   }
-  return boxes.filter(function(b){ return b.l>1e-6 && b.a>1e-6 && b.h>1e-6; });
+  // dedup: en las esquinas, las bandas profundas de dos brazos se solapan al ir hacia el interior;
+  // se descarta la caja cuyo centro cae dentro de otra ya colocada (evita cajas montadas).
+  const val = boxes.filter(function(b){ return b.l>1e-6 && b.a>1e-6 && b.h>1e-6; });
+  const kept=[];
+  val.forEach(function(b){ const vb=b.l*b.a*b.h;
+    const solapa = kept.some(function(k){ const ox=Math.min(b.x+b.l,k.x+k.l)-Math.max(b.x,k.x), oy=Math.min(b.y+b.h,k.y+k.h)-Math.max(b.y,k.y), oz=Math.min(b.z+b.a,k.z+k.a)-Math.max(b.z,k.z);
+      if(ox<=1e-6||oy<=1e-6||oz<=1e-6) return false; return (ox*oy*oz) > 0.4*vb; });   // >40% del volumen solapado → descartar
+    if(!solapa) kept.push(b); });
+  return kept;
 }
 function muro3dEle(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return;
