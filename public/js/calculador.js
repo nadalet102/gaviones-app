@@ -394,7 +394,7 @@ function generarPorPerfil(){
   if(ras.length<2 || ter.length<2){ if(res) res.innerHTML='<div class="empty"><i class="ti ti-mountain"></i><p>Da al menos 2 puntos "distancia cota" en la rasante y en el terreno</p></div>'; return; }
   muroPorPerfil(ras, ter, res);
 }
-// Núcleo: interpola las dos líneas, rellena el hueco con gaviones y dibuja
+// Núcleo: interpola las dos líneas, rellena el hueco con gaviones (con estado editable)
 function muroPorPerfil(ras, ter, res){
   const cell=2, L=Math.max(ras[ras.length-1].d, ter[ter.length-1].d), N=Math.max(1, Math.round(L/cell));
   let rasReal=[], terReal=[], base=[], crown=[];
@@ -406,31 +406,80 @@ function muroPorPerfil(ras, ter, res){
   const minB=Math.min.apply(null,base);
   base=base.map(b=>b-minB); crown=crown.map(c=>c-minB);
   const rr=rasReal.map(v=>v-minB), tt=terReal.map(v=>v-minB);
-  const m=porCotasModelo(base, crown, cell, N);
-  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const piezas=porCotasPiezas(base, crown, cell, N);
+  window.__perfil={base:base, crown:crown, cell:cell, N:N, L:L, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
+  window.__perfilRes=res;
+  renderPerfilResult();
+}
+// Lista de piezas (con posición) del relleno: fulls (1 m) + medios (0,5 m), como se traban
+function porCotasPiezas(base, crown, cell, N){
+  const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
+  const maxTop=Math.max.apply(null,crown), piezas=[];
+  const addBand=(x0,x1,ym,alto,off)=>{ let x=x0; muroTramo(x1-x0, off).forEach(p=>{ piezas.push({x:x, y:ym, largo:p, alto:alto}); x+=p; }); };
+  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1,(Math.floor(y)%2===1)); j=k; } else j++; } }
+  const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,false); j=k; } else j++; } };
+  halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
+  halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
+  return piezas;
+}
+function renderPerfilResult(){
+  const st=window.__perfil, res=window.__perfilRes; if(!st||!res) return;
   const tramos=[]; let j=0;
-  while(j<N){ let k=j; while(k<N && Math.abs(base[k]-base[j])<1e-9 && Math.abs(crown[k]-crown[j])<1e-9) k++; tramos.push({L:(k-j)*cell, H:crown[j]-base[j], ancho:null, desnivel:base[j]-((k<N)?base[k]:base[j])}); j=k; }
+  while(j<st.N){ let k=j; while(k<st.N && Math.abs(st.base[k]-st.base[j])<1e-9 && Math.abs(st.crown[k]-st.crown[j])<1e-9) k++; tramos.push({L:(k-j)*st.cell, H:st.crown[j]-st.base[j], ancho:null, desnivel:st.base[j]-((k<st.N)?st.base[k]:st.base[j])}); j=k; }
   window.__muroTramos={tramos:tramos, perfil:'esc'};
-  const filaDesp = m.piezas.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
   res.innerHTML =
     '<div class="card">'+
-      '<div class="card-hdr"><div class="card-title"><i class="ti ti-mountain"></i> Muro por perfil · '+fmtN(L)+' m · relleno rasante–terreno</div>'+
-        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge b-steel">'+m.piezas.length+' tipos de pieza</span>'+
+      '<div class="card-hdr"><div class="card-title"><i class="ti ti-mountain"></i> Muro por perfil · '+fmtN(st.L)+' m</div>'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge b-amber" id="perfil-quitados">0 quitados</span>'+
         '<button class="btn btn-outline btn-sm" onclick="fichaTramos()"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
-      '<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+filaDesp+
-        '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones (cara frontal)</td><td class="r mono" style="font-weight:700">'+fmtN(m.total)+'</td></tr>'+
-      '</tbody></table>'+
+      '<div id="perfil-desp"></div>'+
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular (cara 1 m ancho)</span> '+
-        '<strong style="font-size:18px;color:var(--blue);margin-left:6px">'+fmtN(m.granular)+' m³</strong></div>'+
+        '<strong id="perfil-gran" style="font-size:18px;color:var(--blue);margin-left:6px">—</strong></div>'+
     '</div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado (relleno entre rasante y terreno)</div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado · clic en un gavión para quitarlo o ponerlo</div>'+
       '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotas(base, crown, cell, rr, tt)+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotasInter(st)+
       '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> 1 m alto &nbsp; '+
       '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> 0,5 m &nbsp; '+
       '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #dc2626;vertical-align:middle"></span> rasante &nbsp; '+
-      '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno</div>'+
+      '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno &nbsp;·&nbsp; toca un gavión para quitar/poner</div>'+
     '</div></div>';
+  perfilActualizarTotales();
+}
+function perfilActualizarTotales(){
+  const st=window.__perfil; if(!st) return;
+  const cnt={}; let vol=0, total=0;
+  st.piezas.forEach(function(p,i){ if(st.removed.has(i)) return; const k=p.largo+'|'+p.alto; cnt[k]=(cnt[k]||0)+1; vol+=p.largo*p.alto; total++; });
+  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const lista=Object.keys(cnt).map(k=>{const pp=k.split('|'); return {largo:+pp[0],alto:+pp[1],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
+  const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
+  const desp=document.getElementById('perfil-desp');
+  if(desp) desp.innerHTML='<table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Unidades</th></tr></thead><tbody>'+filas+'<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total gaviones (cara frontal)</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>';
+  const g=document.getElementById('perfil-gran'); if(g) g.textContent=fmtN(vol)+' m³';
+  const q=document.getElementById('perfil-quitados'); if(q) q.textContent=st.removed.size+' quitados';
+}
+function perfilToggle(i){
+  const st=window.__perfil; if(!st) return;
+  if(st.removed.has(i)) st.removed.delete(i); else st.removed.add(i);
+  const el=document.getElementById('pz'+i);
+  if(el){ const p=st.piezas[i], rem=st.removed.has(i), col=(p.alto===1?['#3b82f6','#1d4ed8']:['#f59e0b','#b45309']);
+    el.setAttribute('fill', rem?'#e5e7eb':col[0]); el.setAttribute('stroke', rem?'#cbd5e1':col[1]);
+    if(rem) el.setAttribute('stroke-dasharray','2 2'); else el.removeAttribute('stroke-dasharray'); }
+  perfilActualizarTotales();
+}
+function croquisPorCotasInter(st){
+  const crown=st.crown, N=st.N, cell=st.cell, rr=st.rr, tt=st.tt, piezas=st.piezas, removed=st.removed;
+  const maxTop=Math.max.apply(null,crown), Lm=N*cell;
+  const sc=Math.max(10, Math.min(22, 200/maxTop));
+  const padL=16,padR=16,padT=14,padB=28, vbW=padL+Lm*sc+padR, vbH=padT+maxTop*sc+padB, groundY=padT+maxTop*sc;
+  const X=xm=>padL+xm*sc, Y=ym=>groundY-ym*sc; let out='';
+  const fmtm=x=>String(x).replace('.',',');
+  piezas.forEach(function(p,i){ const rem=removed.has(i), col=(p.alto===1?['#3b82f6','#1d4ed8']:['#f59e0b','#b45309']);
+    out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col[0])+'" stroke="'+(rem?'#cbd5e1':col[1])+'" stroke-width="0.6"'+(rem?' stroke-dasharray="2 2"':'')+' style="cursor:pointer" onclick="perfilToggle('+i+')"><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
+  });
+  if(tt){ let tp=''; for(let j=0;j<N;j++){ tp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(tt[j]).toFixed(1)+' '; } out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.8" pointer-events="none"/>'; }
+  if(rr){ let rp=''; for(let j=0;j<N;j++){ rp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(rr[j]).toFixed(1)+' '; } out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="2" pointer-events="none"/>'; }
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado editable del muro por perfil">'+out+'</svg>';
 }
 
 // Escalonado por cotas: muro CONTINUO trabado. Cimentación (base) con floor y coronación
