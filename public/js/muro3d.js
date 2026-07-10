@@ -49,18 +49,43 @@ function muro3dTramos(){
 }
 
 // Muro en L / U: cada tramo (piezas de su alzado) se coloca y gira 90° según la planta.
-function muro3dEle(){
-  const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return;
-  const w=1, boxes=[];   // w = ancho/profundidad del muro en planta
+// Encastre de esquina: por cada hilada, un brazo CRUZA la esquina (se alarga 0,5 m) y el otro
+// se RECORTA 0,5 m, alternando de brazo hilada a hilada → encastra sin huecos ni solapes.
+function eleBoxes(){
+  const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return [];
+  const w=1, half=w/2, boxes=[];
   data.segs.forEach(function(s, si){ const st=data.estados[si]; if(!st) return;
-    st.piezas.forEach(function(p){
-      if(s.dx>0)      boxes.push({x:s.p0.x+p.x,           y:p.y, z:s.p0.y-w/2,          l:p.largo, a:w,       h:p.alto, largo:p.largo});
-      else if(s.dx<0) boxes.push({x:s.p0.x-p.x-p.largo,   y:p.y, z:s.p0.y-w/2,          l:p.largo, a:w,       h:p.alto, largo:p.largo});
-      else if(s.dy>0) boxes.push({x:s.p0.x-w/2,           y:p.y, z:s.p0.y+p.x,          l:w,       a:p.largo, h:p.alto, largo:p.largo});
-      else            boxes.push({x:s.p0.x-w/2,           y:p.y, z:s.p0.y-p.x-p.largo,  l:w,       a:p.largo, h:p.alto, largo:p.largo});
+    st.piezas.forEach(function(p){ let b;
+      if(s.dx>0)      b={x:s.p0.x+p.x,          y:p.y, z:s.p0.y-half,         l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      else if(s.dx<0) b={x:s.p0.x-p.x-p.largo,  y:p.y, z:s.p0.y-half,         l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      else if(s.dy>0) b={x:s.p0.x-half,         y:p.y, z:s.p0.y+p.x,          l:w,       a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      else            b={x:s.p0.x-half,         y:p.y, z:s.p0.y-p.x-p.largo,   l:w,      a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      boxes.push(b);
     });
   });
-  muro3dOpen(boxes, 'Muro en L/U · '+data.T.length+' tramos');
+  for(let ci=0; ci<data.segs.length-1; ci++){
+    const V={x:data.segs[ci].p1.x, z:data.segs[ci].p1.y}, a=ci, b=ci+1;
+    const Sx0=V.x-half, Sx1=V.x+half, Sz0=V.z-half, Sz1=V.z+half;
+    boxes.forEach(function(bx){ if(bx.arm!==a && bx.arm!==b) return;
+      const ox=Math.min(bx.x+bx.l,Sx1)-Math.max(bx.x,Sx0), oz=Math.min(bx.z+bx.a,Sz1)-Math.max(bx.z,Sz0);
+      if(ox<=1e-6 || oz<=1e-6) return;   // esta caja no toca el cuadro de esquina
+      const owner=(Math.floor(bx.y+1e-6)%2===0)?a:b, ext=(bx.arm===owner);   // dueño alterna por hilada
+      if(bx.dx!==0){ const end=bx.x+bx.l;
+        if(bx.x < Sx0-1e-6) bx.l=(ext?Sx1:Sx0)-bx.x;                 // extremo derecho dentro de S
+        else if(end > Sx1+1e-6){ const nx=(ext?Sx0:Sx1); bx.x=nx; bx.l=end-nx; }   // extremo izquierdo dentro
+        else bx.l=(ext?Sx1:Sx0)-bx.x;
+      } else { const end=bx.z+bx.a;
+        if(bx.z < Sz0-1e-6) bx.a=(ext?Sz1:Sz0)-bx.z;
+        else if(end > Sz1+1e-6){ const nz=(ext?Sz0:Sz1); bx.z=nz; bx.a=end-nz; }
+        else bx.a=(ext?Sz1:Sz0)-bx.z;
+      }
+    });
+  }
+  return boxes.filter(function(b){ return b.l>1e-6 && b.a>1e-6 && b.h>1e-6; });
+}
+function muro3dEle(){
+  const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return;
+  muro3dOpen(eleBoxes(), 'Muro en L/U · '+data.T.length+' tramos');
 }
 
 function muro3dInjectCSS(){
