@@ -422,12 +422,12 @@ function muroPorPerfil(ras, ter, res){
 function porCotasPiezas(base, crown, cell, N){
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), piezas=[];
-  // off=false SIEMPRE: hiladas de gaviones de 2 m alineados (se maximiza el 2 m). El
-  // trabado lo dan los escalones. Como cada banda mide un nº entero de celdas de 2 m,
-  // NO aparece ninguna pieza de 1 m/1,5 m en el interior; sólo saldrían al inicio/final
-  // si la longitud total fuese impar.
+  // Hiladas de 1 m: SIEMPRE trabadas a matajunta (fase global por paridad de y → las
+  // pares alineadas y las impares desfasadas 1 m). Los únicos 1 m son las medias-piezas
+  // del borde inclinado, que son precisamente las que traban (como un muro de ladrillo).
+  // Franjas medias (0,5): alineadas de 2 m → sin piezas naranjas pequeñas.
   const addBand=(x0,x1,ym,alto,off)=>{ let x=x0; muroTramo(x1-x0, off).forEach(p=>{ piezas.push({x:x, y:ym, largo:p, alto:alto}); x+=p; }); };
-  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1,false); j=k; } else j++; } }
+  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1,(Math.floor(y)%2===1)); j=k; } else j++; } }
   const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,false); j=k; } else j++; } };
   halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
