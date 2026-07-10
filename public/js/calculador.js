@@ -415,18 +415,30 @@ function muroPorPerfil(ras, ter, res){
   window.__perfilRes=res;
   renderPerfilResult();
 }
-// Lista de piezas (con posición) del relleno: fulls (1 m) + medios (0,5 m), como se traban
+// Lista de piezas del relleno POR COBERTURA: running bond de 2 m; en los escalones la
+// pieza de 2 m sobresale (cubre) en vez de meter un 1 m. Las de 1 m solo en inicio/fin.
 function porCotasPiezas(base, crown, cell, N){
-  const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
-  const maxTop=Math.max.apply(null,crown), piezas=[];
-  // TRABADO (running bond): las hiladas alternan el desfase → juntas verticales desfasadas.
-  // Los 2 m van en el centro; la pieza de 1 m sale SOLO en los extremos de cada hilada
-  // (inevitable para trabar). Los que sobren se quitan con clic.
-  const addBand=(x0,x1,ym,alto,off)=>{ let x=x0; muroTramo(x1-x0, off).forEach(p=>{ piezas.push({x:x, y:ym, largo:p, alto:alto}); x+=p; }); };
-  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,k*cell,y,1,(Math.floor(y)%2===1)); j=k; } else j++; } }
-  const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,k*cell,v,0.5,(Math.floor(v+1e-6)%2===1)); j=k; } else j++; } };
-  halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
-  halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
+  const maxTop=Math.max.apply(null,crown), L=N*cell, piezas=[];
+  // tabica [x0,x1] a nivel y con piezas de 2 m en la retícula global (desfase off);
+  // permite sobresalir (cubrir) en los extremos internos; recorta solo en 0 y L.
+  const tila=(x0,x1,y,alto,off)=>{
+    let gs=Math.floor((x0-off)/2)*2+off;               // primera posición de retícula ≤ x0
+    for(let g=gs; g<x1-1e-6; g+=2){
+      let px=g, w=2;
+      if(px<-1e-6){ w=g+2; px=0; }                     // arranque del muro → remate parcial
+      else if(g+2>L+1e-6){ w=L-g; }                    // final del muro → remate parcial
+      if(w>0.4){ const lg = (w>=1.75)?2:(w>=1.25)?1.5:1; piezas.push({x:px, y:y, largo:lg, alto:alto}); }
+    }
+  };
+  // hiladas completas (1 m): cubre donde el muro abarca [y, y+1]
+  for(let y=0;y<Math.round(maxTop);y++){ const off=(y%2)?1:0; let j=0;
+    while(j<N){ if(base[j]<=y+1e-6 && crown[j]>=y+1-1e-6){ let k=j; while(k<N && base[k]<=y+1e-6 && crown[k]>=y+1-1e-6) k++; tila(j*cell,k*cell,y,1,off); j=k; } else j++; }
+  }
+  // medios (0,5): remate superior (crown no entero) e inferior (base no entera)
+  let j=0;
+  while(j<N){ const v=Math.floor(crown[j]); if(crown[j]-v>0.25){ let k=j; while(k<N && Math.abs(Math.floor(crown[k])-v)<1e-6 && crown[k]-v>0.25) k++; tila(j*cell,k*cell,v,0.5,(v%2)?1:0); j=k; } else j++; }
+  j=0;
+  while(j<N){ const v=base[j], fv=Math.floor(v+1e-6); if(v-fv>0.25){ let k=j; while(k<N && Math.abs(base[k]-v)<1e-6) k++; tila(j*cell,k*cell,v,0.5,(fv%2)?1:0); j=k; } else j++; }
   return piezas;
 }
 function renderPerfilResult(){
