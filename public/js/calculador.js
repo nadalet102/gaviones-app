@@ -413,6 +413,7 @@ function muroPorPerfil(ras, ter, res){
   const rr=rasReal.map(v=>v-minB), tt=terReal.map(v=>v-minB);
   const piezas=porCotasPiezas(base, crown, cell, N, L);
   window.__perfil={base:base, crown:crown, cell:cell, N:N, L:L, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
+  window.__perfilSel=null;
   window.__perfilRes=res;
   window.__perfilInput={ras:ras, ter:ter, res:res};   // para recalcular al cambiar de modo
   renderPerfilResult();
@@ -481,15 +482,44 @@ function renderPerfilResult(){
       '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular (cara 1 m ancho)</span> '+
         '<strong id="perfil-gran" style="font-size:18px;color:var(--blue);margin-left:6px">—</strong></div>'+
     '</div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado · clic en un gavión para quitarlo o ponerlo</div>'+
-      '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado · toca un gavión para editarlo o eliminarlo</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn btn-outline btn-sm" onclick="perfilRestablecerTodo()"><i class="ti ti-refresh"></i> Restablecer</button>'+
+      '<button class="btn btn-primary btn-sm" onclick="muro3dTramos()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D real</button></div></div>'+
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPorCotasInter(st)+
+      '<div id="perfil-edit"></div>'+
       '<div class="dim" style="font-size:11px;margin-top:8px"><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> 1 m alto &nbsp; '+
       '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> 0,5 m &nbsp; '+
       '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #dc2626;vertical-align:middle"></span> rasante &nbsp; '+
-      '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno &nbsp;·&nbsp; toca un gavión para quitar/poner</div>'+
+      '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno &nbsp;·&nbsp; toca un gavión para editar largo/alto o eliminarlo</div>'+
     '</div></div>';
   perfilActualizarTotales();
+  perfilRenderEdit();
+}
+// Panel de edición del gavión seleccionado (largo/alto, eliminar/restaurar)
+function perfilRenderEdit(){
+  const st=window.__perfil, box=document.getElementById('perfil-edit'); if(!box) return;
+  const i=window.__perfilSel;
+  if(i==null || !st || !st.piezas[i]){ box.innerHTML=''; return; }
+  const p=st.piezas[i], rem=st.removed.has(i), fmtm=x=>String(x).replace('.',',');
+  box.innerHTML='<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2,#f8fafc);display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">'+
+    '<div style="font-weight:600;font-size:12px;align-self:center">Gavión: <span class="mono">'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</span></div>'+
+    '<div class="field" style="margin:0"><label style="font-size:11px">Largo (m)</label><input type="number" id="ed-largo" min="0.5" step="0.5" value="'+p.largo+'" style="width:84px" onkeydown="if(event.key===\'Enter\')perfilEditAplicar()"></div>'+
+    '<div class="field" style="margin:0"><label style="font-size:11px">Alto (m)</label><select id="ed-alto"><option value="1"'+(p.alto===1?' selected':'')+'>1</option><option value="0.5"'+(p.alto===0.5?' selected':'')+'>0,5</option></select></div>'+
+    '<button class="btn btn-primary btn-sm" onclick="perfilEditAplicar()"><i class="ti ti-check"></i> Aplicar</button>'+
+    '<button class="btn btn-outline btn-sm" onclick="perfilEditEliminar()">'+(rem?'<i class="ti ti-arrow-back-up"></i> Restaurar':'<i class="ti ti-trash"></i> Eliminar')+'</button>'+
+    '<button class="btn btn-outline btn-sm" onclick="perfilEditCerrar()">Cerrar</button>'+
+  '</div>';
+}
+function perfilSelect(i){ window.__perfilSel=i; renderPerfilResult(); }
+function perfilEditCerrar(){ window.__perfilSel=null; renderPerfilResult(); }
+function perfilRestablecerTodo(){ const st=window.__perfil; if(!st) return; st.removed.clear(); window.__perfilSel=null; renderPerfilResult(); }
+function perfilEditEliminar(){ const st=window.__perfil, i=window.__perfilSel; if(!st||i==null) return; if(st.removed.has(i)) st.removed.delete(i); else st.removed.add(i); renderPerfilResult(); }
+function perfilEditAplicar(){ const st=window.__perfil, i=window.__perfilSel; if(!st||i==null||!st.piezas[i]) return;
+  const l=parseFloat(document.getElementById('ed-largo').value), a=parseFloat(document.getElementById('ed-alto').value);
+  if(l>0) st.piezas[i].largo=Math.round(l*2)/2;                 // ajustado a 0,5 m
+  if(Math.abs(a-1)<1e-6||Math.abs(a-0.5)<1e-6) st.piezas[i].alto=a;
+  renderPerfilResult();
 }
 function perfilActualizarTotales(){
   const st=window.__perfil; if(!st) return;
@@ -521,8 +551,9 @@ function croquisPorCotasInter(st, ficha){
   const fmtm=x=>String(x).replace('.',',');
   piezas.forEach(function(p,i){ const rem=removed.has(i); if(ficha&&rem) return;   // en ficha se omiten los quitados
     const col=(p.alto===1?['#3b82f6','#1d4ed8']:['#f59e0b','#b45309']);
-    const act = ficha ? '' : ' style="cursor:pointer" onclick="perfilToggle('+i+')"';
-    out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col[0])+'" stroke="'+(rem?'#cbd5e1':col[1])+'" stroke-width="0.6"'+(rem?' stroke-dasharray="2 2"':'')+act+'><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
+    const sel=(!ficha && window.__perfilSel===i);   // gavión seleccionado → borde resaltado
+    const act = ficha ? '' : ' style="cursor:pointer" onclick="perfilSelect('+i+')"';
+    out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col[0])+'" stroke="'+(sel?'#111827':(rem?'#cbd5e1':col[1]))+'" stroke-width="'+(sel?'2.5':'0.6')+'"'+(rem?' stroke-dasharray="2 2"':'')+act+'><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
   });
   if(tt){ let tp=''; for(let j=0;j<N;j++){ tp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(tt[N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.8" pointer-events="none"/>'; }
   if(rr){ let rp=''; for(let j=0;j<N;j++){ rp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(rr[N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="2" pointer-events="none"/>'; }
