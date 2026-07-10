@@ -726,24 +726,44 @@ function eleCalcular(){
         estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Tramo '+(i+1)+' · '+fmtN(T[i].largo)+' m · '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt '+fmtN(T[i].H)+' m</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
       '</div></div>';
 }
+// Huella del muro en planta con MEDIDAS EXTERIORES: la polilínea que dibuja el usuario es la
+// CARA EXTERIOR; el muro (ancho w) se pega hacia DENTRO. Así el largo de cada tramo y la
+// envolvente son exteriores exactos. Devuelve un rect por tramo {rx,ry,rw,rh,nx,ny,s}.
+function eleFootprint(segs, w){
+  const pts=[]; segs.forEach((s,i)=>{ if(i===0)pts.push(s.p0); pts.push(s.p1); });
+  const cx=pts.reduce((a,p)=>a+p.x,0)/pts.length, cy=pts.reduce((a,p)=>a+p.y,0)/pts.length;
+  return segs.map(s=>{ const midx=(s.p0.x+s.p1.x)/2, midy=(s.p0.y+s.p1.y)/2;
+    let nx=-s.dy, ny=s.dx; if((cx-midx)*nx+(cy-midy)*ny<0){ nx=-nx; ny=-ny; }   // normal hacia el interior
+    let rx,ry,rw,rh;
+    if(s.dx!==0){ rx=Math.min(s.p0.x,s.p1.x); rw=s.largo; ry=(ny<0)?s.p0.y-w:s.p0.y; rh=w; }
+    else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=(nx<0)?s.p0.x-w:s.p0.x; rw=w; }
+    return {rx:rx, ry:ry, rw:rw, rh:rh, nx:nx, ny:ny, s:s}; });
+}
 function croquisPlantaLU(segs){
-  const w=1;   // ancho del muro en planta (m)
-  let xs=[], ys=[]; segs.forEach(s=>{ xs.push(s.p0.x,s.p1.x); ys.push(s.p0.y,s.p1.y); });
-  const minX=Math.min.apply(null,xs)-w, maxX=Math.max.apply(null,xs)+w, minY=Math.min.apply(null,ys)-w, maxY=Math.max.apply(null,ys)+w;
-  const Wm=maxX-minX, Hm=maxY-minY, sc=Math.max(3, Math.min(10, 520/Math.max(Wm,Hm)));
-  const pad=26, vbW=pad*2+Wm*sc, vbH=pad*2+Hm*sc;
-  const X=xm=>pad+(xm-minX)*sc, Y=ym=>pad+(maxY-ym)*sc;   // Y hacia arriba
-  let out='';
-  segs.forEach(s=>{ let rx,ry,rw,rh;
-    if(s.dx!==0){ rx=Math.min(s.p0.x,s.p1.x); rw=s.largo; ry=s.p0.y-w/2; rh=w; }
-    else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=s.p0.x-w/2; rw=w; }
-    out+='<rect x="'+X(rx).toFixed(1)+'" y="'+Y(ry+rh).toFixed(1)+'" width="'+(rw*sc).toFixed(1)+'" height="'+(rh*sc).toFixed(1)+'" fill="#3b82f6" fill-opacity="0.45" stroke="#1d4ed8" stroke-width="1.2"/>';
-    const mx=(s.p0.x+s.p1.x)/2, my=(s.p0.y+s.p1.y)/2;
+  const w=1;
+  const R=eleFootprint(segs, w);
+  // envolvente EXTERIOR = polilínea del recorrido (bordes de fuera)
+  let vx=[], vy=[]; segs.forEach((s,i)=>{ if(i===0){vx.push(s.p0.x);vy.push(s.p0.y);} vx.push(s.p1.x); vy.push(s.p1.y); });
+  const exMinX=Math.min.apply(null,vx), exMaxX=Math.max.apply(null,vx), exMinY=Math.min.apply(null,vy), exMaxY=Math.max.apply(null,vy);
+  const extW=exMaxX-exMinX, extH=exMaxY-exMinY;
+  const minX=exMinX-3, maxX=exMaxX+3, minY=exMinY-3, maxY=exMaxY+3;
+  const Wm=maxX-minX, Hm=maxY-minY, sc=Math.max(3, Math.min(11, 520/Math.max(Wm,Hm)));
+  const pad=24, vbW=pad*2+Wm*sc, vbH=pad*2+Hm*sc;
+  const X=xm=>pad+(xm-minX)*sc, Y=ym=>pad+(maxY-ym)*sc; let out='';
+  R.forEach(function(r){ const s=r.s;
+    out+='<rect x="'+X(r.rx).toFixed(1)+'" y="'+Y(r.ry+r.rh).toFixed(1)+'" width="'+(r.rw*sc).toFixed(1)+'" height="'+(r.rh*sc).toFixed(1)+'" fill="#3b82f6" fill-opacity="0.45" stroke="#1d4ed8" stroke-width="1.2"/>';
+    const mx=r.rx+r.rw/2, my=r.ry+r.rh/2;
     out+='<text x="'+X(mx).toFixed(1)+'" y="'+Y(my).toFixed(1)+'" font-size="11" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" style="paint-order:stroke;stroke:#fff;stroke-width:3px">T'+(s.i+1)+' · '+fmtN(s.largo)+'m</text>';
   });
-  for(let i=0;i<segs.length-1;i++){ const c=segs[i].p1;
-    out+='<rect x="'+X(c.x-w/2).toFixed(1)+'" y="'+Y(c.y+w/2).toFixed(1)+'" width="'+(w*sc).toFixed(1)+'" height="'+(w*sc).toFixed(1)+'" fill="none" stroke="#dc2626" stroke-width="1.6" stroke-dasharray="3 2"/>'; }
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block;max-width:100%;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta del muro en L/U">'+out+'</svg>';
+  // esquinas: intersección de rects contiguos
+  for(let i=0;i<R.length-1;i++){ const a=R[i], b=R[i+1];
+    const ix0=Math.max(a.rx,b.rx), ix1=Math.min(a.rx+a.rw,b.rx+b.rw), iy0=Math.max(a.ry,b.ry), iy1=Math.min(a.ry+a.rh,b.ry+b.rh);
+    if(ix1>ix0+1e-6&&iy1>iy0+1e-6) out+='<rect x="'+X(ix0).toFixed(1)+'" y="'+Y(iy1).toFixed(1)+'" width="'+((ix1-ix0)*sc).toFixed(1)+'" height="'+((iy1-iy0)*sc).toFixed(1)+'" fill="none" stroke="#dc2626" stroke-width="1.6" stroke-dasharray="3 2"/>'; }
+  // cotas exteriores (arriba = ancho, izquierda = alto)
+  const dy=Y(exMaxY)-14, dx=X(exMinX)-14;
+  out+='<line x1="'+X(exMinX)+'" y1="'+dy+'" x2="'+X(exMaxX)+'" y2="'+dy+'" stroke="#64748b" stroke-width="1"/><text x="'+((X(exMinX)+X(exMaxX))/2)+'" y="'+(dy-3)+'" font-size="10.5" font-weight="600" text-anchor="middle" fill="#334155">'+fmtN(extW)+' m ext.</text>';
+  out+='<line x1="'+dx+'" y1="'+Y(exMinY)+'" x2="'+dx+'" y2="'+Y(exMaxY)+'" stroke="#64748b" stroke-width="1"/><text x="'+dx+'" y="'+((Y(exMinY)+Y(exMaxY))/2)+'" font-size="10.5" font-weight="600" text-anchor="middle" fill="#334155" transform="rotate(-90 '+dx+' '+((Y(exMinY)+Y(exMaxY))/2)+')">'+fmtN(extH)+' m ext.</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block;max-width:100%;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta del muro en L/U (medidas exteriores)">'+out+'</svg>';
 }
 function croquisPorCotasInter(st, ficha){
   const crown=st.crown, N=st.N, cell=st.cell, rr=st.rr, tt=st.tt, piezas=st.piezas, removed=st.removed;

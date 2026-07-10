@@ -53,19 +53,27 @@ function muro3dTramos(){
 // se RECORTA 0,5 m, alternando de brazo hilada a hilada → encastra sin huecos ni solapes.
 function eleBoxes(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return [];
-  const w=1, half=w/2, boxes=[];
+  const w=1, boxes=[];
+  const R = (typeof eleFootprint==='function') ? eleFootprint(data.segs, w) : null;   // huella hacia dentro (medidas exteriores)
   data.segs.forEach(function(s, si){ const st=data.estados[si]; if(!st) return;
+    const r = R ? R[si] : {rx:s.p0.x-w/2, ry:s.p0.y-w/2};
     st.piezas.forEach(function(p){ let b;
-      if(s.dx>0)      b={x:s.p0.x+p.x,          y:p.y, z:s.p0.y-half,         l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
-      else if(s.dx<0) b={x:s.p0.x-p.x-p.largo,  y:p.y, z:s.p0.y-half,         l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
-      else if(s.dy>0) b={x:s.p0.x-half,         y:p.y, z:s.p0.y+p.x,          l:w,       a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
-      else            b={x:s.p0.x-half,         y:p.y, z:s.p0.y-p.x-p.largo,   l:w,      a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      if(s.dx>0)      b={x:s.p0.x+p.x,          y:p.y, z:r.ry,               l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      else if(s.dx<0) b={x:s.p0.x-p.x-p.largo,  y:p.y, z:r.ry,               l:p.largo, a:w,       h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      else if(s.dy>0) b={x:r.rx,                y:p.y, z:s.p0.y+p.x,          l:w,       a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
+      else            b={x:r.rx,                y:p.y, z:s.p0.y-p.x-p.largo,   l:w,      a:p.largo, h:p.alto, largo:p.largo, arm:si, dx:s.dx, dy:s.dy};
       boxes.push(b);
     });
   });
   for(let ci=0; ci<data.segs.length-1; ci++){
-    const V={x:data.segs[ci].p1.x, z:data.segs[ci].p1.y}, a=ci, b=ci+1;
-    const Sx0=V.x-half, Sx1=V.x+half, Sz0=V.z-half, Sz1=V.z+half;
+    const a=ci, b=ci+1;
+    // cuadro de esquina = intersección de las huellas de los dos brazos
+    let Sx0, Sx1, Sz0, Sz1;
+    if(R){ const ra=R[ci], rb=R[ci+1];
+      Sx0=Math.max(ra.rx, rb.rx); Sx1=Math.min(ra.rx+ra.rw, rb.rx+rb.rw);
+      Sz0=Math.max(ra.ry, rb.ry); Sz1=Math.min(ra.ry+ra.rh, rb.ry+rb.rh);
+    } else { const V={x:data.segs[ci].p1.x, z:data.segs[ci].p1.y}; Sx0=V.x-w/2; Sx1=V.x+w/2; Sz0=V.z-w/2; Sz1=V.z+w/2; }
+    if(!(Sx1>Sx0+1e-6 && Sz1>Sz0+1e-6)) continue;
     boxes.forEach(function(bx){ if(bx.arm!==a && bx.arm!==b) return;
       const ox=Math.min(bx.x+bx.l,Sx1)-Math.max(bx.x,Sx0), oz=Math.min(bx.z+bx.a,Sz1)-Math.max(bx.z,Sz0);
       if(ox<=1e-6 || oz<=1e-6) return;   // esta caja no toca el cuadro de esquina
