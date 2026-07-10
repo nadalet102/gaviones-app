@@ -21,6 +21,29 @@ function muroPerfilAnchos(H){
   for(var k=1;k<=H;k++) w.push(1 + Math.max(0, extra - 0.5*(k-1)));
   return w; // bottom→top
 }
+// Sección del prontuario: anchos (profundidad) por hilada, de abajo a arriba, para una altura H.
+// Muros <2 m: profundidad 1 m. H≥2: usa MURO_TABLA (base más ancha), la copa siempre 1 m.
+function seccionAnchos(H){
+  if(H>=2-1e-9){ var dH=Math.min(10, Math.max(2, Math.ceil(H-1e-6))); return muroPerfilAnchos(dH); }
+  return [1];
+}
+// Despiece CON PROFUNDIDAD según el prontuario: recorre cada columna (2 m) del muro por perfil,
+// aplica la sección del prontuario según su altura y suma piezas por (largo×ancho×alto) + volumen.
+function perfilProntuario(base, crown, cell, N){
+  var granular=0, cnt={};
+  for(var j=0;j<N;j++){ var Hj=crown[j]-base[j]; if(Hj<=1e-6) continue;
+    var anchos=seccionAnchos(Hj), full=Math.floor(Hj+1e-9), half=(Hj-full)>0.25;
+    var addCourse=function(k, alto){ var wk=anchos[Math.min(k, anchos.length-1)];
+      granular += wk*alto*cell;
+      muroBandas(wk).forEach(function(bw){ var key='2|'+bw+'|'+alto; cnt[key]=(cnt[key]||0)+Math.round(cell/2); });
+    };
+    for(var k=0;k<full;k++) addCourse(k,1);
+    if(half) addCourse(full,0.5);
+  }
+  var piezas=Object.keys(cnt).map(function(key){ var p=key.split('|'); return {largo:+p[0], ancho:+p[1], alto:+p[2], n:cnt[key]}; })
+    .sort(function(a,b){ return (b.alto-a.alto)||(b.ancho-a.ancho); });
+  return { granular:granular, piezas:piezas, total:piezas.reduce(function(s,p){return s+p.n;},0) };
+}
 // Tabica una hilada de longitud L con piezas COMPLETAS de 2/1,5/1 m que suman EXACTO L.
 // Prioriza piezas de 2 m; el medio metro (L acabado en ,5) lo aporta una pieza de 1,5 m.
 // offset=true desfasa las juntas (trabado): la hilada se coloca "al revés" y, si es todo
@@ -487,20 +510,46 @@ function porCotasPiezas(base, crown, cell, N, L){
   });
   return piezas.filter(Boolean);
 }
+// Sección del muro (profundidad × altura) según el prontuario: base ancha que estrecha hacia arriba.
+function croquisSeccionPront(H){
+  const anchos=seccionAnchos(H), nH=anchos.length, maxW=Math.max.apply(null,anchos);
+  const sc=Math.max(12, Math.min(26, 150/Math.max(nH,maxW)));
+  const pad=18, vbW=pad*2+maxW*sc+28, vbH=pad*2+nH*sc;
+  const X=x=>pad+x*sc, Y=k=>pad+(nH-k)*sc;   // k desde abajo
+  let out='';
+  for(let k=0;k<nH;k++){ const w=anchos[k];
+    out+='<rect x="'+X(0).toFixed(1)+'" y="'+Y(k+1).toFixed(1)+'" width="'+(w*sc).toFixed(1)+'" height="'+sc.toFixed(1)+'" fill="#3b82f6" fill-opacity="0.4" stroke="#1d4ed8" stroke-width="1"/>';
+    out+='<text x="'+(X(w)+4).toFixed(1)+'" y="'+(Y(k)-sc/2+3).toFixed(1)+'" font-size="9" fill="#0f172a" style="paint-order:stroke;stroke:#fff;stroke-width:2px">'+fmtN(w)+' m</text>';
+  }
+  out+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(0).toFixed(1)+'" x2="'+X(0).toFixed(1)+'" y2="'+Y(nH).toFixed(1)+'" stroke="#dc2626" stroke-width="2.2"/>';
+  out+='<text x="'+X(0).toFixed(1)+'" y="'+(Y(nH)-4).toFixed(1)+'" font-size="9" fill="#dc2626" text-anchor="middle">cara</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sección del muro (prontuario)">'+out+'</svg>';
+}
 function renderPerfilResult(){
   const st=window.__perfil, res=window.__perfilRes; if(!st||!res) return;
   const tramos=[]; let j=0;
   while(j<st.N){ let k=j; while(k<st.N && Math.abs(st.base[k]-st.base[j])<1e-9 && Math.abs(st.crown[k]-st.crown[j])<1e-9) k++; tramos.push({L:(k-j)*st.cell, H:st.crown[j]-st.base[j], ancho:null, desnivel:st.base[j]-((k<st.N)?st.base[k]:st.base[j])}); j=k; }
   window.__muroTramos={tramos:tramos, perfil:'esc'};
+  const pr=perfilProntuario(st.base, st.crown, st.cell, st.N), Hmax=Math.max.apply(null,st.crown);
+  const fmtm2=x=>String(Math.round(x*100)/100).replace('.',',');
+  const prFilas=pr.piezas.map(p=>'<tr><td>Gavión <strong>'+fmtm2(p.largo)+'×'+fmtm2(p.ancho)+'×'+fmtm2(p.alto)+' m</strong></td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
   res.innerHTML =
     '<div class="card">'+
       '<div class="card-hdr"><div class="card-title"><i class="ti ti-mountain"></i> Muro por perfil · '+fmtN(st.L)+' m</div>'+
         '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge b-amber" id="perfil-quitados">0 quitados</span>'+
         '<button class="btn btn-outline btn-sm" onclick="fichaPerfil()"><i class="ti ti-file-description"></i> Ficha técnica</button></div></div>'+
       '<div id="perfil-desp"></div>'+
-      '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Material granular (cara 1 m ancho)</span> '+
+      '<div class="card-body" style="padding:12px 16px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Gaviones cara frontal · granular (cara 1 m)</span> '+
         '<strong id="perfil-gran" style="font-size:18px;color:var(--blue);margin-left:6px">—</strong></div>'+
     '</div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección y material real (prontuario ARISAC)</div>'+
+      '<span class="dim">'+fmtN(pr.granular)+' m³ · '+fmtN(pr.total)+' gaviones</span></div>'+
+      '<div class="card-body" style="padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'+
+        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección a la altura máx. ('+fmtN(Hmax)+' m)</div>'+croquisSeccionPront(Hmax)+'</div>'+
+        '<div style="flex:1;min-width:240px"><table class="tbl"><thead><tr><th>Pieza (largo×ancho×alto)</th><th class="r">Uds</th></tr></thead><tbody>'+prFilas+
+          '<tr style="border-top:2px solid var(--border)"><td style="font-weight:600">Total (con profundidad)</td><td class="r mono" style="font-weight:700">'+fmtN(pr.total)+'</td></tr></tbody></table>'+
+          '<div class="dim" style="font-size:11px;margin-top:6px">A más altura, la base ensancha (prontuario): añade bandas de profundidad detrás de la cara. Volumen granular real = <strong>'+fmtN(pr.granular)+' m³</strong>.</div></div>'+
+      '</div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzado · toca un gavión para editarlo o eliminarlo</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
       '<button class="btn btn-outline btn-sm" onclick="perfilRestablecerTodo()"><i class="ti ti-refresh"></i> Restablecer</button>'+
@@ -644,7 +693,13 @@ function eleCalcular(){
     if(half){ cnt['1.5|0.5']=(cnt['1.5|0.5']||0)+1; esqN++; esqVol+=0.75; }
   }
   vol+=esqVol; total+=esqN;
+  // PRONTUARIO (profundidad real): suma por tramo la sección del prontuario según su altura
+  let prVol=0, prTotal=0, prCnt={}, prHmax=0;
+  estados.forEach(function(st){ const p=perfilProntuario(st.base,st.crown,st.cell,st.N); prVol+=p.granular; prTotal+=p.total;
+    p.piezas.forEach(function(q){ const k=q.largo+'|'+q.ancho+'|'+q.alto; prCnt[k]=(prCnt[k]||0)+q.n; });
+    prHmax=Math.max(prHmax, Math.max.apply(null,st.crown)); });
   const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const prFilas=Object.keys(prCnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],ancho:+pp[1],alto:+pp[2],n:prCnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)).map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+'×'+fmtm(p.ancho)+'×'+fmtm(p.alto)+' m</strong></td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
   const lista=Object.keys(cnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],alto:+pp[1],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
   const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
   const nEsq=Math.max(0,T.length-1);
@@ -658,6 +713,14 @@ function eleCalcular(){
       '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
       '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
       '<div class="dim" style="font-size:11px;margin-top:6px">Incluye <strong>'+fmtN(esqN)+'</strong> gaviones de <strong>1,5 m</strong> de traba en '+nEsq+' esquina(s) — uno por hilada, alternando de brazo (1,5 m = 1 m del ancho del otro muro + 0,5 m dentro del suyo).</div></div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección y material real (prontuario ARISAC)</div>'+
+      '<span class="dim">'+fmtN(prVol)+' m³ · '+fmtN(prTotal)+' gaviones</span></div>'+
+      '<div class="card-body" style="padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'+
+        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección a la altura máx. ('+fmtN(prHmax)+' m)</div>'+croquisSeccionPront(prHmax)+'</div>'+
+        '<div style="flex:1;min-width:240px"><table class="tbl"><thead><tr><th>Pieza (largo×ancho×alto)</th><th class="r">Uds</th></tr></thead><tbody>'+prFilas+
+          '<tr style="border-top:2px solid var(--border)"><td style="font-weight:600">Total (con profundidad)</td><td class="r mono" style="font-weight:700">'+fmtN(prTotal)+'</td></tr></tbody></table>'+
+          '<div class="dim" style="font-size:11px;margin-top:6px">A más altura, la base ensancha (prontuario) y añade bandas de profundidad. Volumen granular real = <strong>'+fmtN(prVol)+' m³</strong> (suma de los tramos).</div></div>'+
+      '</div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por tramo</div></div>'+
       '<div class="card-body" style="padding:14px 16px">'+
         estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Tramo '+(i+1)+' · '+fmtN(T[i].largo)+' m · '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt '+fmtN(T[i].H)+' m</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
