@@ -627,7 +627,7 @@ function perfilToggle(i){
 // ---------- Muro en L / U — dibujo sobre cuadrícula ----------
 // Estado: window.__eleDraw={seg:[{dx,dy,largo,ci,cf,H}]}. Cada clic añade un tramo ortogonal
 // (esquina 90° automática); la tabla ajusta largo/cotas/altura; la planta se recalcula sola.
-const ELG={sc:9, Xmin:-4, Xmax:44, Ymin:-20, Ymax:20, cx0:36, cy0:180, vbW:432, vbH:360};
+const ELG={sc:8, Xmin:-32, Xmax:32, Ymin:-32, Ymax:32, cx0:256, cy0:256, vbW:512, vbH:512};   // origen (inicio) centrado, ±32 m
 function eleVertices(){ const D=window.__eleDraw||(window.__eleDraw={seg:[]}); let x=0,y=0; const v=[{x:0,y:0}]; D.seg.forEach(s=>{ x+=s.dx*s.largo; y+=s.dy*s.largo; v.push({x:x,y:y}); }); return v; }
 function eleGridClick(evt){
   const svg=evt.currentTarget, rect=svg.getBoundingClientRect();
