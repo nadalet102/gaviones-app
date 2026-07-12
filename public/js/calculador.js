@@ -147,7 +147,10 @@ function renderCalculador(){
   const formEle =
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
       '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-vector-triangle"></i> Muro en L / U — dibuja el recorrido</div>'+
-      '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Haz <strong>clic en la cuadrícula</strong> para ir extendiendo el muro (las esquinas salen a 90° solas). Luego ajusta largo, cotas y altura de cada tramo en la tabla.</div>'+
+      '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Haz <strong>clic en la cuadrícula</strong> para ir extendiendo el muro (las esquinas salen a 90° solas). Fija la altura por defecto y se aplica a todo lo que dibujes (luego puedes afinar cada tramo en la tabla).</div>'+
+      '<div class="frow3" style="gap:12px;align-items:flex-end;margin-bottom:10px">'+
+        '<div class="field" style="margin:0"><label>Altura por defecto (m)</label><input type="number" id="el-alt-def" min="0.5" step="0.5" value="'+((window.__eleH)||3)+'" style="width:110px" oninput="eleSetH(this.value)"></div>'+
+      '</div>'+
       '<div id="ele-grid"></div>'+
       '<div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">'+
         '<button class="btn btn-outline btn-sm" onclick="eleUndo()"><i class="ti ti-arrow-back-up"></i> Deshacer</button>'+
@@ -643,6 +646,9 @@ function eleView(){
 }
 function eleZoom(f){ window.__eleZoom=Math.max(0.3, Math.min(4, (window.__eleZoom||1)*f)); eleGridRedraw(); }
 function eleZoomReset(){ window.__eleZoom=1; eleGridRedraw(); }
+// Altura por defecto: se aplica a TODO lo dibujado (tramos existentes) y a los nuevos.
+function eleSetH(v){ const h=parseFloat(v); if(!(h>0)) return; window.__eleH=Math.max(0.5, Math.round(h*2)/2);
+  const D=window.__eleDraw; if(D) D.seg.forEach(function(s){ s.H=window.__eleH; }); eleGridRedraw(); }
 function eleGridClick(evt){
   const svg=evt.currentTarget, rect=svg.getBoundingClientRect(), G=eleView();
   const vx=(evt.clientX-rect.left)*(G.vbW/rect.width), vy=(evt.clientY-rect.top)*(G.vbH/rect.height);
@@ -652,7 +658,7 @@ function eleGridClick(evt){
   let dx0=wx-last.x, dy0=wy-last.y; if(Math.abs(dx0)<1&&Math.abs(dy0)<1) return;
   let dx,dy,largo; if(Math.abs(dx0)>=Math.abs(dy0)){ dx=dx0>0?1:-1; dy=0; largo=Math.abs(dx0); } else { dx=0; dy=dy0>0?1:-1; largo=Math.abs(dy0); }
   const prev=D.seg[D.seg.length-1];
-  D.seg.push({dx:dx, dy:dy, largo:largo, ci:(prev?prev.cf:0), cf:(prev?prev.cf:0), H:(prev?prev.H:3)});
+  D.seg.push({dx:dx, dy:dy, largo:largo, ci:(prev?prev.cf:0), cf:(prev?prev.cf:0), H:(window.__eleH||(prev?prev.H:3))});
   eleGridRedraw();
 }
 function eleGridRedraw(){
