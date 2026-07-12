@@ -627,12 +627,26 @@ function perfilToggle(i){
 // ---------- Muro en L / U — dibujo sobre cuadrícula ----------
 // Estado: window.__eleDraw={seg:[{dx,dy,largo,ci,cf,H}]}. Cada clic añade un tramo ortogonal
 // (esquina 90° automática); la tabla ajusta largo/cotas/altura; la planta se recalcula sola.
-const ELG={sc:8, Xmin:-32, Xmax:32, Ymin:-32, Ymax:32, cx0:256, cy0:256, vbW:512, vbH:512};   // origen (inicio) centrado, ±32 m
 function eleVertices(){ const D=window.__eleDraw||(window.__eleDraw={seg:[]}); let x=0,y=0; const v=[{x:0,y:0}]; D.seg.forEach(s=>{ x+=s.dx*s.largo; y+=s.dy*s.largo; v.push({x:x,y:y}); }); return v; }
+// Vista DINÁMICA: el encuadre se auto-ajusta al muro dibujado (crece solo, sin límite de metros),
+// centrado; window.__eleZoom (por defecto 1) permite acercar/alejar. Devuelve la transformación.
+function eleView(){
+  const V=eleVertices(); const xs=V.map(p=>p.x), ys=V.map(p=>p.y);
+  let minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs), minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+  const margin=6; minX-=margin; maxX+=margin; minY-=margin; maxY+=margin;
+  const minSpan=20, cX=(minX+maxX)/2, cY=(minY+maxY)/2;
+  const spanX=Math.max(maxX-minX, minSpan), spanY=Math.max(maxY-minY, minSpan);
+  const vbW=560, vbH=440, pad=10, zoom=window.__eleZoom||1;
+  const sc=Math.min((vbW-2*pad)/spanX, (vbH-2*pad)/spanY)*zoom;
+  const wMinX=cX-(vbW-2*pad)/(2*sc), wMaxY=cY+(vbH-2*pad)/(2*sc);
+  return {minX:wMinX, maxY:wMaxY, sc:sc, ox:pad, oy:pad, vbW:vbW, vbH:vbH};
+}
+function eleZoom(f){ window.__eleZoom=Math.max(0.3, Math.min(4, (window.__eleZoom||1)*f)); eleGridRedraw(); }
+function eleZoomReset(){ window.__eleZoom=1; eleGridRedraw(); }
 function eleGridClick(evt){
-  const svg=evt.currentTarget, rect=svg.getBoundingClientRect();
-  const vx=(evt.clientX-rect.left)*(ELG.vbW/rect.width), vy=(evt.clientY-rect.top)*(ELG.vbH/rect.height);
-  const wx=Math.round((vx-ELG.cx0)/ELG.sc), wy=Math.round((ELG.cy0-vy)/ELG.sc);
+  const svg=evt.currentTarget, rect=svg.getBoundingClientRect(), G=eleView();
+  const vx=(evt.clientX-rect.left)*(G.vbW/rect.width), vy=(evt.clientY-rect.top)*(G.vbH/rect.height);
+  const wx=Math.round((vx-G.ox)/G.sc + G.minX), wy=Math.round(G.maxY - (vy-G.oy)/G.sc);
   const D=window.__eleDraw||(window.__eleDraw={seg:[]});
   const last=eleVertices().slice(-1)[0];
   let dx0=wx-last.x, dy0=wy-last.y; if(Math.abs(dx0)<1&&Math.abs(dy0)<1) return;
@@ -643,18 +657,27 @@ function eleGridClick(evt){
 }
 function eleGridRedraw(){
   const g=document.getElementById('ele-grid'); if(!g) return;
-  const D=window.__eleDraw||(window.__eleDraw={seg:[]}); const G=ELG;
-  const SX=wx=>G.cx0+wx*G.sc, SY=wy=>G.cy0-wy*G.sc; let grid='';
-  for(let x=G.Xmin;x<=G.Xmax;x+=2){ const m=(x%10===0); grid+='<line x1="'+SX(x)+'" y1="0" x2="'+SX(x)+'" y2="'+G.vbH+'" stroke="'+(m?'#cbd5e1':'#eef2f7')+'" stroke-width="'+(m?1:0.7)+'"/>'; }
-  for(let y=G.Ymin;y<=G.Ymax;y+=2){ const m=(y%10===0); grid+='<line x1="0" y1="'+SY(y)+'" x2="'+G.vbW+'" y2="'+SY(y)+'" stroke="'+(m?'#cbd5e1':'#eef2f7')+'" stroke-width="'+(m?1:0.7)+'"/>'; }
-  grid+='<line x1="0" y1="'+SY(0)+'" x2="'+G.vbW+'" y2="'+SY(0)+'" stroke="#94a3b8"/><line x1="'+SX(0)+'" y1="0" x2="'+SX(0)+'" y2="'+G.vbH+'" stroke="#94a3b8"/>';
-  const V=eleVertices(); let path='M'+SX(0)+' '+SY(0)+' ', verts='<circle cx="'+SX(0)+'" cy="'+SY(0)+'" r="4.5" fill="#16a34a"/>', labels='';
-  D.seg.forEach((s,i)=>{ const a=V[i], b=V[i+1]; path+='L'+SX(b.x)+' '+SY(b.y)+' ';
-    labels+='<text x="'+((SX(a.x)+SX(b.x))/2)+'" y="'+((SY(a.y)+SY(b.y))/2-5)+'" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1d4ed8" style="paint-order:stroke;stroke:#fff;stroke-width:3px">T'+(i+1)+' '+fmtN(s.largo)+'m</text>';
-    verts+='<circle cx="'+SX(b.x)+'" cy="'+SY(b.y)+'" r="4" fill="#1d4ed8"/>'; });
-  const wall=D.seg.length?'<path d="'+path+'" fill="none" stroke="#3b82f6" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" opacity="0.8" pointer-events="none"/>':'';
-  g.innerHTML='<svg viewBox="0 0 '+G.vbW+' '+G.vbH+'" width="100%" style="display:block;max-width:'+G.vbW+'px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:crosshair;touch-action:manipulation" onclick="eleGridClick(event)" xmlns="http://www.w3.org/2000/svg">'+grid+wall+labels+verts+'</svg>'+
-    '<div class="dim" style="font-size:11px;margin-top:4px">'+(D.seg.length? D.seg.length+' tramo(s) · clic para añadir otro. El punto verde es el inicio.' : 'Punto verde = inicio. Haz clic para dibujar el primer tramo.')+'</div>';
+  const D=window.__eleDraw||(window.__eleDraw={seg:[]}); const G=eleView();
+  const SX=wx=>G.ox+(wx-G.minX)*G.sc, SY=wy=>G.oy+(G.maxY-wy)*G.sc;
+  const wMinX=G.minX, wMaxX=G.minX+(G.vbW-2*G.ox)/G.sc, wMaxY=G.maxY, wMinY=G.maxY-(G.vbH-2*G.oy)/G.sc;
+  const step=(G.sc<6)?4:2;   // si está muy alejado, líneas cada 4 m
+  let grid='';
+  for(let x=Math.ceil(wMinX/step)*step; x<=wMaxX; x+=step){ const m=(Math.abs(x%10)<1e-6); grid+='<line x1="'+SX(x).toFixed(1)+'" y1="0" x2="'+SX(x).toFixed(1)+'" y2="'+G.vbH+'" stroke="'+(m?'#cbd5e1':'#eef2f7')+'" stroke-width="'+(m?1:0.7)+'"/>'; }
+  for(let y=Math.ceil(wMinY/step)*step; y<=wMaxY; y+=step){ const m=(Math.abs(y%10)<1e-6); grid+='<line x1="0" y1="'+SY(y).toFixed(1)+'" x2="'+G.vbW+'" y2="'+SY(y).toFixed(1)+'" stroke="'+(m?'#cbd5e1':'#eef2f7')+'" stroke-width="'+(m?1:0.7)+'"/>'; }
+  grid+='<line x1="0" y1="'+SY(0).toFixed(1)+'" x2="'+G.vbW+'" y2="'+SY(0).toFixed(1)+'" stroke="#94a3b8"/><line x1="'+SX(0).toFixed(1)+'" y1="0" x2="'+SX(0).toFixed(1)+'" y2="'+G.vbH+'" stroke="#94a3b8"/>';
+  const V=eleVertices(); let path='M'+SX(0).toFixed(1)+' '+SY(0).toFixed(1)+' ', verts='<circle cx="'+SX(0).toFixed(1)+'" cy="'+SY(0).toFixed(1)+'" r="4.5" fill="#16a34a"/>', labels='';
+  D.seg.forEach((s,i)=>{ const a=V[i], b=V[i+1]; path+='L'+SX(b.x).toFixed(1)+' '+SY(b.y).toFixed(1)+' ';
+    labels+='<text x="'+((SX(a.x)+SX(b.x))/2).toFixed(1)+'" y="'+((SY(a.y)+SY(b.y))/2-5).toFixed(1)+'" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1d4ed8" style="paint-order:stroke;stroke:#fff;stroke-width:3px">T'+(i+1)+' '+fmtN(s.largo)+'m</text>';
+    verts+='<circle cx="'+SX(b.x).toFixed(1)+'" cy="'+SY(b.y).toFixed(1)+'" r="4" fill="#1d4ed8"/>'; });
+  const wall=D.seg.length?'<path d="'+path+'" fill="none" stroke="#3b82f6" stroke-width="'+Math.max(3,Math.min(9,G.sc*0.9)).toFixed(1)+'" stroke-linejoin="round" stroke-linecap="round" opacity="0.8" pointer-events="none"/>':'';
+  g.innerHTML='<div style="position:relative">'+
+    '<svg viewBox="0 0 '+G.vbW+' '+G.vbH+'" width="100%" style="display:block;max-width:'+G.vbW+'px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:crosshair;touch-action:manipulation" onclick="eleGridClick(event)" xmlns="http://www.w3.org/2000/svg">'+grid+wall+labels+verts+'</svg>'+
+    '<div style="position:absolute;top:6px;right:6px;display:flex;gap:4px">'+
+      '<button class="btn btn-outline btn-sm" style="padding:2px 8px" onclick="eleZoom(1.3)" title="Acercar">+</button>'+
+      '<button class="btn btn-outline btn-sm" style="padding:2px 8px" onclick="eleZoom(1/1.3)" title="Alejar">−</button>'+
+      '<button class="btn btn-outline btn-sm" style="padding:2px 8px" onclick="eleZoomReset()" title="Ajustar al muro"><i class="ti ti-focus-2"></i></button>'+
+    '</div></div>'+
+    '<div class="dim" style="font-size:11px;margin-top:4px">'+(D.seg.length? D.seg.length+' tramo(s) · clic para añadir otro. Se auto-ajusta; usa +/− para acercar/alejar.' : 'Punto verde = inicio (centro). Haz clic para dibujar. La cuadrícula crece sola sin límite.')+'</div>';
   eleSegTable();
 }
 function eleSegTable(){
