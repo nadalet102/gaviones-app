@@ -1142,6 +1142,48 @@ async function muroHistToggle(){
   if(!window.__histAbierto){ if(c) c.innerHTML=''; return; }
   await renderHistorial();
 }
+// Filtro del buscador (insensible a mayúsculas y tildes) sobre nombre/obra/cliente/nota/tipo
+function histNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function histFiltrado(){
+  const list=window.__histLista||[], q=histNorm(window.__histFiltro||'');
+  if(!q) return list;
+  const modoTxt={simple:'un muro', tramos:'tramos', ele:'l/u'};
+  return list.filter(function(m){
+    return histNorm(m.nombre).indexOf(q)>=0 || histNorm(m.obra).indexOf(q)>=0 ||
+      histNorm(m.cliente).indexOf(q)>=0 || histNorm(m.notas).indexOf(q)>=0 ||
+      histNorm(modoTxt[m.modo]||m.modo).indexOf(q)>=0;
+  });
+}
+function histFiltrar(v){
+  window.__histFiltro=v;
+  const tb=document.getElementById('hist-tbody'); if(tb) tb.innerHTML=histRowsHTML(histFiltrado());
+}
+function histRowsHTML(list){
+  const modoTxt={simple:'Un muro', tramos:'Tramos', ele:'L / U'};
+  const fm=x=>String(x).replace('.',',');
+  if(!list.length) return '<tr><td colspan="7" class="dim" style="padding:14px;text-align:center">Sin resultados'+(window.__histFiltro?(' para «'+fkEsc(window.__histFiltro)+'»'):'')+'</td></tr>';
+  return list.map(function(m){
+    const r=m.resumen||{};
+    const res=[(r.gaviones!=null?fmtN(r.gaviones)+' gav.':null),(r.m3!=null?fm(r.m3)+' m³':null),
+      (r.hmax!=null?'H '+fm(r.hmax)+' m':null),(r.largo!=null?fm(r.largo)+' m':null)].filter(Boolean).join(' · ');
+    const editando=(window.__muroGuardadoId===m.id), tieneNota=!!(m.notas&&m.notas.trim());
+    return '<tr'+(editando?' style="background:var(--bg2,#eff6ff)"':'')+'>'+
+      '<td style="font-weight:600">'+fkEsc(m.nombre)+(editando?' <span class="badge b-steel" style="font-size:10px">editando</span>':'')+'</td>'+
+      '<td class="dim">'+fkEsc(m.obra||'—')+'</td><td class="dim">'+fkEsc(m.cliente||'—')+'</td>'+
+      '<td><span class="badge b-steel">'+(modoTxt[m.modo]||m.modo||'—')+'</span></td>'+
+      '<td class="dim" style="font-size:11.5px">'+res+'</td>'+
+      '<td class="dim" style="font-size:11.5px;white-space:nowrap">'+fmtD(m.updated_at)+'</td>'+
+      '<td class="r" style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="muroCargar('+m.id+')"><i class="ti ti-folder-open"></i> Cargar</button> '+
+        '<button class="btn btn-outline btn-sm" title="Duplicar (guardar una copia)" onclick="muroDuplicar('+m.id+')"><i class="ti ti-copy"></i></button> '+
+        '<button class="btn btn-outline btn-sm" title="'+(tieneNota?('Nota: '+fkEsc(m.notas)):'Añadir nota')+'" onclick="muroNotaToggle('+m.id+')"><i class="ti ti-note" style="'+(tieneNota?'color:var(--amber)':'')+'"></i></button> '+
+        '<button class="btn btn-outline btn-sm" title="Borrar del historial" onclick="muroBorrar('+m.id+')"><i class="ti ti-trash"></i></button></td></tr>'+
+      '<tr id="nota-row-'+m.id+'" style="display:none"><td colspan="7" style="background:var(--bg2,#f8fafc);padding:10px 14px">'+
+        '<div style="font-size:11px;font-weight:600;margin-bottom:4px"><i class="ti ti-note"></i> Nota de «'+fkEsc(m.nombre)+'»</div>'+
+        '<textarea id="nota-txt-'+m.id+'" rows="2" placeholder="Cambios pedidos, estado de la obra, precios…" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical">'+fkEsc(m.notas||'')+'</textarea>'+
+        '<div style="margin-top:6px;display:flex;gap:6px"><button class="btn btn-primary btn-sm" onclick="muroNotaGuardar('+m.id+')"><i class="ti ti-device-floppy"></i> Guardar nota</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="muroNotaToggle('+m.id+')">Cerrar</button></div></td></tr>';
+  }).join('');
+}
 async function renderHistorial(){
   const c=document.getElementById('calc-hist'); if(!c) return;
   c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body dim" style="padding:12px 16px">Cargando historial…</div></div>';
@@ -1153,25 +1195,43 @@ async function renderHistorial(){
     c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body dim" style="padding:12px 16px;font-size:12.5px"><i class="ti ti-history"></i> Aún no hay muros guardados. Calcula uno, pon obra y cliente, y dale a «Guardar muro».</div></div>';
     return;
   }
-  const modoTxt={simple:'Un muro', tramos:'Tramos', ele:'L / U'};
-  const fm=x=>String(x).replace('.',',');
-  const rows=list.map(function(m){
-    const r=m.resumen||{};
-    const res=[(r.gaviones!=null?fmtN(r.gaviones)+' gav.':null),(r.m3!=null?fm(r.m3)+' m³':null),
-      (r.hmax!=null?'H '+fm(r.hmax)+' m':null),(r.largo!=null?fm(r.largo)+' m':null)].filter(Boolean).join(' · ');
-    const editando=(window.__muroGuardadoId===m.id);
-    return '<tr'+(editando?' style="background:var(--bg2,#eff6ff)"':'')+'>'+
-      '<td style="font-weight:600">'+fkEsc(m.nombre)+(editando?' <span class="badge b-steel" style="font-size:10px">editando</span>':'')+'</td>'+
-      '<td class="dim">'+fkEsc(m.obra||'—')+'</td><td class="dim">'+fkEsc(m.cliente||'—')+'</td>'+
-      '<td><span class="badge b-steel">'+(modoTxt[m.modo]||m.modo||'—')+'</span></td>'+
-      '<td class="dim" style="font-size:11.5px">'+res+'</td>'+
-      '<td class="dim" style="font-size:11.5px;white-space:nowrap">'+fmtD(m.updated_at)+'</td>'+
-      '<td class="r" style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="muroCargar('+m.id+')"><i class="ti ti-folder-open"></i> Cargar</button> '+
-        '<button class="btn btn-outline btn-sm" title="Borrar del historial" onclick="muroBorrar('+m.id+')"><i class="ti ti-trash"></i></button></td></tr>';
-  }).join('');
-  c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de muros ('+list.length+')</div>'+
-      '<span class="dim" style="font-size:11.5px">Cargar deja el muro en pantalla tal cual se guardó; al modificarlo, «Actualizar» lo sobrescribe.</span></div>'+
-    '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Obra</th><th>Cliente</th><th>Tipo</th><th>Resumen</th><th>Fecha</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-hdr" style="flex-wrap:wrap;gap:8px"><div class="card-title"><i class="ti ti-history"></i> Historial de muros ('+list.length+')</div>'+
+      '<input id="hist-buscar" value="'+fkEsc(window.__histFiltro||'')+'" oninput="histFiltrar(this.value)" placeholder="Buscar por nombre, obra, cliente o nota…" style="flex:1;min-width:200px;max-width:340px;font-size:12.5px;padding:6px 10px;border:1px solid var(--border);border-radius:6px"></div>'+
+    '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Obra</th><th>Cliente</th><th>Tipo</th><th>Resumen</th><th>Fecha</th><th></th></tr></thead><tbody id="hist-tbody">'+histRowsHTML(histFiltrado())+'</tbody></table></div>'+
+    '<div class="card-body dim" style="padding:8px 16px;font-size:11px">Cargar deja el muro en pantalla tal cual se guardó · «Actualizar» lo sobrescribe · <i class="ti ti-copy"></i> duplica · <i class="ti ti-note"></i> nota (ámbar = tiene nota) · <i class="ti ti-trash"></i> borra.</div></div>';
+}
+
+async function muroDuplicar(id){
+  let full;
+  try{ full=await api('GET','/muros/'+id); }
+  catch(e){ log('No se pudo leer el muro: '+e.message,'warn'); return; }
+  let nombre=prompt('Nombre para la copia:', (full.nombre||'Muro')+' (copia)');
+  if(nombre==null) return;
+  nombre=nombre.trim();
+  if(!nombre){ log('Sin nombre no se duplica','warn'); return; }
+  try{
+    await api('POST','/muros',{nombre:nombre, obra:full.obra||'', cliente:full.cliente||'', modo:full.modo,
+      resumen:full.resumen||{}, datos:full.datos, notas:full.notas||''});
+  }catch(e){ log('No se pudo duplicar: '+e.message,'warn'); return; }
+  muroHistCount(); if(window.__histAbierto) renderHistorial();
+  log('Copia «'+nombre+'» creada en el historial');
+}
+
+function muroNotaToggle(id){
+  const row=document.getElementById('nota-row-'+id); if(!row) return;
+  const abrir=(row.style.display==='none');
+  row.style.display=abrir?'':'none';
+  if(abrir){ const t=document.getElementById('nota-txt-'+id); if(t){ t.focus(); t.selectionStart=t.value.length; } }
+}
+async function muroNotaGuardar(id){
+  const t=document.getElementById('nota-txt-'+id); if(!t) return;
+  let m;
+  try{ m=await api('PUT','/muros/'+id+'/notas',{notas:t.value}); }
+  catch(e){ log('No se pudo guardar la nota: '+e.message,'warn'); return; }
+  const it=(window.__histLista||[]).find(function(x){ return x.id===id; });
+  if(it){ it.notas=m.notas; it.updated_at=m.updated_at; }
+  const tb=document.getElementById('hist-tbody'); if(tb) tb.innerHTML=histRowsHTML(histFiltrado());
+  log(m.notas?'Nota guardada':'Nota borrada');
 }
 
 async function muroCargar(id){

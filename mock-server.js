@@ -942,10 +942,10 @@ app.get('/api/muros/:id', (req, res) => {
   res.json(m);
 });
 app.post('/api/muros', (req, res) => {
-  const { nombre, obra, cliente, modo, resumen, datos } = req.body;
+  const { nombre, obra, cliente, modo, resumen, datos, notas } = req.body;
   if (!nombre || !datos) return res.status(400).json({ error: 'Faltan nombre o datos del muro' });
   const m = { id: nextId('muros_guardados'), nombre, obra: obra || null, cliente: cliente || null,
-    modo: modo || null, resumen: resumen || {}, datos, created_at: now(), updated_at: now() };
+    modo: modo || null, resumen: resumen || {}, datos, notas: notas || null, created_at: now(), updated_at: now() };
   db.muros_guardados.push(m);
   res.json(m);
 });
@@ -956,6 +956,13 @@ app.put('/api/muros/:id', (req, res) => {
   if (!nombre || !datos) return res.status(400).json({ error: 'Faltan nombre o datos del muro' });
   Object.assign(m, { nombre, obra: obra || null, cliente: cliente || null, modo: modo || null,
     resumen: resumen || {}, datos, updated_at: now() });
+  res.json(m);
+});
+app.put('/api/muros/:id/notas', (req, res) => {
+  const m = db.muros_guardados.find(x => x.id === +req.params.id);
+  if (!m) return res.status(404).json({ error: 'Muro no encontrado' });
+  m.notas = (req.body.notas || '').trim() || null;
+  m.updated_at = now();
   res.json(m);
 });
 app.delete('/api/muros/:id', (req, res) => {

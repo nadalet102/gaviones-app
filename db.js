@@ -117,9 +117,11 @@ async function initDB() {
       modo TEXT,
       resumen JSONB DEFAULT '{}'::jsonb,
       datos JSONB NOT NULL,
+      notas TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+    ALTER TABLE muros_guardados ADD COLUMN IF NOT EXISTS notas TEXT;
     ALTER TABLE movimientos_stock ADD COLUMN IF NOT EXISTS referencia_doc TEXT;
     ALTER TABLE movimientos_stock ADD COLUMN IF NOT EXISTS fecha DATE DEFAULT CURRENT_DATE;
 

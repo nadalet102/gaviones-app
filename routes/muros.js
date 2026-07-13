@@ -7,7 +7,7 @@ const { pool } = require('../db');
 router.get('/api/muros', async (req, res) => {
   try {
     res.json((await pool.query(
-      `SELECT id, nombre, obra, cliente, modo, resumen, created_at, updated_at
+      `SELECT id, nombre, obra, cliente, modo, resumen, notas, created_at, updated_at
          FROM muros_guardados ORDER BY updated_at DESC`
     )).rows);
   } catch(e) { res.status(500).json({error:e.message}); }
@@ -20,13 +20,13 @@ router.get('/api/muros/:id', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 router.post('/api/muros', async (req, res) => {
-  const {nombre, obra, cliente, modo, resumen, datos} = req.body;
+  const {nombre, obra, cliente, modo, resumen, datos, notas} = req.body;
   if(!nombre || !datos) return res.status(400).json({error:'Faltan nombre o datos del muro'});
   try {
     res.json((await pool.query(
-      `INSERT INTO muros_guardados (nombre, obra, cliente, modo, resumen, datos)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [nombre, obra||null, cliente||null, modo||null, JSON.stringify(resumen||{}), JSON.stringify(datos)]
+      `INSERT INTO muros_guardados (nombre, obra, cliente, modo, resumen, datos, notas)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [nombre, obra||null, cliente||null, modo||null, JSON.stringify(resumen||{}), JSON.stringify(datos), notas||null]
     )).rows[0]);
   } catch(e) { res.status(500).json({error:e.message}); }
 });
@@ -39,6 +39,18 @@ router.put('/api/muros/:id', async (req, res) => {
           SET nombre=$1, obra=$2, cliente=$3, modo=$4, resumen=$5, datos=$6, updated_at=NOW()
         WHERE id=$7 RETURNING *`,
       [nombre, obra||null, cliente||null, modo||null, JSON.stringify(resumen||{}), JSON.stringify(datos), req.params.id]
+    )).rows[0];
+    if(!r) return res.status(404).json({error:'Muro no encontrado'});
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+// Solo las notas (desde la lista del historial): el PUT general NO las toca,
+// así «Actualizar» un muro nunca borra la nota que tuviera.
+router.put('/api/muros/:id/notas', async (req, res) => {
+  try {
+    const r = (await pool.query(
+      `UPDATE muros_guardados SET notas=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      [(req.body.notas||'').trim()||null, req.params.id]
     )).rows[0];
     if(!r) return res.status(404).json({error:'Muro no encontrado'});
     res.json(r);
