@@ -925,6 +925,46 @@ app.post('/api/importar-productos', (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  MUROS GUARDADOS (historial del calculador) — imita routes/muros.js
+// ─────────────────────────────────────────────────────────────────────────────
+db.muros_guardados = [];   // {id,nombre,obra,cliente,modo,resumen,datos,created_at,updated_at}
+seq.muros_guardados = 0;
+
+app.get('/api/muros', (req, res) => {
+  const list = db.muros_guardados.slice()
+    .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+    .map(({ datos, ...resto }) => resto);   // el listado no envía `datos` (como el real)
+  res.json(list);
+});
+app.get('/api/muros/:id', (req, res) => {
+  const m = db.muros_guardados.find(x => x.id === +req.params.id);
+  if (!m) return res.status(404).json({ error: 'Muro no encontrado' });
+  res.json(m);
+});
+app.post('/api/muros', (req, res) => {
+  const { nombre, obra, cliente, modo, resumen, datos } = req.body;
+  if (!nombre || !datos) return res.status(400).json({ error: 'Faltan nombre o datos del muro' });
+  const m = { id: nextId('muros_guardados'), nombre, obra: obra || null, cliente: cliente || null,
+    modo: modo || null, resumen: resumen || {}, datos, created_at: now(), updated_at: now() };
+  db.muros_guardados.push(m);
+  res.json(m);
+});
+app.put('/api/muros/:id', (req, res) => {
+  const m = db.muros_guardados.find(x => x.id === +req.params.id);
+  if (!m) return res.status(404).json({ error: 'Muro no encontrado' });
+  const { nombre, obra, cliente, modo, resumen, datos } = req.body;
+  if (!nombre || !datos) return res.status(400).json({ error: 'Faltan nombre o datos del muro' });
+  Object.assign(m, { nombre, obra: obra || null, cliente: cliente || null, modo: modo || null,
+    resumen: resumen || {}, datos, updated_at: now() });
+  res.json(m);
+});
+app.delete('/api/muros/:id', (req, res) => {
+  const i = db.muros_guardados.findIndex(x => x.id === +req.params.id);
+  if (i >= 0) db.muros_guardados.splice(i, 1);
+  res.json({ ok: true });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SPA + 404 de API  (idéntico a server.js)
 // ─────────────────────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {

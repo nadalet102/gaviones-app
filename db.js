@@ -108,6 +108,18 @@ async function initDB() {
       producto_id INTEGER REFERENCES productos(id) ON DELETE SET NULL,
       cantidad NUMERIC DEFAULT 0
     );
+    -- Historial de muros del calculador: se guarda el ESTADO completo (datos JSONB)
+    -- para poder rescatar el muro tal cual se dejó (incluidos ajustes a mano).
+    CREATE TABLE IF NOT EXISTS muros_guardados (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      obra TEXT, cliente TEXT,
+      modo TEXT,
+      resumen JSONB DEFAULT '{}'::jsonb,
+      datos JSONB NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
     ALTER TABLE movimientos_stock ADD COLUMN IF NOT EXISTS referencia_doc TEXT;
     ALTER TABLE movimientos_stock ADD COLUMN IF NOT EXISTS fecha DATE DEFAULT CURRENT_DATE;
 

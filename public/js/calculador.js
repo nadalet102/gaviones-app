@@ -221,12 +221,17 @@ function renderCalculador(){
         '<div><div style="font-size:16px;font-weight:600">Calculador de muros de gaviones</div>'+
         '<div class="dim">Despiece y vistas por altura y longitud (prontuario ARISAC)</div></div>'+
       '</div>'+
-      '<button class="btn btn-outline btn-sm" onclick="switchTab(\'dash\')"><i class="ti ti-arrow-left"></i> Volver al panel</button>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline btn-sm" onclick="muroHistToggle()"><i class="ti ti-history"></i> Historial (<span id="hist-n">'+((window.__histN!=null)?window.__histN:'…')+'</span>)</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="switchTab(\'dash\')"><i class="ti ti-arrow-left"></i> Volver al panel</button>'+
+      '</div>'+
     '</div>'+
-    '<div class="frow3" style="gap:10px;margin-bottom:14px;flex-wrap:wrap">'+
+    '<div class="frow3" style="gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">'+
       '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Obra (para la ficha)</label><input id="fk-obra" value="'+((window.__fichaMeta&&window.__fichaMeta.obra)||'')+'" oninput="fichaSetMeta()" placeholder="Ej. Mancomunidad Alto Henares"></div>'+
       '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Cliente (para la ficha)</label><input id="fk-cliente" value="'+((window.__fichaMeta&&window.__fichaMeta.cliente)||'')+'" oninput="fichaSetMeta()" placeholder="Nombre del cliente"></div>'+
+      '<div id="calc-save-bar" style="display:flex;gap:6px;flex-wrap:wrap">'+saveBarHTML()+'</div>'+
     '</div>'+
+    '<div id="calc-hist"></div>'+
     toggle+
     (calcModo==='ele' ? formEle : calcModo==='tramos' ? formTramos : formSimple)+
     '<div id="calc-result"></div>'+
@@ -237,6 +242,8 @@ function renderCalculador(){
       '<div style="margin-top:8px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Estimación orientativa; el trabado y el reparto se ajustan en obra.</div>'+
     '</div></div>';
   if(calcModo==='tramos') tramoTogglePerfil(); else if(calcModo==='ele') eleGridRedraw(); else muroToggleAncho();
+  muroHistCount();
+  if(window.__histAbierto) renderHistorial();
 }
 
 // Selector de ancho: muros bajos (<2 m, ancho recto) y 2 m (prontuario o 0,50 recto)
@@ -1031,3 +1038,183 @@ function croquisPerfilEscalonado(tramos){
 }
 
 // (croquisTrabado/croquisSeccion/croquis3D antiguos sustituidos por croquisCaraC/croquisSeccionC/croquis3DC)
+
+// ════════════ HISTORIAL DE MUROS (guardar / rescatar) ════════════
+// Cada muro se guarda en el servidor (tabla muros_guardados) con su obra/cliente,
+// un resumen (gaviones, m³, alturas) y el ESTADO completo del calculador (datos),
+// para poder rescatarlo tal cual se dejó — incluidos los ajustes a mano del perfil.
+function saveBarHTML(){
+  if(window.__muroGuardadoId){
+    return '<button class="btn btn-primary btn-sm" onclick="muroGuardar(true)" title="Sobrescribe el muro guardado con lo que hay ahora en pantalla"><i class="ti ti-device-floppy"></i> Actualizar «'+fkEsc(window.__muroGuardadoNombre||'')+'»</button>'+
+      '<button class="btn btn-outline btn-sm" onclick="muroGuardar(false)" title="Guarda una copia nueva sin tocar el original"><i class="ti ti-copy"></i> Guardar como nuevo</button>'+
+      '<button class="btn btn-outline btn-sm" title="Dejar de editar este muro guardado" onclick="muroDejarEdicion()"><i class="ti ti-x"></i></button>';
+  }
+  return '<button class="btn btn-primary btn-sm" onclick="muroGuardar(false)"><i class="ti ti-device-floppy"></i> Guardar muro</button>';
+}
+function renderSaveBar(){ const e=document.getElementById('calc-save-bar'); if(e) e.innerHTML=saveBarHTML(); }
+function muroDejarEdicion(){ window.__muroGuardadoId=null; window.__muroGuardadoNombre=null; renderSaveBar(); if(window.__histAbierto) renderHistorial(); }
+
+// Estado completo del modo activo (o null si no hay nada calculable que guardar)
+function calcEstadoActual(){
+  const fm=window.__fichaMeta||{};
+  const V=id=>{ const e=document.getElementById(id); return e? e.value : ''; };
+  if(calcModo==='simple'){
+    const h=parseFloat(V('calc-altura')), L=parseFloat(V('calc-long'))||0;
+    if(!h||L<=0) return null;
+    const av=V('calc-ancho');
+    let ancho=null;                                   // mismo criterio de ancho que calcularMuro
+    if(h<2) ancho=parseFloat(av)||0.5; else if(h===2&&av&&av!=='pront') ancho=parseFloat(av)||0.5;
+    const d=muroDespiece(h,L,ancho);
+    return {modo:'simple', fichaMeta:fm, datos:{simple:{altura:V('calc-altura'), ancho:av, long:V('calc-long')}},
+      resumen:{gaviones:d.total, m3:Math.round(d.granular*100)/100, hmax:h, largo:L}};
+  }
+  if(calcModo==='tramos'){
+    const subPerfil=!!(document.getElementById('perfil-desp') && window.__perfil);   // lo que hay en pantalla
+    const campos={perfil:V('tr-perfil'), esc:V('tr-esc'), text:V('tr-text'),
+      cs:{ini:V('cs-ini'), fin:V('cs-fin'), long:V('cs-long'), alt:V('cs-alt')},
+      tp:{ras:V('tp-rasante'), ter:V('tp-terreno')}, sub:(subPerfil?'perfil':'texto')};
+    if(subPerfil){
+      const st=window.__perfil;
+      const activo=st.piezas.filter(function(p,i){ return p && !st.removed.has(i); });
+      const vol=activo.reduce(function(s,p){ return s+p.largo*p.alto; },0);
+      let hmax=0; for(let j=0;j<st.N;j++) hmax=Math.max(hmax, st.crown[j]-st.base[j]);
+      return {modo:'tramos', fichaMeta:fm,
+        datos:{tramos:campos, perfilState:{base:st.base, crown:st.crown, cell:st.cell, N:st.N, L:st.L, rr:st.rr, tt:st.tt, piezas:st.piezas, removed:Array.from(st.removed)}},
+        resumen:{gaviones:activo.length, m3:Math.round(vol*100)/100, hmax:Math.round(hmax*100)/100, largo:st.L}};
+    }
+    const parsed=parseTramos(V('tr-text'), parseFloat(V('tr-esc')));
+    if(!parsed.tramos.length) return null;
+    let gav=0, m3=0, largo=0, hmax=0;
+    parsed.tramos.forEach(function(t){ const r=muroPiezasTramo(t); r.piezas.forEach(function(p){ gav+=p.n; }); m3+=r.granular; largo+=t.L; hmax=Math.max(hmax,t.H); });
+    return {modo:'tramos', fichaMeta:fm, datos:{tramos:campos},
+      resumen:{gaviones:gav, m3:Math.round(m3*100)/100, hmax:hmax, largo:largo}};
+  }
+  // 'ele' — requiere haber calculado (muroGuardar lo lanza antes)
+  const D=window.__eleDraw, data=window.__muroEle;
+  if(!D||!D.seg.length||!data||!data.segs||!data.segs.length) return null;
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
+  const vol=boxes.reduce(function(s,b){ return s+b.l*b.a*b.h; },0);
+  const largo=data.segs.reduce(function(s,x){ return s+x.largo; },0);
+  const hmax=Math.max.apply(null, data.T.map(function(t){ return t.H; }));
+  return {modo:'ele', fichaMeta:fm,
+    datos:{ele:{seg:D.seg, H:window.__eleH||null, ancho:data.ancho||null}},
+    resumen:{gaviones:boxes.length, m3:Math.round(vol*100)/100, hmax:hmax, largo:largo}};
+}
+
+async function muroGuardar(actualizar){
+  // recalcula el modo activo para que lo guardado sea EXACTAMENTE lo que hay en pantalla
+  if(calcModo==='simple') calcularMuro();
+  else if(calcModo==='tramos'){
+    const enPerfil=!!(document.getElementById('perfil-desp') && window.__perfil);
+    if(!enPerfil && ((document.getElementById('tr-text')||{}).value||'').trim()) calcularTramos();
+  }
+  else if(calcModo==='ele' && window.__eleDraw && window.__eleDraw.seg.length) eleCalcular();
+  const est=calcEstadoActual();
+  if(!est){ log('Rellena y calcula un muro antes de guardar','warn'); return; }
+  const fm=est.fichaMeta||{};
+  let nombre=window.__muroGuardadoNombre||'';
+  if(!actualizar || !window.__muroGuardadoId){
+    const def=window.__muroGuardadoId ? ((window.__muroGuardadoNombre||'Muro')+' (v2)')
+      : (fm.obra || ('Muro '+(est.modo==='ele'?'L/U':est.modo==='tramos'?'por tramos':'')+' '+new Date().toLocaleDateString('es-ES')).replace('  ',' '));
+    nombre=prompt('Nombre para guardar el muro:', def);
+    if(nombre==null) return;
+    nombre=nombre.trim();
+    if(!nombre){ log('Sin nombre no se guarda','warn'); return; }
+  }
+  const body={nombre:nombre, obra:fm.obra||'', cliente:fm.cliente||'', modo:est.modo, resumen:est.resumen, datos:est.datos};
+  try{
+    let r;
+    if(actualizar && window.__muroGuardadoId) r=await api('PUT','/muros/'+window.__muroGuardadoId, body);
+    else r=await api('POST','/muros', body);
+    window.__muroGuardadoId=r.id; window.__muroGuardadoNombre=r.nombre;
+    renderSaveBar(); muroHistCount(); if(window.__histAbierto) renderHistorial();
+    log('Muro «'+r.nombre+'» '+(actualizar?'actualizado':'guardado en el historial'));
+  }catch(e){ log('No se pudo guardar: '+e.message,'warn'); }
+}
+
+async function muroHistCount(){
+  try{ const l=await api('GET','/muros'); window.__histLista=l; window.__histN=l.length; setHistCount(); }catch(e){}
+}
+function setHistCount(){ const e=document.getElementById('hist-n'); if(e) e.textContent=(window.__histN!=null?window.__histN:'…'); }
+async function muroHistToggle(){
+  window.__histAbierto=!window.__histAbierto;
+  const c=document.getElementById('calc-hist');
+  if(!window.__histAbierto){ if(c) c.innerHTML=''; return; }
+  await renderHistorial();
+}
+async function renderHistorial(){
+  const c=document.getElementById('calc-hist'); if(!c) return;
+  c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body dim" style="padding:12px 16px">Cargando historial…</div></div>';
+  let list=[];
+  try{ list=await api('GET','/muros'); }
+  catch(e){ c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:12px 16px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> No se pudo cargar el historial: '+fkEsc(e.message)+'</div></div>'; return; }
+  window.__histLista=list; window.__histN=list.length; setHistCount();
+  if(!list.length){
+    c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body dim" style="padding:12px 16px;font-size:12.5px"><i class="ti ti-history"></i> Aún no hay muros guardados. Calcula uno, pon obra y cliente, y dale a «Guardar muro».</div></div>';
+    return;
+  }
+  const modoTxt={simple:'Un muro', tramos:'Tramos', ele:'L / U'};
+  const fm=x=>String(x).replace('.',',');
+  const rows=list.map(function(m){
+    const r=m.resumen||{};
+    const res=[(r.gaviones!=null?fmtN(r.gaviones)+' gav.':null),(r.m3!=null?fm(r.m3)+' m³':null),
+      (r.hmax!=null?'H '+fm(r.hmax)+' m':null),(r.largo!=null?fm(r.largo)+' m':null)].filter(Boolean).join(' · ');
+    const editando=(window.__muroGuardadoId===m.id);
+    return '<tr'+(editando?' style="background:var(--bg2,#eff6ff)"':'')+'>'+
+      '<td style="font-weight:600">'+fkEsc(m.nombre)+(editando?' <span class="badge b-steel" style="font-size:10px">editando</span>':'')+'</td>'+
+      '<td class="dim">'+fkEsc(m.obra||'—')+'</td><td class="dim">'+fkEsc(m.cliente||'—')+'</td>'+
+      '<td><span class="badge b-steel">'+(modoTxt[m.modo]||m.modo||'—')+'</span></td>'+
+      '<td class="dim" style="font-size:11.5px">'+res+'</td>'+
+      '<td class="dim" style="font-size:11.5px;white-space:nowrap">'+fmtD(m.updated_at)+'</td>'+
+      '<td class="r" style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="muroCargar('+m.id+')"><i class="ti ti-folder-open"></i> Cargar</button> '+
+        '<button class="btn btn-outline btn-sm" title="Borrar del historial" onclick="muroBorrar('+m.id+')"><i class="ti ti-trash"></i></button></td></tr>';
+  }).join('');
+  c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-history"></i> Historial de muros ('+list.length+')</div>'+
+      '<span class="dim" style="font-size:11.5px">Cargar deja el muro en pantalla tal cual se guardó; al modificarlo, «Actualizar» lo sobrescribe.</span></div>'+
+    '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Obra</th><th>Cliente</th><th>Tipo</th><th>Resumen</th><th>Fecha</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+
+async function muroCargar(id){
+  let m;
+  try{ m=await api('GET','/muros/'+id); }
+  catch(e){ log('No se pudo cargar el muro: '+e.message,'warn'); return; }
+  const d=m.datos||{};
+  window.__fichaMeta={obra:m.obra||'', cliente:m.cliente||''};
+  window.__muroGuardadoId=m.id; window.__muroGuardadoNombre=m.nombre;
+  if(m.modo==='ele' && d.ele){   // globales ANTES de renderizar: el formulario los lee
+    window.__eleDraw={seg:(d.ele.seg||[]).map(function(s){ return Object.assign({},s); })};
+    if(d.ele.H) window.__eleH=d.ele.H;
+    window.__eleAncho=d.ele.ancho||null;
+  }
+  calcModo=m.modo||'simple';
+  renderCalculador();
+  const S=(eid,v)=>{ const e=document.getElementById(eid); if(e&&v!=null&&v!=='') e.value=v; };
+  if(m.modo==='simple' && d.simple){
+    S('calc-altura',d.simple.altura); muroToggleAncho(); S('calc-ancho',d.simple.ancho); S('calc-long',d.simple.long);
+    calcularMuro();
+  } else if(m.modo==='tramos' && d.tramos){
+    S('tr-perfil',d.tramos.perfil); tramoTogglePerfil(); S('tr-esc',d.tramos.esc); S('tr-text',d.tramos.text);
+    if(d.tramos.cs){ S('cs-ini',d.tramos.cs.ini); S('cs-fin',d.tramos.cs.fin); S('cs-long',d.tramos.cs.long); S('cs-alt',d.tramos.cs.alt); }
+    if(d.tramos.tp){ S('tp-rasante',d.tramos.tp.ras); S('tp-terreno',d.tramos.tp.ter); }
+    if(d.tramos.sub==='perfil' && d.perfilState){   // rescata TAL CUAL: con los ajustes a mano
+      const ps=d.perfilState;
+      window.__perfil={base:ps.base, crown:ps.crown, cell:ps.cell, N:ps.N, L:ps.L, rr:ps.rr, tt:ps.tt,
+        piezas:ps.piezas, removed:new Set(ps.removed||[])};
+      window.__perfilSel=null; window.__perfilRes=document.getElementById('calc-result');
+      renderPerfilResult();
+    } else if((d.tramos.text||'').trim()) calcularTramos();
+  } else if(m.modo==='ele'){
+    eleCalcular();
+  }
+  log('Muro «'+m.nombre+'» cargado — modifícalo y dale a «Actualizar» para sobrescribirlo');
+}
+
+async function muroBorrar(id){
+  const m=(window.__histLista||[]).find(function(x){ return x.id===id; });
+  if(!confirm('¿Borrar del historial «'+(m?m.nombre:'este muro')+'»? No se puede deshacer.')) return;
+  try{ await api('DELETE','/muros/'+id); }
+  catch(e){ log('No se pudo borrar: '+e.message,'warn'); return; }
+  if(window.__muroGuardadoId===id){ window.__muroGuardadoId=null; window.__muroGuardadoNombre=null; renderSaveBar(); }
+  muroHistCount(); if(window.__histAbierto) renderHistorial();
+  log('Muro borrado del historial');
+}
