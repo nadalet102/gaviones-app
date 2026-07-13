@@ -148,8 +148,14 @@ function renderCalculador(){
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
       '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-vector-triangle"></i> Muro en L / U — dibuja el recorrido</div>'+
       '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Haz <strong>clic en la cuadrícula</strong> para ir extendiendo el muro (las esquinas salen a 90° solas). Fija la altura por defecto y se aplica a todo lo que dibujes (luego puedes afinar cada tramo en la tabla).</div>'+
-      '<div class="frow3" style="gap:12px;align-items:flex-end;margin-bottom:10px">'+
+      '<div class="frow3" style="gap:12px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap">'+
         '<div class="field" style="margin:0"><label>Altura por defecto (m)</label><input type="number" id="el-alt-def" min="0.5" step="0.5" value="'+((window.__eleH)||3)+'" style="width:110px" oninput="eleSetH(this.value)"></div>'+
+        '<div class="field" style="margin:0"><label>Ancho del gavión</label><select id="el-ancho" style="width:210px" onchange="eleSetAncho(this.value)">'+
+          '<option value=""'+(!window.__eleAncho?' selected':'')+'>Prontuario (auto según altura)</option>'+
+          '<option value="1"'+(window.__eleAncho===1?' selected':'')+'>1 m (recto)</option>'+
+          '<option value="0.5"'+(window.__eleAncho===0.5?' selected':'')+'>0,50 m</option>'+
+          '<option value="0.3"'+(window.__eleAncho===0.3?' selected':'')+'>0,30 m</option>'+
+        '</select></div>'+
       '</div>'+
       '<div id="ele-grid"></div>'+
       '<div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">'+
@@ -649,6 +655,8 @@ function eleZoomReset(){ window.__eleZoom=1; eleGridRedraw(); }
 // Altura por defecto: se aplica a TODO lo dibujado (tramos existentes) y a los nuevos.
 function eleSetH(v){ const h=parseFloat(v); if(!(h>0)) return; window.__eleH=Math.max(0.5, Math.round(h*2)/2);
   const D=window.__eleDraw; if(D) D.seg.forEach(function(s){ s.H=window.__eleH; }); eleGridRedraw(); }
+// Ancho del gavión en L/U: vacío = prontuario (auto); 1 / 0,5 / 0,3 = ancho fijo para todo el muro.
+function eleSetAncho(v){ window.__eleAncho = v ? parseFloat(v) : null; }
 function eleGridClick(evt){
   const svg=evt.currentTarget, rect=svg.getBoundingClientRect(), G=eleView();
   const vx=(evt.clientX-rect.left)*(G.vbW/rect.width), vy=(evt.clientY-rect.top)*(G.vbH/rect.height);
@@ -713,46 +721,47 @@ function eleCalcular(){
   const T=seg;
   const estados=seg.map(s=>{ const ras=[{d:0,c:s.ci+s.H},{d:s.largo,c:s.cf+s.H}], ter=[{d:0,c:s.ci},{d:s.largo,c:s.cf}]; return perfilCalc(ras,ter); });
   let x=0,y=0; const segs=seg.map((s,i)=>{ const p0={x:x,y:y}, p1={x:x+s.dx*s.largo,y:y+s.dy*s.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:s.dx,dy:s.dy,largo:s.largo,H:s.H,i:i}; });
-  window.__muroEle={T:T, estados:estados, segs:segs};
-  // despiece total (suma de tramos)
-  const cnt={}; let vol=0, total=0;
-  estados.forEach(st=>st.piezas.forEach(p=>{ const k=p.largo+'|'+p.alto; cnt[k]=(cnt[k]||0)+1; vol+=p.largo*p.alto; total++; }));
-  // TRABA DE ESQUINA: por cada esquina, un gavión de 1,5 m por hilada (200×100×100 → 1,5 m =
-  // 1 m de ancho del otro muro + 0,5 m dentro del suyo). Alternan de brazo hilada a hilada.
-  const nEsq0=Math.max(0,T.length-1); let esqN=0, esqVol=0;
-  for(let i=0;i<seg.length-1;i++){ const hc=Math.min(seg[i].H, seg[i+1].H); const full=Math.floor(hc+1e-9), half=(hc-full)>0.25;
-    for(let k=0;k<full;k++){ cnt['1.5|1']=(cnt['1.5|1']||0)+1; esqN++; esqVol+=1.5; }
-    if(half){ cnt['1.5|0.5']=(cnt['1.5|0.5']||0)+1; esqN++; esqVol+=0.75; }
-  }
-  vol+=esqVol; total+=esqN;
-  // PRONTUARIO (profundidad real): suma por tramo la sección del prontuario según su altura
-  let prVol=0, prTotal=0, prCnt={}, prHmax=0;
-  estados.forEach(function(st){ const p=perfilProntuario(st.base,st.crown,st.cell,st.N); prVol+=p.granular; prTotal+=p.total;
-    p.piezas.forEach(function(q){ const k=q.largo+'|'+q.ancho+'|'+q.alto; prCnt[k]=(prCnt[k]||0)+q.n; });
-    prHmax=Math.max(prHmax, Math.max.apply(null,st.crown)); });
+  const fix=window.__eleAncho||null;   // ancho fijo (1 / 0,5 / 0,3) o null = prontuario
+  window.__muroEle={T:T, estados:estados, segs:segs, ancho:fix};
+  // DESPIECE REAL pieza a pieza: las MISMAS cajas que la vista 3D (esquinas engranadas con
+  // headers, bandas de profundidad y sección del prontuario incluidas) → las cuentas cuadran.
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
+  const cnt={}; let vol=0; const total=boxes.length;
+  boxes.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100;
+    const k=b.largo+'|'+an+'|'+b.h; cnt[k]=(cnt[k]||0)+1; vol+=b.l*b.a*b.h; });
   const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
-  const prFilas=Object.keys(prCnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],ancho:+pp[1],alto:+pp[2],n:prCnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)).map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+'×'+fmtm(p.ancho)+'×'+fmtm(p.alto)+' m</strong></td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
-  const lista=Object.keys(cnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],alto:+pp[1],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
-  const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
+  const lista=Object.keys(cnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],ancho:+pp[1],alto:+pp[2],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo));
+  const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
   const nEsq=Math.max(0,T.length-1);
-  res.innerHTML=
-    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+T.length+' tramos, '+nEsq+' esquina(s)</div>'+
-      '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs)+
-      '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro).</div></div></div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-details"></i> Despiece total</div>'+
-      '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones (cara)</span></div>'+
-      '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
-      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
-      '<div class="dim" style="font-size:11px;margin-top:6px">Incluye <strong>'+fmtN(esqN)+'</strong> gaviones de <strong>1,5 m</strong> de traba en '+nEsq+' esquina(s) — uno por hilada, alternando de brazo (1,5 m = 1 m del ancho del otro muro + 0,5 m dentro del suyo).</div></div></div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección y material real (prontuario ARISAC)</div>'+
-      '<span class="dim">'+fmtN(prVol)+' m³ · '+fmtN(prTotal)+' gaviones</span></div>'+
+  const Hmax=Math.max.apply(null, T.map(t=>t.H));
+  // tarjeta de sección: prontuario (auto) o aviso si el ancho fijo se queda corto en altura
+  let secCard='';
+  if(!fix){
+    let prHmax=0; estados.forEach(function(st){ prHmax=Math.max(prHmax, Math.max.apply(null,st.crown)); });
+    secCard='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</div></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'+
         '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección a la altura máx. ('+fmtN(prHmax)+' m)</div>'+croquisSeccionPront(prHmax)+'</div>'+
-        '<div style="flex:1;min-width:240px"><table class="tbl"><thead><tr><th>Pieza (largo×ancho×alto)</th><th class="r">Uds</th></tr></thead><tbody>'+prFilas+
-          '<tr style="border-top:2px solid var(--border)"><td style="font-weight:600">Total (con profundidad)</td><td class="r mono" style="font-weight:700">'+fmtN(prTotal)+'</td></tr></tbody></table>'+
-          '<div class="dim" style="font-size:11px;margin-top:6px">A más altura, la base ensancha (prontuario) y añade bandas de profundidad. Volumen granular real = <strong>'+fmtN(prVol)+' m³</strong> (suma de los tramos).</div></div>'+
+        '<div class="dim" style="flex:1;min-width:220px;font-size:12px">A más altura, la base ensancha según el prontuario y añade bandas de profundidad. El despiece de arriba <strong>ya lo incluye</strong> (sale del modelo 3D pieza a pieza).</div>'+
+      '</div></div>';
+  } else if(Hmax>=2){
+    secCard='<div class="card" style="margin-top:14px"><div class="card-body" style="padding:10px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Ancho fijo de '+fmtm(fix)+' m con altura de '+fmtm(Hmax)+' m: no se aplica el ensanche de base del prontuario (recomendado a partir de 2 m). Revisa la estabilidad.</div></div>';
+  }
+  const holgura03=(fix===0.3&&nEsq>0)?'<div class="dim" style="font-size:11px;margin-top:6px">Ancho 0,30 m: el recorte de esquina va a la rejilla de 0,5 → queda una holgura de 20 cm en el rincón, que se cierra al atar en obra.</div>':'';
+  res.innerHTML=
+    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+T.length+' tramos, '+nEsq+' esquina(s)'+(fix?(' · ancho '+fmtm(fix)+' m'):'')+'</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline btn-sm" onclick="elePlanoHiladas()"><i class="ti ti-stack-2"></i> Plano por hiladas</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaEle()"><i class="ti ti-file-description"></i> Ficha técnica</button>'+
+        '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button>'+
       '</div></div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs, fix||1)+
+      '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro).</div>'+holgura03+'</div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-details"></i> Despiece total (según 3D)</div>'+
+      '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones</span></div>'+
+      '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
+      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
+      '<div class="dim" style="font-size:11px;margin-top:6px">Cuenta pieza a pieza del modelo 3D: esquinas engranadas (headers que cruzan alternando de brazo)'+(fix?'':' y bandas de profundidad del prontuario')+' incluidas.</div></div></div>'+
+    secCard+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por tramo</div></div>'+
       '<div class="card-body" style="padding:14px 16px">'+
         estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Tramo '+(i+1)+' · '+fmtN(T[i].largo)+' m · '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt '+fmtN(T[i].H)+' m</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
@@ -771,8 +780,8 @@ function eleFootprint(segs, w){
     else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=(nx<0)?s.p0.x-w:s.p0.x; rw=w; }
     return {rx:rx, ry:ry, rw:rw, rh:rh, nx:nx, ny:ny, s:s}; });
 }
-function croquisPlantaLU(segs){
-  const w=1;
+function croquisPlantaLU(segs, w){
+  w=w||((window.__muroEle&&window.__muroEle.ancho)||1);
   const R=eleFootprint(segs, w);
   // envolvente EXTERIOR = polilínea del recorrido (bordes de fuera)
   let vx=[], vy=[]; segs.forEach((s,i)=>{ if(i===0){vx.push(s.p0.x);vy.push(s.p0.y);} vx.push(s.p1.x); vy.push(s.p1.y); });
