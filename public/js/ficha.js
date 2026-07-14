@@ -447,8 +447,9 @@ function croquisAlzadoPlano(i){
     out+='<rect x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+Math.max(1,p.largo*sc-0.6).toFixed(1)+'" height="'+Math.max(1,p.alto*sc-0.6).toFixed(1)+'" fill="'+c.f+'" stroke="'+c.s+'" stroke-width="0.6"><title>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</title></rect>';
   });
   // terreno (marrón) y rasante (roja) del motor por cotas
-  if(st.tt){ let tp=''; for(let j=0;j<st.N;j++){ tp+=(j?'L':'M')+X((j+0.5)*st.cell).toFixed(1)+' '+Y(st.tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(st.tt[st.N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.6" pointer-events="none"/>'; }
-  if(st.rr){ let rp=''; for(let j=0;j<st.N;j++){ rp+=(j?'L':'M')+X((j+0.5)*st.cell).toFixed(1)+' '+Y(st.rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(st.rr[st.N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6 3" pointer-events="none"/>'; }
+  const cxj=j=>st.edges?((st.edges[j]+st.edges[j+1])/2):((j+0.5)*st.cell);
+  if(st.tt){ let tp=''; for(let j=0;j<st.N;j++){ tp+=(j?'L':'M')+X(cxj(j)).toFixed(1)+' '+Y(st.tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(st.tt[st.N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.6" pointer-events="none"/>'; }
+  if(st.rr){ let rp=''; for(let j=0;j<st.N;j++){ rp+=(j?'L':'M')+X(cxj(j)).toFixed(1)+' '+Y(st.rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(st.rr[st.N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6 3" pointer-events="none"/>'; }
   // juntas de tramo (la recta puede fundir varios tramos)
   if(T.tr && T.tr.length>1){ let d=0;
     T.tr.forEach(function(t,k){
