@@ -95,6 +95,7 @@ function elePlaceD(s, r, x, pl, y, alto, dOff, bw, arm){
 function eleBoxes(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return [];
   const fix = data.ancho || null;                 // ancho fijo elegido (1 / 0,5 / 0,3) o null = prontuario
+  const cara = data.cara || 'int';                // ensanche de la base: 'int' hacia dentro (cara lisa) · 'ext' hacia fuera (sobresale)
   const w = fix || 1, segs=data.segs, n=segs.length, boxes=[];
   // Recortes de esquina sobre la rejilla de 0,5 m: el brazo del header recede recBig (y el header,
   // de largo recBig, cruza la esquina); el otro brazo recede recSmall. Para 0,3 m el recorte se
@@ -113,7 +114,9 @@ function eleBoxes(){
         const kIdx=Math.max(0, Math.floor(p.y - st.base[j] + 1e-6));
         const dep=anchos[Math.min(kIdx, anchos.length-1)];
         const bandas=(typeof muroBandas==='function')?muroBandas(dep):[w];
-        let dOff=0;
+        // 'ext': el ensanche SALE del muro (trasera enrasada con la hilada de 1 m; el extra
+        // sobresale de la línea dibujada). 'int' (defecto): cara lisa, el extra va hacia dentro.
+        let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
         bandas.forEach(function(bw){ boxes.push(elePlaceD(s, r, p.x, p.largo, p.y, p.alto, dOff, bw, i)); dOff+=bw; });
       });
       continue;
@@ -136,7 +139,7 @@ function eleBoxes(){
       const bandas = (typeof muroBandas==='function') ? muroBandas(dep) : [w];
       // cada banda de profundidad se traba con la de al lado (fase alternada por banda) y con la
       // hilada de arriba/abajo (fase por paridad de y): trabado en las dos direcciones.
-      let dOff=0;
+      let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;   // 'ext': el ensanche sobresale de la línea
       bandas.forEach(function(bw, bi){ const fase=(yp+bi)%2;
         eleTileGrid(a, b, fase).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, c.y, c.alto, dOff, bw, i)); });
         dOff+=bw; });
