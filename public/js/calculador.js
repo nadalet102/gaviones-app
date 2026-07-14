@@ -725,9 +725,28 @@ function eleCalcular(){
   const res=document.getElementById('calc-result'); if(!res) return;
   const seg=(window.__eleDraw&&window.__eleDraw.seg)||[];
   if(!seg.length){ res.innerHTML='<div class="empty"><i class="ti ti-vector-triangle"></i><p>Dibuja el recorrido en la cuadrícula</p></div>'; return; }
-  const T=seg;
-  const estados=seg.map(s=>{ const ras=[{d:0,c:s.ci+s.H},{d:s.largo,c:s.cf+s.H}], ter=[{d:0,c:s.ci},{d:s.largo,c:s.cf}]; return perfilCalc(ras,ter); });
-  let x=0,y=0; const segs=seg.map((s,i)=>{ const p0={x:x,y:y}, p1={x:x+s.dx*s.largo,y:y+s.dy*s.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:s.dx,dy:s.dy,largo:s.largo,H:s.H,i:i}; });
+  // AGRUPAR en RECTAS: tramos consecutivos con la MISMA dirección NO son esquinas — son un
+  // muro CONTINUO que sigue recto (cambia la cota/altura). Se funden en una sola recta y el
+  // motor por cotas los traba a través de la junta (escalones con pieza entera incluidos).
+  // La esquina (giro 90° con encastre) solo aparece cuando de verdad cambia la dirección.
+  const runs=[]; seg.forEach(function(s){
+    const r=runs[runs.length-1];
+    if(r && r.dx===s.dx && r.dy===s.dy) r.tr.push(s); else runs.push({dx:s.dx, dy:s.dy, tr:[s]});
+  });
+  const T=runs.map(function(r){
+    const L=r.tr.reduce(function(a,t){ return a+t.largo; },0);
+    return {dx:r.dx, dy:r.dy, largo:L, H:Math.max.apply(null,r.tr.map(function(t){return t.H;})),
+      ci:r.tr[0].ci, cf:r.tr[r.tr.length-1].cf, tr:r.tr};
+  });
+  const estados=T.map(function(t){
+    const ras=[], ter=[]; let d=0;
+    t.tr.forEach(function(s,k){ const d0=k? d+1e-4 : 0;   // salto de cota en la junta (sin d duplicada)
+      ter.push({d:d0,c:s.ci},{d:d+s.largo,c:s.cf});
+      ras.push({d:d0,c:s.ci+s.H},{d:d+s.largo,c:s.cf+s.H});
+      d+=s.largo; });
+    return perfilCalc(ras,ter);
+  });
+  let x=0,y=0; const segs=T.map(function(t,i){ const p0={x:x,y:y}, p1={x:x+t.dx*t.largo,y:y+t.dy*t.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:t.dx,dy:t.dy,largo:t.largo,H:t.H,i:i}; });
   const fix=window.__eleAncho||null;   // ancho fijo (1 / 0,5 / 0,3) o null = prontuario
   window.__muroEle={T:T, estados:estados, segs:segs, ancho:fix};
   // DESPIECE REAL pieza a pieza: las MISMAS cajas que la vista 3D (esquinas engranadas con
@@ -755,23 +774,23 @@ function eleCalcular(){
   }
   const holgura03=(fix===0.3&&nEsq>0)?'<div class="dim" style="font-size:11px;margin-top:6px">Ancho 0,30 m: el recorte de esquina va a la rejilla de 0,5 → queda una holgura de 20 cm en el rincón, que se cierra al atar en obra.</div>':'';
   res.innerHTML=
-    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+T.length+' tramos, '+nEsq+' esquina(s)'+(fix?(' · ancho '+fmtm(fix)+' m'):'')+'</div>'+
+    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+seg.length+' tramo(s) · '+T.length+' recta(s) · '+nEsq+' esquina(s)'+(fix?(' · ancho '+fmtm(fix)+' m'):'')+'</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         '<button class="btn btn-outline btn-sm" onclick="elePlanoHiladas()"><i class="ti ti-stack-2"></i> Plano por hiladas</button>'+
         '<button class="btn btn-outline btn-sm" onclick="fichaEle()"><i class="ti ti-file-description"></i> Ficha técnica</button>'+
         '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button>'+
       '</div></div>'+
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs, fix||1)+
-      '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro).</div>'+holgura03+'</div></div>'+
+      '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro). Los tramos seguidos <strong>en la misma dirección</strong> se funden en una recta continua, trabada a través de la junta.</div>'+holgura03+'</div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-details"></i> Despiece total (según 3D)</div>'+
       '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones</span></div>'+
       '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
       '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
       '<div class="dim" style="font-size:11px;margin-top:6px">Cuenta pieza a pieza del modelo 3D: esquinas engranadas (headers que cruzan alternando de brazo)'+(fix?'':' y bandas de profundidad del prontuario')+' incluidas.</div></div></div>'+
     secCard+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por tramo</div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por recta</div></div>'+
       '<div class="card-body" style="padding:14px 16px">'+
-        estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Tramo '+(i+1)+' · '+fmtN(T[i].largo)+' m · '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt '+fmtN(T[i].H)+' m</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
+        estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Recta '+(i+1)+' · '+fmtN(T[i].largo)+' m · cotas '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt máx '+fmtN(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos fundidos'):'')+'</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
       '</div></div>';
 }
 // Huella del muro en planta con MEDIDAS EXTERIORES: la polilínea que dibuja el usuario es la

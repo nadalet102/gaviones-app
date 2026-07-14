@@ -320,9 +320,9 @@ function fichaEle(){
   const peso=d.vol*FICHA_PARAM.densRelleno;
   const Ea=0.5*FICHA_PARAM.Ka*FICHA_PARAM.gamma*Hmax*Hmax;
   const kv=(k,v,hi)=>'<div class="fk-kv'+(hi?' fk-hi':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
-  const alzados=data.estados.map(function(st,i){ return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#334155">Tramo '+(i+1)+' · '+fnum(T[i].largo)+' m · alt '+fmtm(T[i].H)+' m</div>'+croquisPorCotasInter(st,true)+'</div>'; }).join('');
+  const alzados=data.estados.map(function(st,i){ return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#334155">Recta '+(i+1)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos'):'')+'</div>'+croquisPorCotasInter(st,true)+'</div>'; }).join('');
   const sheet=
-    fichaHead('Muro de gaviones en L/U', segs.length+' tramos · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario'))+
+    fichaHead('Muro de gaviones en L/U', segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario'))+
     '<div class="fk-body">'+
       '<div class="fk-sec"><h2><i class="ti ti-ruler-2"></i> Datos del muro</h2><div class="fk-grid">'+
         kv('Longitud total (ext.)', fnum(largoTot)+' <small>m</small>')+ kv('Altura máx.', fmtm(Hmax)+' <small>m</small>')+

@@ -104,8 +104,18 @@ function eleBoxes(){
   for(let i=0;i<n;i++){ const s=segs[i], st=data.estados[i]; if(!st) continue;
     const r = R ? R[i] : {rx:s.p0.x-w/2, ry:s.p0.y-w/2}, Lext=s.largo;
     const flat = st.base.every(b=>Math.abs(b-st.base[0])<1e-6) && st.crown.every(c=>Math.abs(c-st.crown[0])<1e-6);
-    if(!flat){   // tramo en pendiente: colocación por pieza (sin encastre fino, caso poco común)
-      st.piezas.forEach(function(p){ boxes.push(elePlace(s, r, p.x, p.largo, p.y, p.alto, w, i)); });
+    if(!flat){   // recta ESCALONADA (cotas/alturas variables): piezas del motor por cotas
+      // (trabadas a través de las juntas de tramo) + profundidad del prontuario por columna.
+      st.piezas.forEach(function(p){
+        const j=Math.min(st.N-1, Math.max(0, Math.floor((p.x+p.largo/2)/st.cell)));
+        const Hj=st.crown[j]-st.base[j];
+        const anchos=fix?[w]:((typeof seccionAnchos==='function')?seccionAnchos(Hj):[w]);
+        const kIdx=Math.max(0, Math.floor(p.y - st.base[j] + 1e-6));
+        const dep=anchos[Math.min(kIdx, anchos.length-1)];
+        const bandas=(typeof muroBandas==='function')?muroBandas(dep):[w];
+        let dOff=0;
+        bandas.forEach(function(bw){ boxes.push(elePlaceD(s, r, p.x, p.largo, p.y, p.alto, dOff, bw, i)); dOff+=bw; });
+      });
       continue;
     }
     // tramo PLANO: rejilla global (fase por paridad) para TRABAR todas las caras. En cada esquina,
@@ -166,7 +176,7 @@ function eleBoxes(){
 }
 function muro3dEle(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return;
-  muro3dOpen(eleBoxes(), 'Muro en L/U · '+data.T.length+' tramos'+(data.ancho?(' · ancho '+fmtN(data.ancho)+' m'):''));
+  muro3dOpen(eleBoxes(), 'Muro en L/U · '+data.T.length+' recta(s)'+(data.ancho?(' · ancho '+fmtN(data.ancho)+' m'):''));
 }
 
 function muro3dInjectCSS(){
