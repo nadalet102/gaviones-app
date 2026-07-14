@@ -217,10 +217,8 @@ function fichaPerfil(){
   const Ea=0.5*FICHA_PARAM.Ka*FICHA_PARAM.gamma*hMax*hMax;
   const kv=(k,v,hi)=>'<div class="fk-kv'+(hi?' fk-hi':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
   const leyenda='<div style="font-size:11.5px;color:#475569;margin-top:8px">'+
-    '<span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border:1px solid #1d4ed8;vertical-align:middle"></span> gavión 2×1×1 (1 m alto) &nbsp; '+
-    '<span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border:1px solid #b45309;vertical-align:middle"></span> gavión 2×1×0,5 &nbsp; '+
     '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #dc2626;vertical-align:middle"></span> rasante (calle) &nbsp; '+
-    '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno</div>';
+    '<span style="display:inline-block;width:16px;height:0;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno</div>'+fichaLeyendaNorma();
   const sheet=
     fichaHead('Muro de gaviones · alzado por perfil', 'Relleno entre rasante y terreno · '+fnum(st.L)+' m de longitud'+(st.removed.size?(' · '+st.removed.size+' gaviones ajustados a mano'):''))+
     '<div class="fk-body">'+
@@ -253,7 +251,7 @@ function croquisPlantaHilada(c, L){
   const bandas=muroBandas(w); let z=0;
   bandas.forEach(function(bw,bi){
     const off=(c.offset!==(bi%2===1)); let x=0; const yb=y0+z*ys;
-    muroTramo(L,off).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p);
+    muroTramo(L,off).forEach(function(p){ const pw=p*xs, col=colorGavion(p, bw, c.h);
       out+='<rect x="'+(x0+x*xs).toFixed(1)+'" y="'+yb.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(bw*ys-gap).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"/>';
       if(pw>=13) out+='<text x="'+(x0+x*xs+pw/2).toFixed(1)+'" y="'+(yb+bw*ys/2+3.5).toFixed(1)+'" font-size="9.5" fill="#0f172a" text-anchor="middle" font-family="system-ui">'+String(p).replace('.',',')+'</text>';
       x+=p;
@@ -290,7 +288,7 @@ function planoFilas(H, L, ancho){
   const sheet=fichaHead('Plano por hiladas · muro '+fmtm(H)+' m × '+fnum(L)+' m',
       'Cómo va cada fila por dentro (bandas de profundidad incluidas) · de arriba abajo')+
     '<div class="fk-body">'+
-      '<div class="fk-sec"><h2><i class="ti ti-info-circle"></i> Cómo leerlo</h2><div style="font-size:12.5px;color:#334155">Una lámina por hilada, de la más alta a la base. Cada lámina es la <strong>vista en planta</strong> (desde arriba) de esa fila: el largo del muro en horizontal y la profundidad (ancho) en vertical, con las <strong>bandas interiores</strong> que no se ven en alzado. Los colores son la medida de la pieza (azul 2 m · verde 1,5 m · ámbar 1 m).</div></div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-info-circle"></i> Cómo leerlo</h2><div style="font-size:12.5px;color:#334155">Una lámina por hilada, de la más alta a la base. Cada lámina es la <strong>vista en planta</strong> (desde arriba) de esa fila: el largo del muro en horizontal y la profundidad (ancho) en vertical, con las <strong>bandas interiores</strong> que no se ven en alzado. '+fichaLeyendaNorma()+'</div></div>'+
       secs+ fichaNota()+
     '</div>';
   fichaOpen(sheet, 'plano-hiladas-'+fmtm(H)+'m');
@@ -356,7 +354,7 @@ function eleCroquisHilada(bs){
   const X=x=>padL+(x-minX)*sc, Y=z=>padT+(maxZ-z)*sc;
   let out='';
   bs.forEach(function(b){
-    const col=muroColorPieza(b.largo), rw=b.l*sc, rh=b.a*sc;
+    const col=colorGavion(b.largo, (Math.abs(b.l-b.largo)<1e-6)?b.a:b.l, b.h), rw=b.l*sc, rh=b.a*sc;
     out+='<rect x="'+X(b.x).toFixed(1)+'" y="'+Y(b.z+b.a).toFixed(1)+'" width="'+Math.max(1,rw-1).toFixed(1)+'" height="'+Math.max(1,rh-1).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"><title>'+String(b.l).replace('.',',')+' × '+String(b.a).replace('.',',')+' × '+String(b.h).replace('.',',')+' m</title></rect>';
     const cxp=X(b.x)+rw/2, cyp=Y(b.z+b.a)+rh/2, lbl=String(b.largo).replace('.',',');
     if(rw>=17 && rh>=9) out+='<text x="'+cxp.toFixed(1)+'" y="'+(cyp+3.2).toFixed(1)+'" font-size="9" fill="#0f172a" text-anchor="middle" font-family="system-ui">'+lbl+'</text>';
@@ -389,11 +387,99 @@ function elePlanoHiladas(){
       '<div style="font-size:12px;margin-top:6px;color:#334155">'+lista+'</div></div>';
   }).join('');
   const chip=(c,s,t)=>'<span style="display:inline-block;width:12px;height:12px;background:'+c+';border:1px solid '+s+';vertical-align:middle"></span> '+t;
-  const sheet=fichaHead('Plano por hiladas · muro en L/U', data.T.length+' tramos · '+lvls.length+' hiladas · de arriba abajo'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):''))+
+  const sheet=fichaHead('Plano por hiladas · muro en L/U', data.T.length+' recta(s) · '+lvls.length+' hiladas · de arriba abajo'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):''))+
     '<div class="fk-body">'+
-      '<div class="fk-sec"><h2><i class="ti ti-info-circle"></i> Cómo leerlo</h2><div style="font-size:12.5px;color:#334155">Una lámina por hilada, de la más alta a la base. Cada lámina es la <strong>vista en planta</strong> (desde arriba) de esa fila con TODOS los gaviones ya colocados: brazos, esquinas engranadas (headers que cruzan el rincón) y bandas de profundidad. El color es la medida del gavión: '+
-        chip('#3b82f6','#1d4ed8','2 m')+' &nbsp; '+chip('#22c55e','#15803d','1,5 m')+' &nbsp; '+chip('#f59e0b','#b45309','1 m')+'.</div></div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-info-circle"></i> Cómo leerlo</h2><div style="font-size:12.5px;color:#334155">Una lámina por hilada, de la más alta a la base. Cada lámina es la <strong>vista en planta</strong> (desde arriba) de esa fila con TODOS los gaviones ya colocados: brazos, esquinas engranadas (headers que cruzan el rincón) y bandas de profundidad. '+fichaLeyendaNorma()+'</div></div>'+
       secs+ fichaNota()+
     '</div>';
   fichaOpen(sheet, 'plano-hiladas-LU');
+}
+
+// Leyenda de la norma de colores (tono = tipo ancho×alto · intensidad = largo)
+function fichaLeyendaNorma(){
+  const chip=(c,t)=>'<span style="display:inline-block;width:12px;height:12px;background:'+c.f+';border:1px solid '+c.s+';vertical-align:middle;border-radius:2px"></span> '+t;
+  return '<div style="font-size:11.5px;color:#475569;margin-top:6px"><strong>Norma de colores</strong> — tono = tipo (ancho×alto): '+
+    chip(colorGavion(1.5,1,1),'×100×100 azul')+' &nbsp; '+chip(colorGavion(1.5,1,0.5),'×100×50 verde')+' &nbsp; '+
+    chip(colorGavion(1.5,0.5,1),'×50×100 marrón')+' &nbsp; '+chip(colorGavion(1.5,0.5,0.5),'×50×50 amarillo')+' &nbsp; '+
+    chip(colorGavion(1.5,0.3,1),'×30×100 morado')+' &nbsp; '+chip(colorGavion(1.5,0.3,0.5),'×30×50 rosa')+
+    '<br>Intensidad = largo: '+chip(colorGavion(2,1,1),'200 oscuro')+' &nbsp; '+chip(colorGavion(1.5,1,1),'150 medio')+' &nbsp; '+chip(colorGavion(1,1,1),'100 claro')+'</div>';
+}
+
+// ════════════ PLANO 2D DEL MURO EN L/U: planta + TODOS los perfiles (alzados) ════════════
+// Cada alzado sale de las cajas REALES del modelo 3D (cara frontal de cada recta), con la
+// norma de colores por tipo de gavión. Imprimible como plano de obra.
+function eleAlzadoFrontal(i){
+  const data=window.__muroEle; if(!data) return [];
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
+  const segs=data.segs, s=segs[i], w=data.ancho||1;
+  const R=(typeof eleFootprint==='function')?eleFootprint(segs, w):null; if(!R) return [];
+  const r=R[i], out=[];
+  boxes.forEach(function(b){ if(b.arm!==i) return;
+    let front, lx, len, anc;
+    if(s.dx!==0){ const ext=(r.ny>0)? r.ry : (r.ry+r.rh);
+      front=(r.ny>0)? Math.abs(b.z-ext)<1e-6 : Math.abs((b.z+b.a)-ext)<1e-6;
+      len=b.l; anc=b.a; lx=(s.dx>0)? (b.x-s.p0.x) : (s.p0.x-(b.x+b.l));
+    } else { const ext=(r.nx>0)? r.rx : (r.rx+r.rw);
+      front=(r.nx>0)? Math.abs(b.x-ext)<1e-6 : Math.abs((b.x+b.l)-ext)<1e-6;
+      len=b.a; anc=b.l; lx=(s.dy>0)? (b.z-s.p0.y) : (s.p0.y-(b.z+b.a));
+    }
+    if(front) out.push({x:lx, y:b.y, largo:len, ancho:anc, alto:b.h});
+  });
+  return out;
+}
+function croquisAlzadoPlano(i){
+  const data=window.__muroEle, st=data.estados[i], T=data.T[i];
+  const piezas=eleAlzadoFrontal(i), fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const Lm=T.largo, maxTop=Math.max.apply(null, st.crown);
+  const sc=Math.max(5.5, Math.min(16, 740/Lm));
+  const padL=14, padR=14, padT=(T.tr&&T.tr.length>1)?22:12, padB=30;
+  const vbW=padL+Lm*sc+padR, vbH=padT+maxTop*sc+padB, groundY=padT+maxTop*sc;
+  const X=x=>padL+x*sc, Y=y=>groundY-y*sc; let out='';
+  piezas.forEach(function(p){
+    const c=colorGavion(p.largo, p.ancho, p.alto);
+    out+='<rect x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+Math.max(1,p.largo*sc-0.6).toFixed(1)+'" height="'+Math.max(1,p.alto*sc-0.6).toFixed(1)+'" fill="'+c.f+'" stroke="'+c.s+'" stroke-width="0.6"><title>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</title></rect>';
+  });
+  // terreno (marrón) y rasante (roja) del motor por cotas
+  if(st.tt){ let tp=''; for(let j=0;j<st.N;j++){ tp+=(j?'L':'M')+X((j+0.5)*st.cell).toFixed(1)+' '+Y(st.tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(st.tt[st.N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.6" pointer-events="none"/>'; }
+  if(st.rr){ let rp=''; for(let j=0;j<st.N;j++){ rp+=(j?'L':'M')+X((j+0.5)*st.cell).toFixed(1)+' '+Y(st.rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(st.rr[st.N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6 3" pointer-events="none"/>'; }
+  // juntas de tramo (la recta puede fundir varios tramos)
+  if(T.tr && T.tr.length>1){ let d=0;
+    T.tr.forEach(function(t,k){
+      out+='<text x="'+X(d+t.largo/2).toFixed(1)+'" y="'+(padT-8)+'" font-size="9.5" fill="#64748b" text-anchor="middle">T'+(k+1)+' · '+String(t.largo).replace('.',',')+'</text>';
+      d+=t.largo;
+      if(k<T.tr.length-1) out+='<line x1="'+X(d).toFixed(1)+'" y1="'+(padT-4)+'" x2="'+X(d).toFixed(1)+'" y2="'+(groundY+6)+'" stroke="#94a3b8" stroke-width="0.8" stroke-dasharray="3 3"/>';
+    });
+  }
+  // cota de largo total
+  const ly=groundY+16;
+  out+='<line x1="'+padL+'" y1="'+ly+'" x2="'+(padL+Lm*sc).toFixed(1)+'" y2="'+ly+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<text x="'+(padL+Lm*sc/2).toFixed(1)+'" y="'+(ly+11)+'" font-size="10" fill="#334155" text-anchor="middle">'+fnum(Lm)+' m (exterior)</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),750)+'" style="max-width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado de la recta '+(i+1)+'">'+out+'</svg>';
+}
+function elePlano(){
+  const data=window.__muroEle; if(!data||!data.segs||!data.segs.length) return;
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[]; if(!boxes.length) return;
+  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  // recuento por tipo (todas las cajas: cara + bandas + headers)
+  const map={}; boxes.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100;
+    const k=b.largo+'|'+an+'|'+b.h; if(!map[k])map[k]={largo:b.largo,ancho:an,alto:b.h,n:0}; map[k].n++; });
+  const tipos=Object.keys(map).map(k=>map[k]).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo));
+  const chips=tipos.map(function(t){ const c=colorGavion(t.largo,t.ancho,t.alto);
+    return '<span style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;font-size:12.5px"><span style="width:13px;height:13px;background:'+c.f+';border:1px solid '+c.s+';display:inline-block;border-radius:2px"></span>'+Math.round(t.largo*100)+'×'+Math.round(t.ancho*100)+'×'+Math.round(t.alto*100)+': <strong>'+fnum(t.n)+'</strong></span>'; }).join('');
+  const T=data.T, nEsq=Math.max(0,data.segs.length-1);
+  const largoTot=data.segs.reduce(function(s,x){return s+x.largo;},0);
+  const alzados=data.segs.map(function(s,i){
+    return '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Perfil · recta '+(i+1)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos fundidos'):'')+'</h2>'+
+      '<div class="fk-draw" style="display:block;overflow-x:auto">'+croquisAlzadoPlano(i)+'</div></div>';
+  }).join('');
+  const sheet=
+    fichaHead('Plano 2D · muro en L/U', data.segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):' · sección prontuario'))+
+    '<div class="fk-body">'+
+      '<div class="fk-sec"><h2><i class="ti ti-map-2"></i> Planta (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(data.segs, data.ancho||1)+'</div></div>'+
+      alzados+
+      '<div class="fk-sec"><h2><i class="ti ti-palette"></i> Gaviones del muro (uds por tipo, en cm)</h2><div>'+chips+'</div>'+fichaLeyendaNorma()+
+        '<div style="font-size:11.5px;color:#475569;margin-top:6px"><span style="display:inline-block;width:16px;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno &nbsp; <span style="display:inline-block;width:16px;border-top:2px dashed #dc2626;vertical-align:middle"></span> rasante · Los alzados muestran la cara vista (banda frontal); las bandas de fondo y los headers de esquina están contados en la lista.</div></div>'+
+      fichaNota()+
+    '</div>';
+  fichaOpen(sheet, 'plano-2d-LU');
 }
