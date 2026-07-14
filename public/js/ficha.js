@@ -295,3 +295,105 @@ function planoFilas(H, L, ancho){
     '</div>';
   fichaOpen(sheet, 'plano-hiladas-'+fmtm(H)+'m');
 }
+
+// ════════════ MURO EN L / U: ficha técnica y plano por hiladas ════════════
+// Todo sale de las cajas del modelo 3D (eleBoxes): esquinas engranadas, bandas
+// de profundidad y sección del prontuario incluidas → las cuentas siempre cuadran.
+function eleDespieceBoxes(boxes){
+  const map={}; let vol=0;
+  boxes.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100;
+    const k=b.largo+'|'+an+'|'+b.h;
+    if(!map[k]) map[k]={largo:b.largo, ancho:an, alto:b.h, n:0};
+    map[k].n++; vol+=b.l*b.a*b.h; });
+  const piezas=Object.keys(map).map(k=>map[k]).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo));
+  return {piezas:piezas, vol:vol, total:boxes.length};
+}
+
+// ── Ficha del muro en L/U (planta + sección + alzados + despiece del 3D) ──
+function fichaEle(){
+  const data=window.__muroEle; if(!data||!data.segs||!data.segs.length) return;
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[]; if(!boxes.length) return;
+  const d=eleDespieceBoxes(boxes), fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const T=data.T, segs=data.segs, fix=data.ancho||null;
+  const largoTot=segs.reduce(function(s,x){return s+x.largo;},0), nEsq=Math.max(0,segs.length-1);
+  const Hmax=Math.max.apply(null,T.map(function(t){return t.H;}));
+  const peso=d.vol*FICHA_PARAM.densRelleno;
+  const Ea=0.5*FICHA_PARAM.Ka*FICHA_PARAM.gamma*Hmax*Hmax;
+  const kv=(k,v,hi)=>'<div class="fk-kv'+(hi?' fk-hi':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  const alzados=data.estados.map(function(st,i){ return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#334155">Recta '+(i+1)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos'):'')+'</div>'+croquisPorCotasInter(st,true)+'</div>'; }).join('');
+  const sheet=
+    fichaHead('Muro de gaviones en L/U', segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario'))+
+    '<div class="fk-body">'+
+      '<div class="fk-sec"><h2><i class="ti ti-ruler-2"></i> Datos del muro</h2><div class="fk-grid">'+
+        kv('Longitud total (ext.)', fnum(largoTot)+' <small>m</small>')+ kv('Altura máx.', fmtm(Hmax)+' <small>m</small>')+
+        kv('Esquinas', fnum(nEsq))+ kv('Ancho', fix?(fmtm(fix)+' <small>m</small>'):'<span style="font-size:15px">Prontuario</span>')+
+      '</div></div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-map-2"></i> Planta (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(segs, fix||1)+'</div>'+
+        '<div style="font-size:11.5px;color:#475569;margin-top:6px">Las esquinas van <strong>engranadas</strong>: en cada hilada un gavión cruza el rincón alternando de brazo (matajunta también en el giro).</div></div>'+
+      (!fix?('<div class="fk-sec"><h2><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</h2><div class="fk-draw">'+croquisSeccionPront(Hmax)+'</div></div>'):'')+
+      '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Alzados por tramo</h2>'+alzados+'</div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-stack-2"></i> Mediciones y materiales</h2>'+
+        '<div class="fk-grid" style="margin-bottom:12px">'+
+          kv('Total gaviones', fnum(d.total), true)+ kv('Relleno granular', fnum(d.vol,1)+' <small>m³</small>', true)+ kv('Peso aprox. del muro', fnum(peso,1)+' <small>t</small>', true)+
+        '</div>'+ fichaDespieceTabla(d.piezas, d.total)+'</div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-arrow-bar-to-left"></i> Solicitaciones (en la altura máxima)</h2><div class="fk-grid">'+
+        kv('Empuje activo del terreno', fnum(Ea,1)+' <small>kN/m</small>')+ kv('Punto de aplicación', fnum(Hmax/3,2)+' <small>m sobre base</small>')+
+        kv('Coef. empuje activo (Ka)', String(FICHA_PARAM.Ka).replace('.',','))+
+      '</div></div>'+
+      fichaCondiciones()+ fichaNota()+
+    '</div>';
+  fichaOpen(sheet, 'ficha-muro-LU');
+}
+
+// ── Planta de UNA hilada del L/U (todas las cajas de esa cota, pieza a pieza) ──
+function eleCroquisHilada(bs){
+  let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9;
+  bs.forEach(function(b){ minX=Math.min(minX,b.x); maxX=Math.max(maxX,b.x+b.l); minZ=Math.min(minZ,b.z); maxZ=Math.max(maxZ,b.z+b.a); });
+  const Wm=Math.max(0.5,maxX-minX), Hm=Math.max(0.5,maxZ-minZ);
+  const sc=Math.max(4, Math.min(24, Math.min(620/Wm, 460/Hm)));
+  const padL=34, padT=16, padR=16, padB=34;
+  const vbW=padL+Wm*sc+padR, vbH=padT+Hm*sc+padB;
+  const X=x=>padL+(x-minX)*sc, Y=z=>padT+(maxZ-z)*sc;
+  let out='';
+  bs.forEach(function(b){
+    const col=muroColorPieza(b.largo), rw=b.l*sc, rh=b.a*sc;
+    out+='<rect x="'+X(b.x).toFixed(1)+'" y="'+Y(b.z+b.a).toFixed(1)+'" width="'+Math.max(1,rw-1).toFixed(1)+'" height="'+Math.max(1,rh-1).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"><title>'+String(b.l).replace('.',',')+' × '+String(b.a).replace('.',',')+' × '+String(b.h).replace('.',',')+' m</title></rect>';
+    const cxp=X(b.x)+rw/2, cyp=Y(b.z+b.a)+rh/2, lbl=String(b.largo).replace('.',',');
+    if(rw>=17 && rh>=9) out+='<text x="'+cxp.toFixed(1)+'" y="'+(cyp+3.2).toFixed(1)+'" font-size="9" fill="#0f172a" text-anchor="middle" font-family="system-ui">'+lbl+'</text>';
+    else if(rh>=17 && rw>=9) out+='<text x="'+cxp.toFixed(1)+'" y="'+cyp.toFixed(1)+'" font-size="9" fill="#0f172a" text-anchor="middle" font-family="system-ui" transform="rotate(-90 '+cxp.toFixed(1)+' '+cyp.toFixed(1)+')" dominant-baseline="middle">'+lbl+'</text>';
+  });
+  // cotas exteriores del conjunto
+  const ly=padT+Hm*sc+14;
+  out+='<line x1="'+padL+'" y1="'+ly+'" x2="'+(padL+Wm*sc).toFixed(1)+'" y2="'+ly+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<text x="'+(padL+Wm*sc/2).toFixed(1)+'" y="'+(ly+12)+'" font-size="10" fill="#334155" text-anchor="middle" font-family="system-ui">'+fmtN(Wm)+' m</text>';
+  const lx=padL-12;
+  out+='<line x1="'+lx+'" y1="'+padT+'" x2="'+lx+'" y2="'+(padT+Hm*sc).toFixed(1)+'" stroke="#94a3b8" stroke-width="1"/>';
+  out+='<text x="'+(lx-5)+'" y="'+(padT+Hm*sc/2).toFixed(1)+'" font-size="10" fill="#334155" text-anchor="middle" font-family="system-ui" transform="rotate(-90 '+(lx-5)+' '+(padT+Hm*sc/2).toFixed(1)+')">'+fmtN(Hm)+' m</text>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),720)+'" style="max-width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta de la hilada">'+out+'</svg>';
+}
+
+// ── PLANO POR HILADAS del muro en L/U: una lámina en planta por cota, de arriba abajo ──
+function elePlanoHiladas(){
+  const data=window.__muroEle; if(!data||!data.segs||!data.segs.length) return;
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[]; if(!boxes.length) return;
+  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const lvls=[]; boxes.forEach(function(b){ if(!lvls.some(function(y){return Math.abs(y-b.y)<1e-6;})) lvls.push(b.y); }); lvls.sort(function(a,b){return a-b;});
+  const secs=lvls.slice().reverse().map(function(y){
+    const bs=boxes.filter(function(b){return Math.abs(b.y-y)<1e-6;});
+    const alto=Math.max.apply(null, bs.map(function(b){return b.h;}));
+    const idx=lvls.indexOf(y)+1;
+    const cnt={}; bs.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100; const k=b.largo+'|'+an; cnt[k]=(cnt[k]||0)+1; });
+    const lista=Object.keys(cnt).sort().map(function(k){ const pp=k.split('|'); return fmtm(+pp[0])+'×'+fmtm(+pp[1])+'×'+fmtm(alto)+' m: <strong>'+cnt[k]+'</strong>'; }).join(' &nbsp;·&nbsp; ');
+    return '<div class="fk-sec"><h2><i class="ti ti-layers-subtract"></i> Hilada '+idx+(idx===1?' (base)':'')+' · cota '+fmtm(y)+' m · '+bs.length+' gaviones</h2>'+
+      '<div class="fk-draw">'+eleCroquisHilada(bs)+'</div>'+
+      '<div style="font-size:12px;margin-top:6px;color:#334155">'+lista+'</div></div>';
+  }).join('');
+  const chip=(c,s,t)=>'<span style="display:inline-block;width:12px;height:12px;background:'+c+';border:1px solid '+s+';vertical-align:middle"></span> '+t;
+  const sheet=fichaHead('Plano por hiladas · muro en L/U', data.T.length+' tramos · '+lvls.length+' hiladas · de arriba abajo'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):''))+
+    '<div class="fk-body">'+
+      '<div class="fk-sec"><h2><i class="ti ti-info-circle"></i> Cómo leerlo</h2><div style="font-size:12.5px;color:#334155">Una lámina por hilada, de la más alta a la base. Cada lámina es la <strong>vista en planta</strong> (desde arriba) de esa fila con TODOS los gaviones ya colocados: brazos, esquinas engranadas (headers que cruzan el rincón) y bandas de profundidad. El color es la medida del gavión: '+
+        chip('#3b82f6','#1d4ed8','2 m')+' &nbsp; '+chip('#22c55e','#15803d','1,5 m')+' &nbsp; '+chip('#f59e0b','#b45309','1 m')+'.</div></div>'+
+      secs+ fichaNota()+
+    '</div>';
+  fichaOpen(sheet, 'plano-hiladas-LU');
+}

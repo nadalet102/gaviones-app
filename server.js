@@ -25,6 +25,7 @@ app.use(require('./routes/partes'));
 app.use(require('./routes/necesidades'));
 app.use(require('./routes/historial'));
 app.use(require('./routes/import'));
+app.use(require('./routes/muros'));
 
 // ── SPA + 404 de API ───────────────────────────────────────────────────────────
 app.get('*', (req,res)=>{

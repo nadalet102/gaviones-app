@@ -148,8 +148,14 @@ function renderCalculador(){
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:16px">'+
       '<div style="font-weight:600;font-size:13px;margin-bottom:4px"><i class="ti ti-vector-triangle"></i> Muro en L / U — dibuja el recorrido</div>'+
       '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Haz <strong>clic en la cuadrícula</strong> para ir extendiendo el muro (las esquinas salen a 90° solas). Fija la altura por defecto y se aplica a todo lo que dibujes (luego puedes afinar cada tramo en la tabla).</div>'+
-      '<div class="frow3" style="gap:12px;align-items:flex-end;margin-bottom:10px">'+
+      '<div class="frow3" style="gap:12px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap">'+
         '<div class="field" style="margin:0"><label>Altura por defecto (m)</label><input type="number" id="el-alt-def" min="0.5" step="0.5" value="'+((window.__eleH)||3)+'" style="width:110px" oninput="eleSetH(this.value)"></div>'+
+        '<div class="field" style="margin:0"><label>Ancho del gavión</label><select id="el-ancho" style="width:210px" onchange="eleSetAncho(this.value)">'+
+          '<option value=""'+(!window.__eleAncho?' selected':'')+'>Prontuario (auto según altura)</option>'+
+          '<option value="1"'+(window.__eleAncho===1?' selected':'')+'>1 m (recto)</option>'+
+          '<option value="0.5"'+(window.__eleAncho===0.5?' selected':'')+'>0,50 m</option>'+
+          '<option value="0.3"'+(window.__eleAncho===0.3?' selected':'')+'>0,30 m</option>'+
+        '</select></div>'+
       '</div>'+
       '<div id="ele-grid"></div>'+
       '<div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">'+
@@ -215,12 +221,17 @@ function renderCalculador(){
         '<div><div style="font-size:16px;font-weight:600">Calculador de muros de gaviones</div>'+
         '<div class="dim">Despiece y vistas por altura y longitud (prontuario ARISAC)</div></div>'+
       '</div>'+
-      '<button class="btn btn-outline btn-sm" onclick="switchTab(\'dash\')"><i class="ti ti-arrow-left"></i> Volver al panel</button>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline btn-sm" onclick="muroHistToggle()"><i class="ti ti-history"></i> Historial (<span id="hist-n">'+((window.__histN!=null)?window.__histN:'…')+'</span>)</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="switchTab(\'dash\')"><i class="ti ti-arrow-left"></i> Volver al panel</button>'+
+      '</div>'+
     '</div>'+
-    '<div class="frow3" style="gap:10px;margin-bottom:14px;flex-wrap:wrap">'+
+    '<div class="frow3" style="gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">'+
       '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Obra (para la ficha)</label><input id="fk-obra" value="'+((window.__fichaMeta&&window.__fichaMeta.obra)||'')+'" oninput="fichaSetMeta()" placeholder="Ej. Mancomunidad Alto Henares"></div>'+
       '<div class="field" style="margin:0;flex:1;min-width:180px"><label>Cliente (para la ficha)</label><input id="fk-cliente" value="'+((window.__fichaMeta&&window.__fichaMeta.cliente)||'')+'" oninput="fichaSetMeta()" placeholder="Nombre del cliente"></div>'+
+      '<div id="calc-save-bar" style="display:flex;gap:6px;flex-wrap:wrap">'+saveBarHTML()+'</div>'+
     '</div>'+
+    '<div id="calc-hist"></div>'+
     toggle+
     (calcModo==='ele' ? formEle : calcModo==='tramos' ? formTramos : formSimple)+
     '<div id="calc-result"></div>'+
@@ -231,6 +242,8 @@ function renderCalculador(){
       '<div style="margin-top:8px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Estimación orientativa; el trabado y el reparto se ajustan en obra.</div>'+
     '</div></div>';
   if(calcModo==='tramos') tramoTogglePerfil(); else if(calcModo==='ele') eleGridRedraw(); else muroToggleAncho();
+  muroHistCount();
+  if(window.__histAbierto) renderHistorial();
 }
 
 // Selector de ancho: muros bajos (<2 m, ancho recto) y 2 m (prontuario o 0,50 recto)
@@ -649,6 +662,8 @@ function eleZoomReset(){ window.__eleZoom=1; eleGridRedraw(); }
 // Altura por defecto: se aplica a TODO lo dibujado (tramos existentes) y a los nuevos.
 function eleSetH(v){ const h=parseFloat(v); if(!(h>0)) return; window.__eleH=Math.max(0.5, Math.round(h*2)/2);
   const D=window.__eleDraw; if(D) D.seg.forEach(function(s){ s.H=window.__eleH; }); eleGridRedraw(); }
+// Ancho del gavión en L/U: vacío = prontuario (auto); 1 / 0,5 / 0,3 = ancho fijo para todo el muro.
+function eleSetAncho(v){ window.__eleAncho = v ? parseFloat(v) : null; }
 function eleGridClick(evt){
   const svg=evt.currentTarget, rect=svg.getBoundingClientRect(), G=eleView();
   const vx=(evt.clientX-rect.left)*(G.vbW/rect.width), vy=(evt.clientY-rect.top)*(G.vbH/rect.height);
@@ -710,52 +725,72 @@ function eleCalcular(){
   const res=document.getElementById('calc-result'); if(!res) return;
   const seg=(window.__eleDraw&&window.__eleDraw.seg)||[];
   if(!seg.length){ res.innerHTML='<div class="empty"><i class="ti ti-vector-triangle"></i><p>Dibuja el recorrido en la cuadrícula</p></div>'; return; }
-  const T=seg;
-  const estados=seg.map(s=>{ const ras=[{d:0,c:s.ci+s.H},{d:s.largo,c:s.cf+s.H}], ter=[{d:0,c:s.ci},{d:s.largo,c:s.cf}]; return perfilCalc(ras,ter); });
-  let x=0,y=0; const segs=seg.map((s,i)=>{ const p0={x:x,y:y}, p1={x:x+s.dx*s.largo,y:y+s.dy*s.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:s.dx,dy:s.dy,largo:s.largo,H:s.H,i:i}; });
-  window.__muroEle={T:T, estados:estados, segs:segs};
-  // despiece total (suma de tramos)
-  const cnt={}; let vol=0, total=0;
-  estados.forEach(st=>st.piezas.forEach(p=>{ const k=p.largo+'|'+p.alto; cnt[k]=(cnt[k]||0)+1; vol+=p.largo*p.alto; total++; }));
-  // TRABA DE ESQUINA: por cada esquina, un gavión de 1,5 m por hilada (200×100×100 → 1,5 m =
-  // 1 m de ancho del otro muro + 0,5 m dentro del suyo). Alternan de brazo hilada a hilada.
-  const nEsq0=Math.max(0,T.length-1); let esqN=0, esqVol=0;
-  for(let i=0;i<seg.length-1;i++){ const hc=Math.min(seg[i].H, seg[i+1].H); const full=Math.floor(hc+1e-9), half=(hc-full)>0.25;
-    for(let k=0;k<full;k++){ cnt['1.5|1']=(cnt['1.5|1']||0)+1; esqN++; esqVol+=1.5; }
-    if(half){ cnt['1.5|0.5']=(cnt['1.5|0.5']||0)+1; esqN++; esqVol+=0.75; }
-  }
-  vol+=esqVol; total+=esqN;
-  // PRONTUARIO (profundidad real): suma por tramo la sección del prontuario según su altura
-  let prVol=0, prTotal=0, prCnt={}, prHmax=0;
-  estados.forEach(function(st){ const p=perfilProntuario(st.base,st.crown,st.cell,st.N); prVol+=p.granular; prTotal+=p.total;
-    p.piezas.forEach(function(q){ const k=q.largo+'|'+q.ancho+'|'+q.alto; prCnt[k]=(prCnt[k]||0)+q.n; });
-    prHmax=Math.max(prHmax, Math.max.apply(null,st.crown)); });
+  // AGRUPAR en RECTAS: tramos consecutivos con la MISMA dirección NO son esquinas — son un
+  // muro CONTINUO que sigue recto (cambia la cota/altura). Se funden en una sola recta y el
+  // motor por cotas los traba a través de la junta (escalones con pieza entera incluidos).
+  // La esquina (giro 90° con encastre) solo aparece cuando de verdad cambia la dirección.
+  const runs=[]; seg.forEach(function(s){
+    const r=runs[runs.length-1];
+    if(r && r.dx===s.dx && r.dy===s.dy) r.tr.push(s); else runs.push({dx:s.dx, dy:s.dy, tr:[s]});
+  });
+  const T=runs.map(function(r){
+    const L=r.tr.reduce(function(a,t){ return a+t.largo; },0);
+    return {dx:r.dx, dy:r.dy, largo:L, H:Math.max.apply(null,r.tr.map(function(t){return t.H;})),
+      ci:r.tr[0].ci, cf:r.tr[r.tr.length-1].cf, tr:r.tr};
+  });
+  const estados=T.map(function(t){
+    const ras=[], ter=[]; let d=0;
+    t.tr.forEach(function(s,k){ const d0=k? d+1e-4 : 0;   // salto de cota en la junta (sin d duplicada)
+      ter.push({d:d0,c:s.ci},{d:d+s.largo,c:s.cf});
+      ras.push({d:d0,c:s.ci+s.H},{d:d+s.largo,c:s.cf+s.H});
+      d+=s.largo; });
+    return perfilCalc(ras,ter);
+  });
+  let x=0,y=0; const segs=T.map(function(t,i){ const p0={x:x,y:y}, p1={x:x+t.dx*t.largo,y:y+t.dy*t.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:t.dx,dy:t.dy,largo:t.largo,H:t.H,i:i}; });
+  const fix=window.__eleAncho||null;   // ancho fijo (1 / 0,5 / 0,3) o null = prontuario
+  window.__muroEle={T:T, estados:estados, segs:segs, ancho:fix};
+  // DESPIECE REAL pieza a pieza: las MISMAS cajas que la vista 3D (esquinas engranadas con
+  // headers, bandas de profundidad y sección del prontuario incluidas) → las cuentas cuadran.
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
+  const cnt={}; let vol=0; const total=boxes.length;
+  boxes.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100;
+    const k=b.largo+'|'+an+'|'+b.h; cnt[k]=(cnt[k]||0)+1; vol+=b.l*b.a*b.h; });
   const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
-  const prFilas=Object.keys(prCnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],ancho:+pp[1],alto:+pp[2],n:prCnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)).map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+'×'+fmtm(p.ancho)+'×'+fmtm(p.alto)+' m</strong></td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
-  const lista=Object.keys(cnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],alto:+pp[1],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.largo-a.largo));
-  const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × 1 × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
+  const lista=Object.keys(cnt).map(k=>{const pp=k.split('|');return{largo:+pp[0],ancho:+pp[1],alto:+pp[2],n:cnt[k]};}).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo));
+  const filas=lista.map(p=>'<tr><td>Gavión <strong>'+fmtm(p.largo)+' m</strong></td><td>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</td><td class="r mono" style="font-weight:600">'+fmtN(p.n)+'</td></tr>').join('');
   const nEsq=Math.max(0,T.length-1);
-  res.innerHTML=
-    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+T.length+' tramos, '+nEsq+' esquina(s)</div>'+
-      '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs)+
-      '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro).</div></div></div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-details"></i> Despiece total</div>'+
-      '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones (cara)</span></div>'+
-      '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
-      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
-      '<div class="dim" style="font-size:11px;margin-top:6px">Incluye <strong>'+fmtN(esqN)+'</strong> gaviones de <strong>1,5 m</strong> de traba en '+nEsq+' esquina(s) — uno por hilada, alternando de brazo (1,5 m = 1 m del ancho del otro muro + 0,5 m dentro del suyo).</div></div></div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección y material real (prontuario ARISAC)</div>'+
-      '<span class="dim">'+fmtN(prVol)+' m³ · '+fmtN(prTotal)+' gaviones</span></div>'+
+  const Hmax=Math.max.apply(null, T.map(t=>t.H));
+  // tarjeta de sección: prontuario (auto) o aviso si el ancho fijo se queda corto en altura
+  let secCard='';
+  if(!fix){
+    let prHmax=0; estados.forEach(function(st){ prHmax=Math.max(prHmax, Math.max.apply(null,st.crown)); });
+    secCard='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</div></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'+
         '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección a la altura máx. ('+fmtN(prHmax)+' m)</div>'+croquisSeccionPront(prHmax)+'</div>'+
-        '<div style="flex:1;min-width:240px"><table class="tbl"><thead><tr><th>Pieza (largo×ancho×alto)</th><th class="r">Uds</th></tr></thead><tbody>'+prFilas+
-          '<tr style="border-top:2px solid var(--border)"><td style="font-weight:600">Total (con profundidad)</td><td class="r mono" style="font-weight:700">'+fmtN(prTotal)+'</td></tr></tbody></table>'+
-          '<div class="dim" style="font-size:11px;margin-top:6px">A más altura, la base ensancha (prontuario) y añade bandas de profundidad. Volumen granular real = <strong>'+fmtN(prVol)+' m³</strong> (suma de los tramos).</div></div>'+
+        '<div class="dim" style="flex:1;min-width:220px;font-size:12px">A más altura, la base ensancha según el prontuario y añade bandas de profundidad. El despiece de arriba <strong>ya lo incluye</strong> (sale del modelo 3D pieza a pieza).</div>'+
+      '</div></div>';
+  } else if(Hmax>=2){
+    secCard='<div class="card" style="margin-top:14px"><div class="card-body" style="padding:10px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Ancho fijo de '+fmtm(fix)+' m con altura de '+fmtm(Hmax)+' m: no se aplica el ensanche de base del prontuario (recomendado a partir de 2 m). Revisa la estabilidad.</div></div>';
+  }
+  const holgura03=(fix===0.3&&nEsq>0)?'<div class="dim" style="font-size:11px;margin-top:6px">Ancho 0,30 m: el recorte de esquina va a la rejilla de 0,5 → queda una holgura de 20 cm en el rincón, que se cierra al atar en obra.</div>':'';
+  res.innerHTML=
+    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+seg.length+' tramo(s) · '+T.length+' recta(s) · '+nEsq+' esquina(s)'+(fix?(' · ancho '+fmtm(fix)+' m'):'')+'</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline btn-sm" onclick="elePlanoHiladas()"><i class="ti ti-stack-2"></i> Plano por hiladas</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="fichaEle()"><i class="ti ti-file-description"></i> Ficha técnica</button>'+
+        '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button>'+
       '</div></div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por tramo</div></div>'+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs, fix||1)+
+      '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro). Los tramos seguidos <strong>en la misma dirección</strong> se funden en una recta continua, trabada a través de la junta.</div>'+holgura03+'</div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-details"></i> Despiece total (según 3D)</div>'+
+      '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones</span></div>'+
+      '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
+      '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
+      '<div class="dim" style="font-size:11px;margin-top:6px">Cuenta pieza a pieza del modelo 3D: esquinas engranadas (headers que cruzan alternando de brazo)'+(fix?'':' y bandas de profundidad del prontuario')+' incluidas.</div></div></div>'+
+    secCard+
+    '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por recta</div></div>'+
       '<div class="card-body" style="padding:14px 16px">'+
-        estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Tramo '+(i+1)+' · '+fmtN(T[i].largo)+' m · '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt '+fmtN(T[i].H)+' m</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
+        estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">Recta '+(i+1)+' · '+fmtN(T[i].largo)+' m · cotas '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt máx '+fmtN(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos fundidos'):'')+'</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
       '</div></div>';
 }
 // Huella del muro en planta con MEDIDAS EXTERIORES: la polilínea que dibuja el usuario es la
@@ -771,8 +806,8 @@ function eleFootprint(segs, w){
     else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=(nx<0)?s.p0.x-w:s.p0.x; rw=w; }
     return {rx:rx, ry:ry, rw:rw, rh:rh, nx:nx, ny:ny, s:s}; });
 }
-function croquisPlantaLU(segs){
-  const w=1;
+function croquisPlantaLU(segs, w){
+  w=w||((window.__muroEle&&window.__muroEle.ancho)||1);
   const R=eleFootprint(segs, w);
   // envolvente EXTERIOR = polilínea del recorrido (bordes de fuera)
   let vx=[], vy=[]; segs.forEach((s,i)=>{ if(i===0){vx.push(s.p0.x);vy.push(s.p0.y);} vx.push(s.p1.x); vy.push(s.p1.y); });
@@ -1022,3 +1057,243 @@ function croquisPerfilEscalonado(tramos){
 }
 
 // (croquisTrabado/croquisSeccion/croquis3D antiguos sustituidos por croquisCaraC/croquisSeccionC/croquis3DC)
+
+// ════════════ HISTORIAL DE MUROS (guardar / rescatar) ════════════
+// Cada muro se guarda en el servidor (tabla muros_guardados) con su obra/cliente,
+// un resumen (gaviones, m³, alturas) y el ESTADO completo del calculador (datos),
+// para poder rescatarlo tal cual se dejó — incluidos los ajustes a mano del perfil.
+function saveBarHTML(){
+  if(window.__muroGuardadoId){
+    return '<button class="btn btn-primary btn-sm" onclick="muroGuardar(true)" title="Sobrescribe el muro guardado con lo que hay ahora en pantalla"><i class="ti ti-device-floppy"></i> Actualizar «'+fkEsc(window.__muroGuardadoNombre||'')+'»</button>'+
+      '<button class="btn btn-outline btn-sm" onclick="muroGuardar(false)" title="Guarda una copia nueva sin tocar el original"><i class="ti ti-copy"></i> Guardar como nuevo</button>'+
+      '<button class="btn btn-outline btn-sm" title="Dejar de editar este muro guardado" onclick="muroDejarEdicion()"><i class="ti ti-x"></i></button>';
+  }
+  return '<button class="btn btn-primary btn-sm" onclick="muroGuardar(false)"><i class="ti ti-device-floppy"></i> Guardar muro</button>';
+}
+function renderSaveBar(){ const e=document.getElementById('calc-save-bar'); if(e) e.innerHTML=saveBarHTML(); }
+function muroDejarEdicion(){ window.__muroGuardadoId=null; window.__muroGuardadoNombre=null; renderSaveBar(); if(window.__histAbierto) renderHistorial(); }
+
+// Estado completo del modo activo (o null si no hay nada calculable que guardar)
+function calcEstadoActual(){
+  const fm=window.__fichaMeta||{};
+  const V=id=>{ const e=document.getElementById(id); return e? e.value : ''; };
+  if(calcModo==='simple'){
+    const h=parseFloat(V('calc-altura')), L=parseFloat(V('calc-long'))||0;
+    if(!h||L<=0) return null;
+    const av=V('calc-ancho');
+    let ancho=null;                                   // mismo criterio de ancho que calcularMuro
+    if(h<2) ancho=parseFloat(av)||0.5; else if(h===2&&av&&av!=='pront') ancho=parseFloat(av)||0.5;
+    const d=muroDespiece(h,L,ancho);
+    return {modo:'simple', fichaMeta:fm, datos:{simple:{altura:V('calc-altura'), ancho:av, long:V('calc-long')}},
+      resumen:{gaviones:d.total, m3:Math.round(d.granular*100)/100, hmax:h, largo:L}};
+  }
+  if(calcModo==='tramos'){
+    const subPerfil=!!(document.getElementById('perfil-desp') && window.__perfil);   // lo que hay en pantalla
+    const campos={perfil:V('tr-perfil'), esc:V('tr-esc'), text:V('tr-text'),
+      cs:{ini:V('cs-ini'), fin:V('cs-fin'), long:V('cs-long'), alt:V('cs-alt')},
+      tp:{ras:V('tp-rasante'), ter:V('tp-terreno')}, sub:(subPerfil?'perfil':'texto')};
+    if(subPerfil){
+      const st=window.__perfil;
+      const activo=st.piezas.filter(function(p,i){ return p && !st.removed.has(i); });
+      const vol=activo.reduce(function(s,p){ return s+p.largo*p.alto; },0);
+      let hmax=0; for(let j=0;j<st.N;j++) hmax=Math.max(hmax, st.crown[j]-st.base[j]);
+      return {modo:'tramos', fichaMeta:fm,
+        datos:{tramos:campos, perfilState:{base:st.base, crown:st.crown, cell:st.cell, N:st.N, L:st.L, rr:st.rr, tt:st.tt, piezas:st.piezas, removed:Array.from(st.removed)}},
+        resumen:{gaviones:activo.length, m3:Math.round(vol*100)/100, hmax:Math.round(hmax*100)/100, largo:st.L}};
+    }
+    const parsed=parseTramos(V('tr-text'), parseFloat(V('tr-esc')));
+    if(!parsed.tramos.length) return null;
+    let gav=0, m3=0, largo=0, hmax=0;
+    parsed.tramos.forEach(function(t){ const r=muroPiezasTramo(t); r.piezas.forEach(function(p){ gav+=p.n; }); m3+=r.granular; largo+=t.L; hmax=Math.max(hmax,t.H); });
+    return {modo:'tramos', fichaMeta:fm, datos:{tramos:campos},
+      resumen:{gaviones:gav, m3:Math.round(m3*100)/100, hmax:hmax, largo:largo}};
+  }
+  // 'ele' — requiere haber calculado (muroGuardar lo lanza antes)
+  const D=window.__eleDraw, data=window.__muroEle;
+  if(!D||!D.seg.length||!data||!data.segs||!data.segs.length) return null;
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
+  const vol=boxes.reduce(function(s,b){ return s+b.l*b.a*b.h; },0);
+  const largo=data.segs.reduce(function(s,x){ return s+x.largo; },0);
+  const hmax=Math.max.apply(null, data.T.map(function(t){ return t.H; }));
+  return {modo:'ele', fichaMeta:fm,
+    datos:{ele:{seg:D.seg, H:window.__eleH||null, ancho:data.ancho||null}},
+    resumen:{gaviones:boxes.length, m3:Math.round(vol*100)/100, hmax:hmax, largo:largo}};
+}
+
+async function muroGuardar(actualizar){
+  // recalcula el modo activo para que lo guardado sea EXACTAMENTE lo que hay en pantalla
+  if(calcModo==='simple') calcularMuro();
+  else if(calcModo==='tramos'){
+    const enPerfil=!!(document.getElementById('perfil-desp') && window.__perfil);
+    if(!enPerfil && ((document.getElementById('tr-text')||{}).value||'').trim()) calcularTramos();
+  }
+  else if(calcModo==='ele' && window.__eleDraw && window.__eleDraw.seg.length) eleCalcular();
+  const est=calcEstadoActual();
+  if(!est){ log('Rellena y calcula un muro antes de guardar','warn'); return; }
+  const fm=est.fichaMeta||{};
+  let nombre=window.__muroGuardadoNombre||'';
+  if(!actualizar || !window.__muroGuardadoId){
+    const def=window.__muroGuardadoId ? ((window.__muroGuardadoNombre||'Muro')+' (v2)')
+      : (fm.obra || ('Muro '+(est.modo==='ele'?'L/U':est.modo==='tramos'?'por tramos':'')+' '+new Date().toLocaleDateString('es-ES')).replace('  ',' '));
+    nombre=prompt('Nombre para guardar el muro:', def);
+    if(nombre==null) return;
+    nombre=nombre.trim();
+    if(!nombre){ log('Sin nombre no se guarda','warn'); return; }
+  }
+  const body={nombre:nombre, obra:fm.obra||'', cliente:fm.cliente||'', modo:est.modo, resumen:est.resumen, datos:est.datos};
+  try{
+    let r;
+    if(actualizar && window.__muroGuardadoId) r=await api('PUT','/muros/'+window.__muroGuardadoId, body);
+    else r=await api('POST','/muros', body);
+    window.__muroGuardadoId=r.id; window.__muroGuardadoNombre=r.nombre;
+    renderSaveBar(); muroHistCount(); if(window.__histAbierto) renderHistorial();
+    log('Muro «'+r.nombre+'» '+(actualizar?'actualizado':'guardado en el historial'));
+  }catch(e){ log('No se pudo guardar: '+e.message,'warn'); }
+}
+
+async function muroHistCount(){
+  try{ const l=await api('GET','/muros'); window.__histLista=l; window.__histN=l.length; setHistCount(); }catch(e){}
+}
+function setHistCount(){ const e=document.getElementById('hist-n'); if(e) e.textContent=(window.__histN!=null?window.__histN:'…'); }
+async function muroHistToggle(){
+  window.__histAbierto=!window.__histAbierto;
+  const c=document.getElementById('calc-hist');
+  if(!window.__histAbierto){ if(c) c.innerHTML=''; return; }
+  await renderHistorial();
+}
+// Filtro del buscador (insensible a mayúsculas y tildes) sobre nombre/obra/cliente/nota/tipo
+function histNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function histFiltrado(){
+  const list=window.__histLista||[], q=histNorm(window.__histFiltro||'');
+  if(!q) return list;
+  const modoTxt={simple:'un muro', tramos:'tramos', ele:'l/u'};
+  return list.filter(function(m){
+    return histNorm(m.nombre).indexOf(q)>=0 || histNorm(m.obra).indexOf(q)>=0 ||
+      histNorm(m.cliente).indexOf(q)>=0 || histNorm(m.notas).indexOf(q)>=0 ||
+      histNorm(modoTxt[m.modo]||m.modo).indexOf(q)>=0;
+  });
+}
+function histFiltrar(v){
+  window.__histFiltro=v;
+  const tb=document.getElementById('hist-tbody'); if(tb) tb.innerHTML=histRowsHTML(histFiltrado());
+}
+function histRowsHTML(list){
+  const modoTxt={simple:'Un muro', tramos:'Tramos', ele:'L / U'};
+  const fm=x=>String(x).replace('.',',');
+  if(!list.length) return '<tr><td colspan="7" class="dim" style="padding:14px;text-align:center">Sin resultados'+(window.__histFiltro?(' para «'+fkEsc(window.__histFiltro)+'»'):'')+'</td></tr>';
+  return list.map(function(m){
+    const r=m.resumen||{};
+    const res=[(r.gaviones!=null?fmtN(r.gaviones)+' gav.':null),(r.m3!=null?fm(r.m3)+' m³':null),
+      (r.hmax!=null?'H '+fm(r.hmax)+' m':null),(r.largo!=null?fm(r.largo)+' m':null)].filter(Boolean).join(' · ');
+    const editando=(window.__muroGuardadoId===m.id), tieneNota=!!(m.notas&&m.notas.trim());
+    return '<tr'+(editando?' style="background:var(--bg2,#eff6ff)"':'')+'>'+
+      '<td style="font-weight:600">'+fkEsc(m.nombre)+(editando?' <span class="badge b-steel" style="font-size:10px">editando</span>':'')+'</td>'+
+      '<td class="dim">'+fkEsc(m.obra||'—')+'</td><td class="dim">'+fkEsc(m.cliente||'—')+'</td>'+
+      '<td><span class="badge b-steel">'+(modoTxt[m.modo]||m.modo||'—')+'</span></td>'+
+      '<td class="dim" style="font-size:11.5px">'+res+'</td>'+
+      '<td class="dim" style="font-size:11.5px;white-space:nowrap">'+fmtD(m.updated_at)+'</td>'+
+      '<td class="r" style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="muroCargar('+m.id+')"><i class="ti ti-folder-open"></i> Cargar</button> '+
+        '<button class="btn btn-outline btn-sm" title="Duplicar (guardar una copia)" onclick="muroDuplicar('+m.id+')"><i class="ti ti-copy"></i></button> '+
+        '<button class="btn btn-outline btn-sm" title="'+(tieneNota?('Nota: '+fkEsc(m.notas)):'Añadir nota')+'" onclick="muroNotaToggle('+m.id+')"><i class="ti ti-note" style="'+(tieneNota?'color:var(--amber)':'')+'"></i></button> '+
+        '<button class="btn btn-outline btn-sm" title="Borrar del historial" onclick="muroBorrar('+m.id+')"><i class="ti ti-trash"></i></button></td></tr>'+
+      '<tr id="nota-row-'+m.id+'" style="display:none"><td colspan="7" style="background:var(--bg2,#f8fafc);padding:10px 14px">'+
+        '<div style="font-size:11px;font-weight:600;margin-bottom:4px"><i class="ti ti-note"></i> Nota de «'+fkEsc(m.nombre)+'»</div>'+
+        '<textarea id="nota-txt-'+m.id+'" rows="2" placeholder="Cambios pedidos, estado de la obra, precios…" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical">'+fkEsc(m.notas||'')+'</textarea>'+
+        '<div style="margin-top:6px;display:flex;gap:6px"><button class="btn btn-primary btn-sm" onclick="muroNotaGuardar('+m.id+')"><i class="ti ti-device-floppy"></i> Guardar nota</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="muroNotaToggle('+m.id+')">Cerrar</button></div></td></tr>';
+  }).join('');
+}
+async function renderHistorial(){
+  const c=document.getElementById('calc-hist'); if(!c) return;
+  c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body dim" style="padding:12px 16px">Cargando historial…</div></div>';
+  let list=[];
+  try{ list=await api('GET','/muros'); }
+  catch(e){ c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:12px 16px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> No se pudo cargar el historial: '+fkEsc(e.message)+'</div></div>'; return; }
+  window.__histLista=list; window.__histN=list.length; setHistCount();
+  if(!list.length){
+    c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body dim" style="padding:12px 16px;font-size:12.5px"><i class="ti ti-history"></i> Aún no hay muros guardados. Calcula uno, pon obra y cliente, y dale a «Guardar muro».</div></div>';
+    return;
+  }
+  c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-hdr" style="flex-wrap:wrap;gap:8px"><div class="card-title"><i class="ti ti-history"></i> Historial de muros ('+list.length+')</div>'+
+      '<input id="hist-buscar" value="'+fkEsc(window.__histFiltro||'')+'" oninput="histFiltrar(this.value)" placeholder="Buscar por nombre, obra, cliente o nota…" style="flex:1;min-width:200px;max-width:340px;font-size:12.5px;padding:6px 10px;border:1px solid var(--border);border-radius:6px"></div>'+
+    '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Obra</th><th>Cliente</th><th>Tipo</th><th>Resumen</th><th>Fecha</th><th></th></tr></thead><tbody id="hist-tbody">'+histRowsHTML(histFiltrado())+'</tbody></table></div>'+
+    '<div class="card-body dim" style="padding:8px 16px;font-size:11px">Cargar deja el muro en pantalla tal cual se guardó · «Actualizar» lo sobrescribe · <i class="ti ti-copy"></i> duplica · <i class="ti ti-note"></i> nota (ámbar = tiene nota) · <i class="ti ti-trash"></i> borra.</div></div>';
+}
+
+async function muroDuplicar(id){
+  let full;
+  try{ full=await api('GET','/muros/'+id); }
+  catch(e){ log('No se pudo leer el muro: '+e.message,'warn'); return; }
+  let nombre=prompt('Nombre para la copia:', (full.nombre||'Muro')+' (copia)');
+  if(nombre==null) return;
+  nombre=nombre.trim();
+  if(!nombre){ log('Sin nombre no se duplica','warn'); return; }
+  try{
+    await api('POST','/muros',{nombre:nombre, obra:full.obra||'', cliente:full.cliente||'', modo:full.modo,
+      resumen:full.resumen||{}, datos:full.datos, notas:full.notas||''});
+  }catch(e){ log('No se pudo duplicar: '+e.message,'warn'); return; }
+  muroHistCount(); if(window.__histAbierto) renderHistorial();
+  log('Copia «'+nombre+'» creada en el historial');
+}
+
+function muroNotaToggle(id){
+  const row=document.getElementById('nota-row-'+id); if(!row) return;
+  const abrir=(row.style.display==='none');
+  row.style.display=abrir?'':'none';
+  if(abrir){ const t=document.getElementById('nota-txt-'+id); if(t){ t.focus(); t.selectionStart=t.value.length; } }
+}
+async function muroNotaGuardar(id){
+  const t=document.getElementById('nota-txt-'+id); if(!t) return;
+  let m;
+  try{ m=await api('PUT','/muros/'+id+'/notas',{notas:t.value}); }
+  catch(e){ log('No se pudo guardar la nota: '+e.message,'warn'); return; }
+  const it=(window.__histLista||[]).find(function(x){ return x.id===id; });
+  if(it){ it.notas=m.notas; it.updated_at=m.updated_at; }
+  const tb=document.getElementById('hist-tbody'); if(tb) tb.innerHTML=histRowsHTML(histFiltrado());
+  log(m.notas?'Nota guardada':'Nota borrada');
+}
+
+async function muroCargar(id){
+  let m;
+  try{ m=await api('GET','/muros/'+id); }
+  catch(e){ log('No se pudo cargar el muro: '+e.message,'warn'); return; }
+  const d=m.datos||{};
+  window.__fichaMeta={obra:m.obra||'', cliente:m.cliente||''};
+  window.__muroGuardadoId=m.id; window.__muroGuardadoNombre=m.nombre;
+  if(m.modo==='ele' && d.ele){   // globales ANTES de renderizar: el formulario los lee
+    window.__eleDraw={seg:(d.ele.seg||[]).map(function(s){ return Object.assign({},s); })};
+    if(d.ele.H) window.__eleH=d.ele.H;
+    window.__eleAncho=d.ele.ancho||null;
+  }
+  calcModo=m.modo||'simple';
+  renderCalculador();
+  const S=(eid,v)=>{ const e=document.getElementById(eid); if(e&&v!=null&&v!=='') e.value=v; };
+  if(m.modo==='simple' && d.simple){
+    S('calc-altura',d.simple.altura); muroToggleAncho(); S('calc-ancho',d.simple.ancho); S('calc-long',d.simple.long);
+    calcularMuro();
+  } else if(m.modo==='tramos' && d.tramos){
+    S('tr-perfil',d.tramos.perfil); tramoTogglePerfil(); S('tr-esc',d.tramos.esc); S('tr-text',d.tramos.text);
+    if(d.tramos.cs){ S('cs-ini',d.tramos.cs.ini); S('cs-fin',d.tramos.cs.fin); S('cs-long',d.tramos.cs.long); S('cs-alt',d.tramos.cs.alt); }
+    if(d.tramos.tp){ S('tp-rasante',d.tramos.tp.ras); S('tp-terreno',d.tramos.tp.ter); }
+    if(d.tramos.sub==='perfil' && d.perfilState){   // rescata TAL CUAL: con los ajustes a mano
+      const ps=d.perfilState;
+      window.__perfil={base:ps.base, crown:ps.crown, cell:ps.cell, N:ps.N, L:ps.L, rr:ps.rr, tt:ps.tt,
+        piezas:ps.piezas, removed:new Set(ps.removed||[])};
+      window.__perfilSel=null; window.__perfilRes=document.getElementById('calc-result');
+      renderPerfilResult();
+    } else if((d.tramos.text||'').trim()) calcularTramos();
+  } else if(m.modo==='ele'){
+    eleCalcular();
+  }
+  log('Muro «'+m.nombre+'» cargado — modifícalo y dale a «Actualizar» para sobrescribirlo');
+}
+
+async function muroBorrar(id){
+  const m=(window.__histLista||[]).find(function(x){ return x.id===id; });
+  if(!confirm('¿Borrar del historial «'+(m?m.nombre:'este muro')+'»? No se puede deshacer.')) return;
+  try{ await api('DELETE','/muros/'+id); }
+  catch(e){ log('No se pudo borrar: '+e.message,'warn'); return; }
+  if(window.__muroGuardadoId===id){ window.__muroGuardadoId=null; window.__muroGuardadoNombre=null; renderSaveBar(); }
+  muroHistCount(); if(window.__histAbierto) renderHistorial();
+  log('Muro borrado del historial');
+}
