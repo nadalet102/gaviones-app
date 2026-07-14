@@ -68,16 +68,37 @@ function muroTramo(L, offset){
 }
 function muroAddPieza(acc, p){ if(p===2) acc.p2++; else if(p===1.5) acc.p15++; else acc.p1++; }
 
-// Color por medida de pieza (largo), bien diferenciado para leer el dibujo
-function muroColorPieza(p){
-  if(p===2)   return {f:'#3b82f6', s:'#1d4ed8'};   // 2 m   → azul
-  if(p===1.5) return {f:'#22c55e', s:'#15803d'};   // 1,5 m → verde
-  return {f:'#f59e0b', s:'#b45309'};               // 1 m   → ámbar
+// ── NORMA DE COLORES DE GAVIONES ──────────────────────────────────────────────
+// El TONO lo da el TIPO (ancho × alto, en cm) y la INTENSIDAD el LARGO
+// (200 oscuro · 150 medio · 100 claro):
+//   ×100×100 AZUL · ×100×50 VERDE · ×50×100 MARRÓN · ×50×50 AMARILLO ·
+//   ×30×100 morado · ×30×50 rosa · cualquier otro, gris.
+function colorGavion(largo, ancho, alto){
+  const an=Math.round((ancho||1)*100), al=Math.round((alto||1)*100);
+  const FAM={
+    '100x100':{t:['#1e40af','#3b82f6','#93c5fd'], s:'#1e3a8a'},   // azul
+    '100x50' :{t:['#15803d','#22c55e','#86efac'], s:'#14532d'},   // verde
+    '50x100' :{t:['#5f3a1c','#96613a','#c99e77'], s:'#3f2512'},   // marrón
+    '50x50'  :{t:['#ca8a04','#eab308','#fde047'], s:'#854d0e'},   // amarillo
+    '30x100' :{t:['#6d28d9','#8b5cf6','#c4b5fd'], s:'#4c1d95'},   // morado
+    '30x50'  :{t:['#be185d','#ec4899','#f9a8d4'], s:'#831843'}    // rosa
+  };
+  const fam=FAM[an+'x'+al]||{t:['#374151','#6b7280','#d1d5db'], s:'#1f2937'};
+  const i=(largo>=2-1e-6)?0:(largo>=1.5-1e-6)?1:2;
+  return {f:fam.t[i], s:fam.s};
 }
+function colorGavionNombre(ancho, alto){
+  const an=Math.round((ancho||1)*100), al=Math.round((alto||1)*100);
+  return ({'100x100':'azul','100x50':'verde','50x100':'marrón','50x50':'amarillo','30x100':'morado','30x50':'rosa'})[an+'x'+al]||'gris';
+}
+// (compat) color solo por largo → familia ×100×100
+function muroColorPieza(p){ return colorGavion(p, 1, 1); }
 function muroLeyenda(){
-  function chip(c,t){ return '<span style="display:inline-block;width:12px;height:12px;background:'+c.f+';border:1px solid '+c.s+';vertical-align:middle"></span> '+t; }
-  return '<div class="dim" style="font-size:11px;margin-top:8px">'+
-    chip(muroColorPieza(2),'2 m')+' &nbsp; '+chip(muroColorPieza(1.5),'1,5 m')+' &nbsp; '+chip(muroColorPieza(1),'1 m')+'</div>';
+  const chip=(c,t)=>'<span style="display:inline-block;width:12px;height:12px;background:'+c.f+';border:1px solid '+c.s+';vertical-align:middle"></span> '+t;
+  return '<div class="dim" style="font-size:11px;margin-top:8px">Tono = tipo: '+
+    chip(colorGavion(1.5,1,1),'×100×100')+' &nbsp; '+chip(colorGavion(1.5,1,0.5),'×100×50')+' &nbsp; '+
+    chip(colorGavion(1.5,0.5,1),'×50×100')+' &nbsp; '+chip(colorGavion(1.5,0.5,0.5),'×50×50')+
+    ' &nbsp;·&nbsp; Intensidad = largo: '+chip(colorGavion(2,1,1),'200 oscuro')+' '+chip(colorGavion(1.5,1,1),'150 medio')+' '+chip(colorGavion(1,1,1),'100 claro')+'</div>';
 }
 
 // Hiladas del muro (abajo→arriba): ancho (w), alto (h) y offset de trabado de cada una.
@@ -333,8 +354,8 @@ function croquisCaraC(courses, L){
   var sc=Math.max(12, Math.min(30, 220/H)), gap=1.5;   // MISMA escala X/Y (proporción real)
   var w=Math.ceil(L*sc), hpx=H*sc, rects='', yAcc=0;
   courses.forEach(function(c){
-    var chh=c.h*sc, y=hpx-(yAcc+c.h)*sc, x=0;
-    muroTramo(L, c.offset).forEach(function(p){ var pw=p*sc, col=muroColorPieza(p);
+    var chh=c.h*sc, y=hpx-(yAcc+c.h)*sc, x=0, fb=muroBandas(c.w)[0];   // la cara muestra la banda FRONTAL
+    muroTramo(L, c.offset).forEach(function(p){ var pw=p*sc, col=colorGavion(p, fb, c.h);
       rects+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+Math.max(1,pw-gap).toFixed(1)+'" height="'+(chh-gap).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; x+=pw; });
     yAcc+=c.h;
   });
@@ -376,7 +397,7 @@ function croquis3DC(courses, L){
     var ww=c.w*sc, chpx=c.h*sc, dx=ww*dcos, dy=-ww*dsin, topY=groundY-(yAcc+c.h)*sc;
     out+='<polygon points="'+x0+','+topY+' '+(x0+Lpx)+','+topY+' '+(x0+Lpx+dx)+','+(topY+dy)+' '+(x0+dx)+','+(topY+dy)+'" fill="#cabf9d" stroke="#8a7a5c" stroke-width="0.6"/>';
     out+='<polygon points="'+(x0+Lpx)+','+topY+' '+(x0+Lpx)+','+(topY+chpx)+' '+(x0+Lpx+dx)+','+(topY+chpx+dy)+' '+(x0+Lpx+dx)+','+(topY+dy)+'" fill="#b3a67f" stroke="#8a7a5c" stroke-width="0.6"/>';
-    var px=x0; muroTramo(L, c.offset).forEach(function(p){ var pw=p*sc, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+topY.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+chpx.toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"/>'; px+=pw; });
+    var px=x0, fb=muroBandas(c.w)[0]; muroTramo(L, c.offset).forEach(function(p){ var pw=p*sc, col=colorGavion(p, fb, c.h); out+='<rect x="'+px.toFixed(1)+'" y="'+topY.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+chpx.toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"/>'; px+=pw; });
     yAcc+=c.h;
   });
   out+='<text x="'+x0+'" y="'+(groundY+16)+'" font-size="10" fill="#7c6a45">'+fmtN(L)+' m largo · '+String(H).replace('.',',')+' m alto</text>';
@@ -635,8 +656,8 @@ function perfilToggle(i){
   const st=window.__perfil; if(!st) return;
   if(st.removed.has(i)) st.removed.delete(i); else st.removed.add(i);
   const el=document.getElementById('pz'+i);
-  if(el){ const p=st.piezas[i], rem=st.removed.has(i), col=(p.alto===1?['#3b82f6','#1d4ed8']:['#f59e0b','#b45309']);
-    el.setAttribute('fill', rem?'#e5e7eb':col[0]); el.setAttribute('stroke', rem?'#cbd5e1':col[1]);
+  if(el){ const p=st.piezas[i], rem=st.removed.has(i), col=colorGavion(p.largo, 1, p.alto);
+    el.setAttribute('fill', rem?'#e5e7eb':col.f); el.setAttribute('stroke', rem?'#cbd5e1':col.s);
     if(rem) el.setAttribute('stroke-dasharray','2 2'); else el.removeAttribute('stroke-dasharray'); }
   perfilActualizarTotales();
 }
@@ -776,6 +797,7 @@ function eleCalcular(){
   res.innerHTML=
     '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+seg.length+' tramo(s) · '+T.length+' recta(s) · '+nEsq+' esquina(s)'+(fix?(' · ancho '+fmtm(fix)+' m'):'')+'</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline btn-sm" onclick="elePlano()"><i class="ti ti-ruler-measure"></i> Plano 2D (perfiles)</button>'+
         '<button class="btn btn-outline btn-sm" onclick="elePlanoHiladas()"><i class="ti ti-stack-2"></i> Plano por hiladas</button>'+
         '<button class="btn btn-outline btn-sm" onclick="fichaEle()"><i class="ti ti-file-description"></i> Ficha técnica</button>'+
         '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button>'+
@@ -840,10 +862,10 @@ function croquisPorCotasInter(st, ficha){
   const X=xm=>padL+xm*sc, Y=ym=>groundY-ym*sc; let out='';
   const fmtm=x=>String(x).replace('.',',');
   piezas.forEach(function(p,i){ const rem=removed.has(i); if(ficha&&rem) return;   // en ficha se omiten los quitados
-    const col=(p.alto===1?['#3b82f6','#1d4ed8']:['#f59e0b','#b45309']);
+    const col=colorGavion(p.largo, 1, p.alto);
     const sel=(!ficha && window.__perfilSel===i);   // gavión seleccionado → borde resaltado
     const act = ficha ? '' : ' style="cursor:pointer" onclick="perfilSelect('+i+')"';
-    out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col[0])+'" stroke="'+(sel?'#111827':(rem?'#cbd5e1':col[1]))+'" stroke-width="'+(sel?'2.5':'0.6')+'"'+(rem?' stroke-dasharray="2 2"':'')+act+'><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
+    out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col.f)+'" stroke="'+(sel?'#111827':(rem?'#cbd5e1':col.s))+'" stroke-width="'+(sel?'2.5':'0.6')+'"'+(rem?' stroke-dasharray="2 2"':'')+act+'><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
   });
   if(tt){ let tp=''; for(let j=0;j<N;j++){ tp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(tt[N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.8" pointer-events="none"/>'; }
   if(rr){ let rp=''; for(let j=0;j<N;j++){ rp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(rr[N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="2" pointer-events="none"/>'; }
@@ -1035,8 +1057,8 @@ function croquisPerfilEscalonado(tramos){
     const w=t.L*xs; let yc=0;
     // el desfase medio metro entre peldaños (escalón) ya traba las hiladas con el vecino
     muroCourses(t.H, t.ancho).forEach(function(c){
-      const yTop=Y(base[i]+yc+c.h); let px=x;
-      muroTramo(t.L, c.offset).forEach(function(p){ const pw=p*xs, col=muroColorPieza(p); out+='<rect x="'+px.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+(c.h*ys).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; px+=pw; });
+      const yTop=Y(base[i]+yc+c.h); let px=x; const fb=muroBandas(c.w)[0];
+      muroTramo(t.L, c.offset).forEach(function(p){ const pw=p*xs, col=colorGavion(p, fb, c.h); out+='<rect x="'+px.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+pw.toFixed(1)+'" height="'+(c.h*ys).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.6"/>'; px+=pw; });
       yc+=c.h;
     });
     out+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(Y(base[i]+t.H)-5).toFixed(1)+'" font-size="10" fill="#111827" text-anchor="middle">'+String(t.H).replace('.',',')+' m</text>';

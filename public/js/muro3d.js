@@ -199,6 +199,15 @@ function muro3dInjectCSS(){
 
 async function muro3dOpen(boxes, title){
   muro3dInjectCSS();
+  // leyenda por TIPO de gavión (norma: tono = ancho×alto · intensidad = largo), con recuento
+  const tm={};
+  boxes.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100;
+    const k=b.largo+'|'+an+'|'+b.h; if(!tm[k]) tm[k]={largo:b.largo, ancho:an, alto:b.h, n:0}; tm[k].n++; });
+  const legHtml=Object.keys(tm).map(function(k){ return tm[k]; })
+    .sort(function(a,b){ return (b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo); })
+    .map(function(t){ const c=(typeof colorGavion==='function')?colorGavion(t.largo,t.ancho,t.alto):{f:'#3b82f6'};
+      return '<i style="background:'+c.f+'"></i>'+Math.round(t.largo*100)+'×'+Math.round(t.ancho*100)+'×'+Math.round(t.alto*100)+' <span style="color:#64748b">('+t.n+')</span>'; })
+    .join('<br>');
   const ov=document.createElement('div'); ov.className='m3d-ov';
   ov.innerHTML =
     '<div class="m3d-bar"><i class="ti ti-3d-cube-sphere"></i> <strong>'+title+'</strong> · '+fmtN(boxes.length)+' gaviones'+
@@ -209,7 +218,7 @@ async function muro3dOpen(boxes, title){
       '<button data-a="close"><i class="ti ti-x"></i> Cerrar</button>'+
     '</div>'+
     '<div class="m3d-canvas"><div class="m3d-load">Cargando 3D…</div>'+
-      '<div class="m3d-legend"><i style="background:#3b82f6"></i>2 m<br><i style="background:#22c55e"></i>1,5 m<br><i style="background:#f59e0b"></i>1 m</div>'+
+      '<div class="m3d-legend">'+legHtml+'</div>'+
       '<div class="m3d-hint">Arrastra para girar · rueda para zoom · botón derecho para desplazar</div>'+
     '</div>';
   document.body.appendChild(ov);
@@ -266,15 +275,16 @@ async function muro3dOpen(boxes, title){
   const grid = new THREE.GridHelper(groundSize, Math.round(groundSize), 0xb3bccb, 0xc6cdd8);
   grid.position.set(cx, minY, cz); scene.add(grid);
 
-  // gaviones: InstancedMesh por color + jaula (aristas) fusionada
-  const COLORS = { '2':0x3b82f6, '1.5':0x22c55e, '1':0xf59e0b };
-  const groups = { '2':[], '1.5':[], '1':[] };
-  boxes.forEach(function(b){ const key = b.largo===2?'2':b.largo===1.5?'1.5':'1'; groups[key].push(b); });
+  // gaviones: InstancedMesh por color (norma: tono = tipo ancho×alto · intensidad = largo)
+  const groups = {};
+  boxes.forEach(function(b){ const an=(Math.abs(b.l-b.largo)<1e-6)?b.a:b.l;
+    const hex=(typeof colorGavion==='function')?colorGavion(b.largo, an, b.h).f:'#3b82f6';
+    (groups[hex]=groups[hex]||[]).push(b); });
   const geo = new THREE.BoxGeometry(1,1,1);
   const mtx = new THREE.Matrix4(), pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
   Object.keys(groups).forEach(function(key){
     const list = groups[key]; if(!list.length) return;
-    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({color:COLORS[key]}), list.length);
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({color:new THREE.Color(key)}), list.length);
     list.forEach(function(b, i){
       pos.set(b.x+b.l/2, b.y+b.h/2, b.z+b.a/2); scl.set(b.l*0.985, b.h*0.985, b.a*0.985);
       mtx.compose(pos, quat, scl); mesh.setMatrixAt(i, mtx);
