@@ -482,10 +482,15 @@ function generarPorPerfil(){
 }
 // Núcleo: interpola las dos líneas, rellena el hueco con gaviones (con estado editable)
 // Motor puro: de las dos líneas (rasante/terreno) devuelve el estado del muro (sin tocar globals)
-function perfilCalc(ras, ter){
-  const cell=2, L=Math.max(ras[ras.length-1].d, ter[ter.length-1].d), N=Math.max(1, Math.round(L/cell));
+// edges (opcional): bordes de columna en metros [0,...,L]. Sin él, columnas de 2 m (la última
+// absorbe la fracción, como siempre). Con él (rectas L/U de varios tramos), las columnas se
+// CORTAN EXACTO en cada junta de tramo → los medios metros (6,5 · 9,5…) no se redondean.
+function perfilCalc(ras, ter, edges){
+  const cell=2, L=Math.max(ras[ras.length-1].d, ter[ter.length-1].d);
+  if(!edges){ const n=Math.max(1, Math.round(L/cell)); edges=[]; for(let k=0;k<n;k++) edges.push(k*cell); edges.push(L); }
+  const N=edges.length-1;
   let rasReal=[], terReal=[], base=[], crown=[];
-  for(let j=0;j<N;j++){ const x=(j+0.5)*cell; const r=interpPerfil(ras,x), t=interpPerfil(ter,x);
+  for(let j=0;j<N;j++){ const x=(edges[j]+edges[j+1])/2; const r=interpPerfil(ras,x), t=interpPerfil(ter,x);
     rasReal.push(r); terReal.push(t);
     // Pass de 7 cm: si por ≤7 cm no se llega al siguiente medio metro, NO se sube de hilada.
     let b=Math.floor(t/0.5+1e-6)*0.5, cr=Math.ceil((r-0.07)/0.5-1e-6)*0.5; if(cr<b+0.5) cr=b+0.5;
@@ -494,8 +499,8 @@ function perfilCalc(ras, ter){
   const minB=Math.min.apply(null,base);
   base=base.map(b=>b-minB); crown=crown.map(c=>c-minB);
   const rr=rasReal.map(v=>v-minB), tt=terReal.map(v=>v-minB);
-  const piezas=porCotasPiezas(base, crown, cell, N, L);
-  return {base:base, crown:crown, cell:cell, N:N, L:L, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
+  const piezas=porCotasPiezas(base, crown, edges);
+  return {base:base, crown:crown, cell:cell, N:N, L:L, edges:edges, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
 }
 function muroPorPerfil(ras, ter, res){
   window.__perfil=perfilCalc(ras, ter);
@@ -507,10 +512,9 @@ function muroPorPerfil(ras, ter, res){
 // Lista de piezas del relleno: tabicado EXACTO (sin solapes). Running bond: las hiladas
 // alternan el desfase; el 1 m sale solo de remate en los extremos de cada hilada. Nunca
 // se monta una pieza encima de otra.
-function porCotasPiezas(base, crown, cell, N, L){
+function porCotasPiezas(base, crown, edges){
   const trabar = true;   // el muro va SIEMPRE trabado (matajunta); rincones de escalón en 2 m y 1 m solo en las puntas
-  if(L==null) L=N*cell;
-  const endX = k => (k>=N ? L : k*cell);   // la última columna llega hasta la longitud real (contempla el 0,5 sobrante)
+  const N=edges.length-1, L=edges[N];
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), piezas=[];
   // Trabado (trabar=true): hiladas de 1 m con fase global por paridad de y (pares alineadas,
@@ -518,8 +522,8 @@ function porCotasPiezas(base, crown, cell, N, L){
   // Todo 2 m (trabar=false): todas las hiladas alineadas → CERO piezas de 1 m (pero juntas
   // verticales seguidas). Franjas medias (0,5): siempre alineadas de 2 m.
   const addBand=(x0,x1,ym,alto,off)=>{ let x=x0; muroTramo(x1-x0, off).forEach(p=>{ piezas.push({x:x, y:ym, largo:p, alto:alto}); x+=p; }); };
-  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(j*cell,endX(k),y,1,(trabar&&Math.floor(y)%2===1)); j=k; } else j++; } }
-  const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(j*cell,endX(k),v,0.5,false); j=k; } else j++; } };
+  for(let y=0;y<Math.round(maxTop);y++){ let j=0; while(j<N){ if(fb[j]<=y&&y<ct[j]){ let k=j; while(k<N&&fb[k]<=y&&y<ct[k])k++; addBand(edges[j],edges[k],y,1,(trabar&&Math.floor(y)%2===1)); j=k; } else j++; } }
+  const halfRun=(lvl,has)=>{ let j=0; while(j<N){ if(has(j)){ const v=lvl(j); let k=j; while(k<N&&has(k)&&Math.abs(lvl(k)-v)<1e-6)k++; addBand(edges[j],edges[k],v,0.5,false); j=k; } else j++; } };
   halfRun(j=>base[j], j=>base[j]<fb[j]-1e-6);
   halfRun(j=>ct[j], j=>ct[j]<crown[j]-1e-6);
   // Rincón de escalón con gavión ENTERO (modo trabado): el remate de 1 m (1×1) que cierra una
@@ -780,12 +784,17 @@ function eleCalcular(){
       ci:r.tr[0].ci, cf:r.tr[r.tr.length-1].cf, tr:r.tr};
   });
   const estados=T.map(function(t){
-    const ras=[], ter=[]; let d=0;
+    const ras=[], ter=[], edges=[0]; let d=0;
     t.tr.forEach(function(s,k){ const d0=k? d+1e-4 : 0;   // salto de cota en la junta (sin d duplicada)
       ter.push({d:d0,c:s.ci},{d:d+s.largo,c:s.cf});
       ras.push({d:d0,c:s.ci+s.H},{d:d+s.largo,c:s.cf+s.H});
+      // columnas CORTADAS en cada junta de tramo: 2 m dentro del tramo y la última absorbe la
+      // fracción → los largos con medio metro (6,5 · 9,5 · 12,5…) salen EXACTOS, no redondeados
+      const n=Math.max(1, Math.round(s.largo/2));
+      for(let q=1;q<n;q++) edges.push(d+q*2);
+      edges.push(d+s.largo);
       d+=s.largo; });
-    return perfilCalc(ras,ter);
+    return perfilCalc(ras,ter,edges);
   });
   let x=0,y=0; const segs=T.map(function(t,i){ const p0={x:x,y:y}, p1={x:x+t.dx*t.largo,y:y+t.dy*t.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:t.dx,dy:t.dy,largo:t.largo,H:t.H,i:i}; });
   const fix=window.__eleAncho||null;   // ancho fijo (1 / 0,5 / 0,3) o null = prontuario
@@ -889,8 +898,9 @@ function croquisPorCotasInter(st, ficha){
     const act = ficha ? '' : ' style="cursor:pointer" onclick="perfilSelect('+i+')"';
     out+='<rect id="pz'+i+'" x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+(p.largo*sc).toFixed(1)+'" height="'+(p.alto*sc).toFixed(1)+'" fill="'+(rem?'#e5e7eb':col.f)+'" stroke="'+(sel?'#111827':(rem?'#cbd5e1':col.s))+'" stroke-width="'+(sel?'2.5':'0.6')+'"'+(rem?' stroke-dasharray="2 2"':'')+act+'><title>'+fmtm(p.largo)+'×1×'+fmtm(p.alto)+' m</title></rect>';
   });
-  if(tt){ let tp=''; for(let j=0;j<N;j++){ tp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(tt[N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.8" pointer-events="none"/>'; }
-  if(rr){ let rp=''; for(let j=0;j<N;j++){ rp+=(j?'L':'M')+X((j+0.5)*cell).toFixed(1)+' '+Y(rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(rr[N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="2" pointer-events="none"/>'; }
+  const cxj=j=>st.edges?((st.edges[j]+st.edges[j+1])/2):((j+0.5)*cell);
+  if(tt){ let tp=''; for(let j=0;j<N;j++){ tp+=(j?'L':'M')+X(cxj(j)).toFixed(1)+' '+Y(tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(tt[N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.8" pointer-events="none"/>'; }
+  if(rr){ let rp=''; for(let j=0;j<N;j++){ rp+=(j?'L':'M')+X(cxj(j)).toFixed(1)+' '+Y(rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(rr[N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="2" pointer-events="none"/>'; }
   const est = ficha ? 'display:block;max-width:100%;height:auto' : 'display:block';   // en ficha, plano completo ajustado a la página
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="'+est+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado del muro por perfil">'+out+'</svg>';
 }

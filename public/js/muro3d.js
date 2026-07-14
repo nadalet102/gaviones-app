@@ -108,7 +108,10 @@ function eleBoxes(){
     if(!flat){   // recta ESCALONADA (cotas/alturas variables): piezas del motor por cotas
       // (trabadas a través de las juntas de tramo) + profundidad del prontuario por columna.
       st.piezas.forEach(function(p){
-        const j=Math.min(st.N-1, Math.max(0, Math.floor((p.x+p.largo/2)/st.cell)));
+        const xm=p.x+p.largo/2;
+        let j;
+        if(st.edges){ j=0; while(j<st.N-1 && xm>st.edges[j+1]) j++; }
+        else j=Math.min(st.N-1, Math.max(0, Math.floor(xm/st.cell)));
         const Hj=st.crown[j]-st.base[j];
         const anchos=fix?[w]:((typeof seccionAnchos==='function')?seccionAnchos(Hj):[w]);
         const kIdx=Math.max(0, Math.floor(p.y - st.base[j] + 1e-6));
