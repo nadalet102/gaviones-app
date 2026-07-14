@@ -177,6 +177,10 @@ function renderCalculador(){
           '<option value="0.5"'+(window.__eleAncho===0.5?' selected':'')+'>0,50 m</option>'+
           '<option value="0.3"'+(window.__eleAncho===0.3?' selected':'')+'>0,30 m</option>'+
         '</select></div>'+
+        '<div class="field" style="margin:0"><label>Ensanche de la base</label><select id="el-cara" style="width:250px" onchange="eleSetCara(this.value)" title="Solo afecta cuando la base es más ancha que 1 m (sección del prontuario)">'+
+          '<option value="int"'+(window.__eleCara!=='ext'?' selected':'')+'>Hacia dentro (cara vista lisa)</option>'+
+          '<option value="ext"'+(window.__eleCara==='ext'?' selected':'')+'>Hacia fuera (la base sobresale)</option>'+
+        '</select></div>'+
       '</div>'+
       '<div id="ele-grid"></div>'+
       '<div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">'+
@@ -550,19 +554,32 @@ function porCotasPiezas(base, crown, cell, N, L){
   });
   return piezas.filter(Boolean);
 }
-// Sección del muro (profundidad × altura) según el prontuario: base ancha que estrecha hacia arriba.
-function croquisSeccionPront(H){
+// Sección del muro (profundidad × altura) según el prontuario: base ancha que estrecha hacia
+// arriba. cara='int' (defecto): cara vista lisa a la izquierda y ensanche hacia dentro.
+// cara='ext': trasera enrasada; el ensanche SOBRESALE → la cara (izquierda) va escalonada.
+function croquisSeccionPront(H, cara){
   const anchos=seccionAnchos(H), nH=anchos.length, maxW=Math.max.apply(null,anchos);
+  const ext=(cara==='ext');
   const sc=Math.max(12, Math.min(26, 150/Math.max(nH,maxW)));
   const pad=18, vbW=pad*2+maxW*sc+28, vbH=pad*2+nH*sc;
   const X=x=>pad+x*sc, Y=k=>pad+(nH-k)*sc;   // k desde abajo
   let out='';
-  for(let k=0;k<nH;k++){ const w=anchos[k];
-    out+='<rect x="'+X(0).toFixed(1)+'" y="'+Y(k+1).toFixed(1)+'" width="'+(w*sc).toFixed(1)+'" height="'+sc.toFixed(1)+'" fill="#3b82f6" fill-opacity="0.4" stroke="#1d4ed8" stroke-width="1"/>';
-    out+='<text x="'+(X(w)+4).toFixed(1)+'" y="'+(Y(k)-sc/2+3).toFixed(1)+'" font-size="9" fill="#0f172a" style="paint-order:stroke;stroke:#fff;stroke-width:2px">'+fmtN(w)+' m</text>';
+  for(let k=0;k<nH;k++){ const w=anchos[k], x0=ext?(maxW-w):0;
+    out+='<rect x="'+X(x0).toFixed(1)+'" y="'+Y(k+1).toFixed(1)+'" width="'+(w*sc).toFixed(1)+'" height="'+sc.toFixed(1)+'" fill="#3b82f6" fill-opacity="0.4" stroke="#1d4ed8" stroke-width="1"/>';
+    out+='<text x="'+(X(x0+w)+4).toFixed(1)+'" y="'+(Y(k)-sc/2+3).toFixed(1)+'" font-size="9" fill="#0f172a" style="paint-order:stroke;stroke:#fff;stroke-width:2px">'+fmtN(w)+' m</text>';
   }
-  out+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(0).toFixed(1)+'" x2="'+X(0).toFixed(1)+'" y2="'+Y(nH).toFixed(1)+'" stroke="#dc2626" stroke-width="2.2"/>';
-  out+='<text x="'+X(0).toFixed(1)+'" y="'+(Y(nH)-4).toFixed(1)+'" font-size="9" fill="#dc2626" text-anchor="middle">cara</text>';
+  if(ext){   // cara escalonada: baja por el frente de cada hilada, de arriba a la base
+    let d='M'+X(maxW-anchos[nH-1]).toFixed(1)+' '+Y(nH).toFixed(1)+' ';
+    for(let k=nH-1;k>=0;k--){ const xk=X(maxW-anchos[k]);
+      d+='L'+xk.toFixed(1)+' '+Y(k).toFixed(1)+' ';
+      if(k>0) d+='L'+X(maxW-anchos[k-1]).toFixed(1)+' '+Y(k).toFixed(1)+' ';
+    }
+    out+='<path d="'+d+'" fill="none" stroke="#dc2626" stroke-width="2.2"/>';
+    out+='<text x="'+X(maxW-anchos[nH-1]).toFixed(1)+'" y="'+(Y(nH)-4).toFixed(1)+'" font-size="9" fill="#dc2626" text-anchor="middle">cara</text>';
+  } else {
+    out+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(0).toFixed(1)+'" x2="'+X(0).toFixed(1)+'" y2="'+Y(nH).toFixed(1)+'" stroke="#dc2626" stroke-width="2.2"/>';
+    out+='<text x="'+X(0).toFixed(1)+'" y="'+(Y(nH)-4).toFixed(1)+'" font-size="9" fill="#dc2626" text-anchor="middle">cara</text>';
+  }
   return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.ceil(vbW)+'" height="'+Math.ceil(vbH)+'" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sección del muro (prontuario)">'+out+'</svg>';
 }
 function renderPerfilResult(){
@@ -685,6 +702,9 @@ function eleSetH(v){ const h=parseFloat(v); if(!(h>0)) return; window.__eleH=Mat
   const D=window.__eleDraw; if(D) D.seg.forEach(function(s){ s.H=window.__eleH; }); eleGridRedraw(); }
 // Ancho del gavión en L/U: vacío = prontuario (auto); 1 / 0,5 / 0,3 = ancho fijo para todo el muro.
 function eleSetAncho(v){ window.__eleAncho = v ? parseFloat(v) : null; }
+// Ensanche de la base (cuando la sección del prontuario supera 1 m):
+// 'int' hacia dentro (cara vista lisa, defecto) · 'ext' hacia fuera (la base sobresale de la línea).
+function eleSetCara(v){ window.__eleCara = (v==='ext') ? 'ext' : 'int'; }
 function eleGridClick(evt){
   const svg=evt.currentTarget, rect=svg.getBoundingClientRect(), G=eleView();
   const vx=(evt.clientX-rect.left)*(G.vbW/rect.width), vy=(evt.clientY-rect.top)*(G.vbH/rect.height);
@@ -769,7 +789,8 @@ function eleCalcular(){
   });
   let x=0,y=0; const segs=T.map(function(t,i){ const p0={x:x,y:y}, p1={x:x+t.dx*t.largo,y:y+t.dy*t.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:t.dx,dy:t.dy,largo:t.largo,H:t.H,i:i}; });
   const fix=window.__eleAncho||null;   // ancho fijo (1 / 0,5 / 0,3) o null = prontuario
-  window.__muroEle={T:T, estados:estados, segs:segs, ancho:fix};
+  const cara=window.__eleCara||'int';  // ensanche de la base: hacia dentro (cara lisa) o hacia fuera
+  window.__muroEle={T:T, estados:estados, segs:segs, ancho:fix, cara:cara};
   // DESPIECE REAL pieza a pieza: las MISMAS cajas que la vista 3D (esquinas engranadas con
   // headers, bandas de profundidad y sección del prontuario incluidas) → las cuentas cuadran.
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
@@ -787,8 +808,9 @@ function eleCalcular(){
     let prHmax=0; estados.forEach(function(st){ prHmax=Math.max(prHmax, Math.max.apply(null,st.crown)); });
     secCard='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</div></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'+
-        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección a la altura máx. ('+fmtN(prHmax)+' m)</div>'+croquisSeccionPront(prHmax)+'</div>'+
-        '<div class="dim" style="flex:1;min-width:220px;font-size:12px">A más altura, la base ensancha según el prontuario y añade bandas de profundidad. El despiece de arriba <strong>ya lo incluye</strong> (sale del modelo 3D pieza a pieza).</div>'+
+        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección a la altura máx. ('+fmtN(prHmax)+' m)</div>'+croquisSeccionPront(prHmax, cara)+'</div>'+
+        '<div class="dim" style="flex:1;min-width:220px;font-size:12px">A más altura, la base ensancha según el prontuario y añade bandas de profundidad. El despiece de arriba <strong>ya lo incluye</strong> (sale del modelo 3D pieza a pieza).'+
+        (cara==='ext'?' <strong>Base hacia FUERA</strong>: el ensanche sobresale de la línea dibujada (escalones por delante); la trasera queda enrasada.':' <strong>Base hacia DENTRO</strong>: cara vista lisa; el ensanche se entierra hacia el terreno.')+'</div>'+
       '</div></div>';
   } else if(Hmax>=2){
     secCard='<div class="card" style="margin-top:14px"><div class="card-body" style="padding:10px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Ancho fijo de '+fmtm(fix)+' m con altura de '+fmtm(Hmax)+' m: no se aplica el ensanche de base del prontuario (recomendado a partir de 2 m). Revisa la estabilidad.</div></div>';
@@ -1138,7 +1160,7 @@ function calcEstadoActual(){
   const largo=data.segs.reduce(function(s,x){ return s+x.largo; },0);
   const hmax=Math.max.apply(null, data.T.map(function(t){ return t.H; }));
   return {modo:'ele', fichaMeta:fm,
-    datos:{ele:{seg:D.seg, H:window.__eleH||null, ancho:data.ancho||null}},
+    datos:{ele:{seg:D.seg, H:window.__eleH||null, ancho:data.ancho||null, cara:data.cara||'int'}},
     resumen:{gaviones:boxes.length, m3:Math.round(vol*100)/100, hmax:hmax, largo:largo}};
 }
 
@@ -1286,6 +1308,7 @@ async function muroCargar(id){
     window.__eleDraw={seg:(d.ele.seg||[]).map(function(s){ return Object.assign({},s); })};
     if(d.ele.H) window.__eleH=d.ele.H;
     window.__eleAncho=d.ele.ancho||null;
+    window.__eleCara=d.ele.cara||'int';
   }
   calcModo=m.modo||'simple';
   renderCalculador();

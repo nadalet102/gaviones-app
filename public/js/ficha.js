@@ -328,7 +328,8 @@ function fichaEle(){
       '</div></div>'+
       '<div class="fk-sec"><h2><i class="ti ti-map-2"></i> Planta (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(segs, fix||1)+'</div>'+
         '<div style="font-size:11.5px;color:#475569;margin-top:6px">Las esquinas van <strong>engranadas</strong>: en cada hilada un gavión cruza el rincón alternando de brazo (matajunta también en el giro).</div></div>'+
-      (!fix?('<div class="fk-sec"><h2><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</h2><div class="fk-draw">'+croquisSeccionPront(Hmax)+'</div></div>'):'')+
+      (!fix?('<div class="fk-sec"><h2><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</h2><div class="fk-draw">'+croquisSeccionPront(Hmax, data.cara||'int')+'</div>'+
+        '<div style="font-size:11.5px;color:#475569;margin-top:6px">Ensanche de la base: <strong>'+((data.cara==='ext')?'hacia FUERA (la base sobresale de la línea; escalones por delante)':'hacia DENTRO (cara vista lisa; el ensanche va al terreno)')+'</strong>.</div></div>'):'')+
       '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Alzados por tramo</h2>'+alzados+'</div>'+
       '<div class="fk-sec"><h2><i class="ti ti-stack-2"></i> Mediciones y materiales</h2>'+
         '<div class="fk-grid" style="margin-bottom:12px">'+
@@ -413,19 +414,25 @@ function eleAlzadoFrontal(i){
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
   const segs=data.segs, s=segs[i], w=data.ancho||1;
   const R=(typeof eleFootprint==='function')?eleFootprint(segs, w):null; if(!R) return [];
-  const r=R[i], out=[];
+  const r=R[i], arm=[];
+  // profundidad respecto a la línea exterior dibujada (NEGATIVA si la base sobresale con
+  // «ensanche hacia fuera») + coordenada local a lo largo del brazo
   boxes.forEach(function(b){ if(b.arm!==i) return;
-    let front, lx, len, anc;
+    let depth, lx, len, anc;
     if(s.dx!==0){ const ext=(r.ny>0)? r.ry : (r.ry+r.rh);
-      front=(r.ny>0)? Math.abs(b.z-ext)<1e-6 : Math.abs((b.z+b.a)-ext)<1e-6;
+      depth=(r.ny>0)? (b.z-ext) : (ext-(b.z+b.a));
       len=b.l; anc=b.a; lx=(s.dx>0)? (b.x-s.p0.x) : (s.p0.x-(b.x+b.l));
     } else { const ext=(r.nx>0)? r.rx : (r.rx+r.rw);
-      front=(r.nx>0)? Math.abs(b.x-ext)<1e-6 : Math.abs((b.x+b.l)-ext)<1e-6;
+      depth=(r.nx>0)? (b.x-ext) : (ext-(b.x+b.l));
       len=b.a; anc=b.l; lx=(s.dy>0)? (b.z-s.p0.y) : (s.p0.y-(b.z+b.a));
     }
-    if(front) out.push({x:lx, y:b.y, largo:len, ancho:anc, alto:b.h});
+    arm.push({x:lx, y:b.y, largo:len, ancho:anc, alto:b.h, depth:depth});
   });
-  return out;
+  // cara vista = cajas sin otra POR DELANTE (misma hilada, solape a lo largo, menor profundidad)
+  return arm.filter(function(p){
+    return !arm.some(function(q){ return q!==p && Math.abs(q.y-p.y)<1e-6 &&
+      Math.min(q.x+q.largo, p.x+p.largo)-Math.max(q.x, p.x)>1e-6 && q.depth<p.depth-1e-6; });
+  });
 }
 function croquisAlzadoPlano(i){
   const data=window.__muroEle, st=data.estados[i], T=data.T[i];
@@ -473,7 +480,7 @@ function elePlano(){
       '<div class="fk-draw" style="display:block;overflow-x:auto">'+croquisAlzadoPlano(i)+'</div></div>';
   }).join('');
   const sheet=
-    fichaHead('Plano 2D · muro en L/U', data.segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):' · sección prontuario'))+
+    fichaHead('Plano 2D · muro en L/U', data.segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):' · sección prontuario')+((data.cara==='ext')?' · base hacia fuera':''))+
     '<div class="fk-body">'+
       '<div class="fk-sec"><h2><i class="ti ti-map-2"></i> Planta (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(data.segs, data.ancho||1)+'</div></div>'+
       alzados+
