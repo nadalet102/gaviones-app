@@ -485,7 +485,7 @@ function generarPorPerfil(){
 // edges (opcional): bordes de columna en metros [0,...,L]. Sin él, columnas de 2 m (la última
 // absorbe la fracción, como siempre). Con él (rectas L/U de varios tramos), las columnas se
 // CORTAN EXACTO en cada junta de tramo → los medios metros (6,5 · 9,5…) no se redondean.
-function perfilCalc(ras, ter, edges){
+function perfilCalc(ras, ter, edges, hardX){
   const cell=2, L=Math.max(ras[ras.length-1].d, ter[ter.length-1].d);
   if(!edges){ const n=Math.max(1, Math.round(L/cell)); edges=[]; for(let k=0;k<n;k++) edges.push(k*cell); edges.push(L); }
   const N=edges.length-1;
@@ -499,7 +499,7 @@ function perfilCalc(ras, ter, edges){
   const minB=Math.min.apply(null,base);
   base=base.map(b=>b-minB); crown=crown.map(c=>c-minB);
   const rr=rasReal.map(v=>v-minB), tt=terReal.map(v=>v-minB);
-  const piezas=porCotasPiezas(base, crown, edges);
+  const piezas=porCotasPiezas(base, crown, edges, hardX);
   return {base:base, crown:crown, cell:cell, N:N, L:L, edges:edges, rr:rr, tt:tt, piezas:piezas, removed:new Set()};
 }
 function muroPorPerfil(ras, ter, res){
@@ -512,9 +512,13 @@ function muroPorPerfil(ras, ter, res){
 // Lista de piezas del relleno: tabicado EXACTO (sin solapes). Running bond: las hiladas
 // alternan el desfase; el 1 m sale solo de remate en los extremos de cada hilada. Nunca
 // se monta una pieza encima de otra.
-function porCotasPiezas(base, crown, edges){
+function porCotasPiezas(base, crown, edges, hardX){
   const trabar = true;   // el muro va SIEMPRE trabado (matajunta); rincones de escalón en 2 m y 1 m solo en las puntas
   const N=edges.length-1, L=edges[N];
+  // hardX: juntas de TRAMO (rectas L/U). El plano del cambio de altura debe caer EXACTO en la
+  // junta: la conversión de rincón a pieza de 2 m no puede cruzarla (ni subir por encima de la
+  // coronación del tramo vecino ni profundizar su base). Ahí el remate se queda en 1 m.
+  const cruzaJunta = x0 => !!(hardX && hardX.some(J => x0 < J-1e-6 && x0+2 > J+1e-6));
   const fb=base.map(b=>Math.ceil(b-1e-6)), ct=crown.map(c=>Math.floor(c+1e-6));
   const maxTop=Math.max.apply(null,crown), piezas=[];
   // Trabado (trabar=true): hiladas de 1 m con fase global por paridad de y (pares alineadas,
@@ -547,6 +551,7 @@ function porCotasPiezas(base, crown, edges){
     let dir=0; if(izq&&!der) dir=1; else if(der&&!izq) dir=-1; else return;   // remate de un solo lado
     if(dir<0 && x-1<-1e-6) return;            // remate de INICIO del muro → se deja en 1 m
     if(dir>0 && x+2>Lw+1e-6) return;          // remate de FINAL del muro → se deja en 1 m
+    if(cruzaJunta(dir>0 ? x : x-1)) return;   // el 2 m cruzaría una junta de TRAMO → se deja en 1 m
     // run de medios contiguos en el lado abierto, a nivel y+0,5 (escalón de base) o y (coronación)
     for(const lvl of [y+0.5, y]){
       const medios=piezas.filter(q=>q&&q.alto===0.5&&Math.abs(q.y-lvl)<1e-6);
@@ -792,8 +797,9 @@ function eleCalcular(){
       ci:r.tr[0].ci, cf:r.tr[r.tr.length-1].cf, tr:r.tr};
   });
   const estados=T.map(function(t){
-    const ras=[], ter=[], edges=[0]; let d=0;
+    const ras=[], ter=[], edges=[0], juntas=[]; let d=0;
     t.tr.forEach(function(s,k){ const d0=k? d+1e-4 : 0;   // salto de cota en la junta (sin d duplicada)
+      if(k) juntas.push(d);                               // junta de tramo = plano de cambio EXACTO
       ter.push({d:d0,c:s.ci},{d:d+s.largo,c:s.cf});
       ras.push({d:d0,c:s.ci+s.H},{d:d+s.largo,c:s.cf+s.H});
       // columnas CORTADAS en cada junta de tramo: 2 m dentro del tramo y la última absorbe la
@@ -802,7 +808,7 @@ function eleCalcular(){
       for(let q=1;q<n;q++) edges.push(d+q*2);
       edges.push(d+s.largo);
       d+=s.largo; });
-    return perfilCalc(ras,ter,edges);
+    return perfilCalc(ras,ter,edges,juntas);
   });
   let x=0,y=0; const segs=T.map(function(t,i){ const p0={x:x,y:y}, p1={x:x+t.dx*t.largo,y:y+t.dy*t.largo}; x=p1.x; y=p1.y; return {p0:p0,p1:p1,dx:t.dx,dy:t.dy,largo:t.largo,H:t.H,i:i}; });
   const fix=window.__eleAncho||null;   // ancho fijo (1 / 0,5 / 0,3) o null = prontuario
