@@ -152,18 +152,22 @@ function eleBoxes(){
             const B=fronteraEn(p); if(B==null) continue;
             const lL=Math.round((B-p.x)*100)/100, lR=Math.round((p.x+p.largo-B)*100)/100;
             let izq, der;
+            // el primer trozo se elige para que la junta interna caiga a MEDIO metro de la
+            // rejilla entera (arranque entero → 1,5; arranque a medio → 1): así nunca coincide
+            // con los cortes de las bandas traseras ni con las hiladas vecinas
+            const primero=x0=>(Math.abs(x0-Math.round(x0))<1e-9)? 1.5 : 1;
             if(lL>=0.99) izq=[{x:p.x, largo:lL}];
             else { const q=arr[idx-1];
               if(q && Math.abs(q.x+q.largo-p.x)<1e-6 && fronteraEn(q)==null){
-                const s=q.largo+lL; arr[idx-1]=null;
-                izq=(s>2.25)? [{x:q.x, largo:1.5},{x:q.x+1.5, largo:s-1.5}] : [{x:q.x, largo:s}];
+                const s=q.largo+lL, f=primero(q.x); arr[idx-1]=null;
+                izq=(s>2.25)? [{x:q.x, largo:f},{x:q.x+f, largo:s-f}] : [{x:q.x, largo:s}];
               } else izq=[{x:p.x, largo:lL}];
             }
             if(lR>=0.99) der=[{x:B, largo:lR}];
             else { const q=arr[idx+1];
               if(q && Math.abs(p.x+p.largo-q.x)<1e-6 && fronteraEn(q)==null){
-                const s=lR+q.largo; arr[idx+1]=null;
-                der=(s>2.25)? [{x:B, largo:1.5},{x:B+1.5, largo:s-1.5}] : [{x:B, largo:s}];
+                const s=lR+q.largo, f=primero(B); arr[idx+1]=null;
+                der=(s>2.25)? [{x:B, largo:f},{x:B+f, largo:s-f}] : [{x:B, largo:s}];
               } else der=[{x:B, largo:lR}];
             }
             arr[idx]=null;
