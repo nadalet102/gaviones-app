@@ -867,7 +867,13 @@ function eleFootprint(segs, w){
   const pts=[]; segs.forEach((s,i)=>{ if(i===0)pts.push(s.p0); pts.push(s.p1); });
   const cx=pts.reduce((a,p)=>a+p.x,0)/pts.length, cy=pts.reduce((a,p)=>a+p.y,0)/pts.length;
   return segs.map(s=>{ const midx=(s.p0.x+s.p1.x)/2, midy=(s.p0.y+s.p1.y)/2;
-    let nx=-s.dy, ny=s.dx; if((cx-midx)*nx+(cy-midy)*ny<0){ nx=-nx; ny=-ny; }   // normal hacia el interior
+    let nx=-s.dy, ny=s.dx;
+    const dot=(cx-midx)*nx+(cy-midy)*ny;
+    // Muro RECTO puro (el centroide cae sobre la línea): el interior/terreno va a la DERECHA
+    // del sentido de dibujo → la CARA VISTA queda mirando a la cámara por defecto del 3D
+    // (que respeta el sentido izquierda→derecha del dibujo). Con giros manda el centroide.
+    if(Math.abs(dot)<1e-9){ nx=s.dy; ny=-s.dx; }
+    else if(dot<0){ nx=-nx; ny=-ny; }   // normal hacia el interior
     let rx,ry,rw,rh;
     if(s.dx!==0){ rx=Math.min(s.p0.x,s.p1.x); rw=s.largo; ry=(ny<0)?s.p0.y-w:s.p0.y; rh=w; }
     else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=(nx<0)?s.p0.x-w:s.p0.x; rw=w; }
