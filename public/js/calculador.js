@@ -599,6 +599,7 @@ function porCotasPiezas(base, crown, edges, hardX){
 // cara='ext': trasera enrasada; el ensanche SOBRESALE → la cara (izquierda) va escalonada.
 function croquisSeccionPront(H, cara){
   const anchos=seccionAnchos(H), nH=anchos.length, maxW=Math.max.apply(null,anchos);
+  const fm=x=>String(Math.round(x*100)/100).replace('.',',');   // fmtN redondea a entero y convertía el 1,5 en «2»
   const ext=(cara==='ext');
   const sc=Math.max(12, Math.min(26, 150/Math.max(nH,maxW)));
   const pad=18, vbW=pad*2+maxW*sc+28, vbH=pad*2+nH*sc;
@@ -606,7 +607,7 @@ function croquisSeccionPront(H, cara){
   let out='';
   for(let k=0;k<nH;k++){ const w=anchos[k], x0=ext?(maxW-w):0;
     out+='<rect x="'+X(x0).toFixed(1)+'" y="'+Y(k+1).toFixed(1)+'" width="'+(w*sc).toFixed(1)+'" height="'+sc.toFixed(1)+'" fill="#3b82f6" fill-opacity="0.4" stroke="#1d4ed8" stroke-width="1"/>';
-    out+='<text x="'+(X(x0+w)+4).toFixed(1)+'" y="'+(Y(k)-sc/2+3).toFixed(1)+'" font-size="9" fill="#0f172a" style="paint-order:stroke;stroke:#fff;stroke-width:2px">'+fmtN(w)+' m</text>';
+    out+='<text x="'+(X(x0+w)+4).toFixed(1)+'" y="'+(Y(k)-sc/2+3).toFixed(1)+'" font-size="9" fill="#0f172a" style="paint-order:stroke;stroke:#fff;stroke-width:2px">'+fm(w)+' m</text>';
   }
   if(ext){   // cara escalonada: baja por el frente de cada hilada, de arriba a la base
     let d='M'+X(maxW-anchos[nH-1]).toFixed(1)+' '+Y(nH).toFixed(1)+' ';
@@ -851,10 +852,11 @@ function eleCalcular(){
   // tarjeta de sección: prontuario (auto) o aviso si el ancho fijo se queda corto en altura
   let secCard='';
   if(!fix){
-    let prHmax=0; estados.forEach(function(st){ prHmax=Math.max(prHmax, Math.max.apply(null,st.crown)); });
+    // Sección según la ALTURA DEL MURO (no la cota máxima del terreno): un muro de 4 m es
+    // 1,5·1·1·1 aunque su coronación llegue a cota 8 por ir subiendo el terreno.
     secCard='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</div></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'+
-        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección a la altura máx. ('+fmtN(prHmax)+' m)</div>'+croquisSeccionPront(prHmax, cara)+'</div>'+
+        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección del muro a la altura máx. ('+fmtm(Hmax)+' m)</div>'+croquisSeccionPront(Hmax, cara)+'</div>'+
         '<div class="dim" style="flex:1;min-width:220px;font-size:12px">A más altura, la base ensancha según el prontuario y añade bandas de profundidad. El despiece de arriba <strong>ya lo incluye</strong> (sale del modelo 3D pieza a pieza).'+
         (cara==='ext'?' <strong>Base hacia FUERA</strong>: el ensanche sobresale de la línea dibujada (escalones por delante); la trasera queda enrasada.':' <strong>Base hacia DENTRO</strong>: cara vista lisa; el ensanche se entierra hacia el terreno.')+'</div>'+
       '</div></div>';

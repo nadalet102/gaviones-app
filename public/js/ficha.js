@@ -457,13 +457,12 @@ function eleA3(){
     fichaHead('Plano de montaje · muro en L/U (A3)', segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m ext. · '+fnum(vol,1)+' m³'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario')+((cara==='ext')?' · base hacia fuera':' · base hacia dentro'))+
     '<div class="fk-body">'+
       '<div class="fk-sec fk-noBreak"><h2><i class="ti ti-map-2"></i> Planta acotada (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(segs, fix||1, 1380)+'</div></div>'+
+      alzados+
       '<div class="fk-noBreak" style="display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap">'+
-        '<div class="fk-sec"><h2><i class="ti ti-layout-distribute-horizontal"></i> Sección (perfil)</h2>'+croquisSeccionPront(Hmax, cara)+
+        '<div class="fk-sec"><h2><i class="ti ti-layout-distribute-horizontal"></i> Sección (perfil) · muro de '+fmtm(Hmax)+' m</h2>'+croquisSeccionPront(Hmax, cara)+
           '<div style="font-size:11.5px;color:#475569;margin-top:6px">Ensanche de la base: <strong>'+((cara==='ext')?'hacia fuera (la base sobresale)':'hacia dentro (cara vista lisa)')+'</strong></div></div>'+
         '<div class="fk-sec" style="flex:1;min-width:420px"><h2><i class="ti ti-palette"></i> Gaviones por tipo (cm)</h2><div>'+chips+'</div>'+fichaLeyendaNorma()+'</div>'+
       '</div>'+
-      '<div class="fk-page"></div>'+
-      alzados+
       '<div class="fk-page"></div>'+
       '<div class="fk-sec"><h2><i class="ti ti-stack-2"></i> Hiladas (planta por nivel, de coronación a base) — para montaje</h2>'+hiladas+'</div>'+
       fichaNota()+
@@ -522,10 +521,9 @@ function croquisAlzadoPlano(i, wMax){
     const c=colorGavion(p.largo, p.ancho, p.alto);
     out+='<rect x="'+X(p.x).toFixed(1)+'" y="'+Y(p.y+p.alto).toFixed(1)+'" width="'+Math.max(1,p.largo*sc-0.6).toFixed(1)+'" height="'+Math.max(1,p.alto*sc-0.6).toFixed(1)+'" fill="'+c.f+'" stroke="'+c.s+'" stroke-width="0.6"><title>'+fmtm(p.largo)+' × '+fmtm(p.ancho)+' × '+fmtm(p.alto)+' m</title></rect>';
   });
-  // terreno (marrón) y rasante (roja) del motor por cotas
+  // terreno (marrón) del motor por cotas — sin línea de rasante (el usuario no la quiere en el plano)
   const cxj=j=>st.edges?((st.edges[j]+st.edges[j+1])/2):((j+0.5)*st.cell);
   if(st.tt){ let tp=''; for(let j=0;j<st.N;j++){ tp+=(j?'L':'M')+X(cxj(j)).toFixed(1)+' '+Y(st.tt[j]).toFixed(1)+' '; } tp+='L'+X(Lm).toFixed(1)+' '+Y(st.tt[st.N-1]).toFixed(1); out+='<path d="'+tp+'" fill="none" stroke="#8a6d3b" stroke-width="1.6" pointer-events="none"/>'; }
-  if(st.rr){ let rp=''; for(let j=0;j<st.N;j++){ rp+=(j?'L':'M')+X(cxj(j)).toFixed(1)+' '+Y(st.rr[j]).toFixed(1)+' '; } rp+='L'+X(Lm).toFixed(1)+' '+Y(st.rr[st.N-1]).toFixed(1); out+='<path d="'+rp+'" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6 3" pointer-events="none"/>'; }
   // juntas de tramo (la recta puede fundir varios tramos)
   if(T.tr && T.tr.length>1){ let d=0;
     T.tr.forEach(function(t,k){
@@ -562,7 +560,7 @@ function elePlano(){
       '<div class="fk-sec"><h2><i class="ti ti-map-2"></i> Planta (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(data.segs, data.ancho||1)+'</div></div>'+
       alzados+
       '<div class="fk-sec"><h2><i class="ti ti-palette"></i> Gaviones del muro (uds por tipo, en cm)</h2><div>'+chips+'</div>'+fichaLeyendaNorma()+
-        '<div style="font-size:11.5px;color:#475569;margin-top:6px"><span style="display:inline-block;width:16px;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno &nbsp; <span style="display:inline-block;width:16px;border-top:2px dashed #dc2626;vertical-align:middle"></span> rasante · Los alzados muestran la cara vista (banda frontal); las bandas de fondo y los headers de esquina están contados en la lista.</div></div>'+
+        '<div style="font-size:11.5px;color:#475569;margin-top:6px"><span style="display:inline-block;width:16px;border-top:2px solid #8a6d3b;vertical-align:middle"></span> terreno · Los alzados muestran la cara vista (banda frontal); las bandas de fondo y los headers de esquina están contados en la lista.</div></div>'+
       fichaNota()+
     '</div>';
   fichaOpen(sheet, 'plano-2d-LU');
