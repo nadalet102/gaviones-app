@@ -562,19 +562,32 @@ function porCotasPiezas(base, crown, edges, hardX){
     if(dir<0 && x-1<-1e-6) return;            // remate de INICIO del muro → se deja en 1 m
     if(dir>0 && x+2>Lw+1e-6) return;          // remate de FINAL del muro → se deja en 1 m
     if(cruzaJunta(dir>0 ? x : x-1)) return;   // el 2 m cruzaría una junta de TRAMO → se deja en 1 m
-    // run de medios contiguos en el lado abierto, a nivel y+0,5 (escalón de base) o y (coronación)
+    // run de medios contiguos en el lado abierto, a nivel y+0,5 (escalón de base) o y (coronación).
+    // El re-tabicado de los medios va EN LA REJILLA GLOBAL del nivel (fase por paridad), no a
+    // saltos desde el rincón: si no, sus juntas podían calcar las de la hilada vecina.
+    const faseNivel=lvl=>((Math.floor(lvl+1e-6)%2===1)?1:0);
+    const retilea=(a,b,lvl)=>{
+      if(b-a<=1e-6) return [];
+      if(typeof eleTileGrid==='function' && b-a>0.99)
+        return eleTileGrid(a, b, faseNivel(lvl)).map(pc=>({x:pc.x0, y:lvl, largo:pc.l, alto:0.5}));
+      return null;   // región de 0,5 m (o sin rejilla): no se puede re-tabicar limpio
+    };
     for(const lvl of [y+0.5, y]){
       const medios=piezas.filter(q=>q&&q.alto===0.5&&Math.abs(q.y-lvl)<1e-6);
       const chain=[];
       if(dir>0){ let e=x+1; medios.filter(q=>q.x>=x+1-1e-6).sort((a,b)=>a.x-b.x).forEach(q=>{ if(Math.abs(q.x-e)<1e-6){ chain.push(q); e=q.x+q.largo; } });
-        if(!chain.length) continue; const end=e; piezas[piezas.indexOf(P)]={x:x, y:y, largo:2, alto:1};
+        if(!chain.length) continue; const end=e;
+        const nuevas=retilea(x+2, end, lvl); if(nuevas===null) continue;   // no convertible limpio
+        piezas[piezas.indexOf(P)]={x:x, y:y, largo:2, alto:1};
         chain.forEach(q=>{ piezas[piezas.indexOf(q)]=null; });
-        let xx=x+2; while(end-xx>1e-6){ const lg=(end-xx>=2-1e-6)?2:1; piezas.push({x:xx, y:lvl, largo:lg, alto:0.5}); xx+=lg; }
+        nuevas.forEach(t=>piezas.push(t));
         return;
       } else { let s=x; medios.filter(q=>q.x+q.largo<=x+1e-6).sort((a,b)=>b.x-a.x).forEach(q=>{ if(Math.abs((q.x+q.largo)-s)<1e-6){ chain.push(q); s=q.x; } });
-        if(!chain.length) continue; const st=s; piezas[piezas.indexOf(P)]={x:x-1, y:y, largo:2, alto:1};
+        if(!chain.length) continue; const st=s;
+        const nuevas=retilea(st, x-1, lvl); if(nuevas===null) continue;
+        piezas[piezas.indexOf(P)]={x:x-1, y:y, largo:2, alto:1};
         chain.forEach(q=>{ piezas[piezas.indexOf(q)]=null; });
-        let xx=x-1; while(xx-st>1e-6){ const lg=(xx-st>=2-1e-6)?2:1; piezas.push({x:xx-lg, y:lvl, largo:lg, alto:0.5}); xx-=lg; }
+        nuevas.forEach(t=>piezas.push(t));
         return;
       }
     }
