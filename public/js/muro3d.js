@@ -97,6 +97,16 @@ function eleBoxes(){
   const fix = data.ancho || null;                 // ancho fijo elegido (1 / 0,5 / 0,3) o null = prontuario
   const cara = data.cara || 'int';                // ensanche de la base: 'int' hacia dentro (cara lisa) · 'ext' hacia fuera (sobresale)
   const w = fix || 1, segs=data.segs, n=segs.length, boxes=[];
+  // Orden de las bandas de una hilada ancha, del frente hacia el terreno:
+  // · 'int' (cara lisa): el de 50/30 DELANTE y los de 100 detrás → la junta entre bandas cae a
+  //   media losa bajo la hilada superior (traba).
+  // · 'ext' (la base sobresale): SOBRESALE EL DE 100 y el de 50/30 queda detrás, enrasado con la
+  //   trasera → la junta cae a media losa bajo la hilada superior (traba). Si sobresaliera el de
+  //   50, la junta caería justo en el plano de la cara (junta seguida vertical).
+  const bandasDe = function(dep){
+    const b = (typeof muroBandas==='function') ? muroBandas(dep) : [w];
+    return (cara==='ext' && dep>1+1e-9) ? b.slice().reverse() : b;
+  };
   // Recortes de esquina sobre la rejilla de 0,5 m: el brazo del header recede recBig (y el header,
   // de largo recBig, cruza la esquina); el otro brazo recede recSmall. Para 0,3 m el recorte se
   // redondea a 0,5 (queda 0,2 de holgura en el rincón; se cierra al atar en obra).
@@ -107,9 +117,9 @@ function eleBoxes(){
     const flat = st.base.every(b=>Math.abs(b-st.base[0])<1e-6) && st.crown.every(c=>Math.abs(c-st.crown[0])<1e-6);
     if(!flat){   // recta ESCALONADA (cotas/alturas variables): piezas del motor por cotas
       // (trabadas a través de las juntas de tramo) + profundidad del prontuario por columna.
-      // La banda FRONTAL (los de 50/30 van FUERA, en la cara) usa las piezas de cara tal cual;
-      // las bandas TRASERAS se re-tabican con fase alternada → TRABADO DOBLE: cada banda traba
-      // con la de delante y con las hiladas de arriba/abajo (como en las rectas planas).
+      // La banda FRONTAL (la primera de bandasDe: 50/30 en 'int', 100 en 'ext') usa las piezas
+      // de cara tal cual; las TRASERAS se re-tabican con fase alternada → TRABADO DOBLE: cada
+      // banda traba con la de delante y con las hiladas de arriba/abajo (como en las planas).
       const colOf=function(xm){ let j;
         if(st.edges){ j=0; while(j<st.N-1 && xm>st.edges[j+1]) j++; }
         else j=Math.min(st.N-1, Math.max(0, Math.floor(xm/st.cell)));
@@ -128,7 +138,7 @@ function eleBoxes(){
         const frentes=[];
         list.forEach(function(p){
           const dep=depOf(p.x+p.largo/2, y);
-          const bw0=(typeof muroBandas==='function')?muroBandas(dep)[0]:dep;
+          const bw0=bandasDe(dep)[0];
           const off0=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
           frentes.push({x0:p.x, x1:p.x+p.largo, d0:off0, d1:off0+bw0});
           boxes.push(elePlaceD(s, r, p.x, p.largo, p.y, p.alto, off0, bw0, i));
@@ -145,7 +155,7 @@ function eleBoxes(){
             const dep=depOf(sx+0.01, y);
             let ex=Math.min(X1, colEnd(sx+0.01));
             while(ex<X1-1e-9 && Math.abs(depOf(ex+0.01, y)-dep)<1e-9) ex=Math.min(X1, colEnd(ex+0.01));
-            const bandas=(typeof muroBandas==='function')?muroBandas(dep):[w];
+            const bandas=bandasDe(dep);
             let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
             bandas.forEach(function(bw, bi){
               if(bi>0){
@@ -182,7 +192,7 @@ function eleBoxes(){
       // profundidad: ancho fijo elegido, o la sección del prontuario (base ancha que estrecha)
       const anchos = fix ? [w] : ((typeof seccionAnchos==='function') ? seccionAnchos(H) : [w]);
       const dep = anchos[Math.min(Math.floor(c.y+1e-6), anchos.length-1)];
-      const bandas = (typeof muroBandas==='function') ? muroBandas(dep) : [w];
+      const bandas = bandasDe(dep);
       // cada banda de profundidad se traba con la de al lado (fase alternada por banda) y con la
       // hilada de arriba/abajo (fase por paridad de y): trabado en las dos direcciones.
       let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;   // 'ext': el ensanche sobresale de la línea
