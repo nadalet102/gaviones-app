@@ -62,17 +62,19 @@ function eleTileGrid(a, b, p){
   if(first > a + 1e-6){ pieces.push({x0:a, l:first-a}); x=first; }
   while(x + 2 <= b + 1e-6){ pieces.push({x0:x, l:2}); x+=2; }
   if(b - x > 1e-6) pieces.push({x0:x, l:b-x});
-  // Sin piezas de 0,5 m de LARGO (aparecen cuando a/b caen en medio metro — anchos 0,5/0,3):
-  // el resto de 0,5 se funde con la pieza contigua → 1 + 1,5. La junta interna cae en medio
-  // metro, fuera de la rejilla entera → sigue matajuntas con las hiladas y bandas vecinas.
+  // Sin piezas de 0,5 m de LARGO (aparecen cuando a/b caen en medio metro): el resto de 0,5 se
+  // funde con la pieza contigua → 1 + 1,5. El corte del par se elige para que la junta interna
+  // caiga SIEMPRE a medio metro de la rejilla ENTERA (arranque entero → 1,5 primero; a medio →
+  // 1 primero): así nunca calca las juntas de las caras (que van en rejilla entera).
+  const corte=x0=>(Math.abs(x0-Math.round(x0))<1e-9)? 1.5 : 1;
   if(pieces.length>1 && pieces[0].l<0.75){
-    const s=pieces[0].l+pieces[1].l, x0=pieces[0].x0;
-    const rep = s>2.25 ? [{x0:x0,l:1},{x0:x0+1,l:1.5}] : [{x0:x0,l:s}];
+    const s=pieces[0].l+pieces[1].l, x0=pieces[0].x0, f=corte(x0);
+    const rep = s>2.25 ? [{x0:x0,l:f},{x0:x0+f,l:s-f}] : [{x0:x0,l:s}];
     pieces.splice(0,2); Array.prototype.unshift.apply(pieces,rep);
   }
   if(pieces.length>1 && pieces[pieces.length-1].l<0.75){
-    const q=pieces[pieces.length-2], s=q.l+pieces[pieces.length-1].l, x0=q.x0;
-    const rep = s>2.25 ? [{x0:x0,l:1.5},{x0:x0+1.5,l:1}] : [{x0:x0,l:s}];
+    const q=pieces[pieces.length-2], s=q.l+pieces[pieces.length-1].l, x0=q.x0, f=corte(x0);
+    const rep = s>2.25 ? [{x0:x0,l:f},{x0:x0+f,l:s-f}] : [{x0:x0,l:s}];
     pieces.splice(pieces.length-2,2); Array.prototype.push.apply(pieces,rep);
   }
   return pieces;
@@ -269,7 +271,9 @@ function eleBoxes(){
                       if(c.x0<e2-1e-9 && c.x1>e2-1e-9) e2=Math.max(pt.a, Math.min(e2, c.x0));
                     }
                   });
-                  if(e2-s2>0.99) eleTileGrid(s2, e2, (yp+bi)%2).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, y, alto, dOff, bw, i)); });
+                  // bandas traseras a rejilla de MEDIO metro (cortes en x,5): no pueden calcar
+                  // ni la cara de su nivel ni la del nivel vecino (que van en rejilla entera)
+                  if(e2-s2>0.99) eleTileGrid(s2, e2, ((yp+bi)%2)+0.5).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, y, alto, dOff, bw, i)); });
                 }
                 dOff+=bw;
               });
@@ -297,10 +301,11 @@ function eleBoxes(){
       const anchos = fix ? [w] : ((typeof seccionAnchos==='function') ? seccionAnchos(H) : [w]);
       const dep = anchos[Math.min(Math.floor(c.y+1e-6), anchos.length-1)];
       const bandas = bandasDe(dep);
-      // cada banda de profundidad se traba con la de al lado (fase alternada por banda) y con la
-      // hilada de arriba/abajo (fase por paridad de y): trabado en las dos direcciones.
+      // La banda FRONTAL va en rejilla entera con fase por paridad del nivel; las TRASERAS, a
+      // rejilla de MEDIO metro (cortes en x,5): así no calcan ni la cara de su nivel, ni la del
+      // nivel vecino, ni entre ellas → trabado en las dos direcciones garantizado.
       let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;   // 'ext': el ensanche sobresale de la línea
-      bandas.forEach(function(bw, bi){ const fase=(yp+bi)%2;
+      bandas.forEach(function(bw, bi){ const fase=(bi===0)? (yp%2) : (((yp+bi)%2)+0.5);
         eleTileGrid(a, b, fase).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, c.y, c.alto, dOff, bw, i)); });
         dOff+=bw; });
     });
