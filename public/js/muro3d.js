@@ -253,7 +253,9 @@ async function muro3dOpen(boxes, title){
   const camera = new THREE.PerspectiveCamera(50, wrap.clientWidth/wrap.clientHeight, 0.1, maxDim*40+200);
   function encuadrar(){
     const d = maxDim*1.5 + 6;
-    camera.position.set(cx + d*0.75, cy + Math.max(sizeY, d*0.5), cz + d*1.15);
+    // la cámara arranca del lado de la CARA VISTA (la cara va en z=0 y el trasdós hacia +z;
+    // antes se abría desde el trasdós y el ensanche de la base parecía ir al revés)
+    camera.position.set(cx + d*0.75, cy + Math.max(sizeY, d*0.5), cz - d*1.15);
     camera.lookAt(cx, cy, cz);
   }
   encuadrar();
