@@ -47,7 +47,9 @@ function fichaInjectCSS(){
     '.fk-draw{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;justify-content:center;padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:#fbfdff}'+
     '.fk-note{margin-top:22px;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:11.5px;color:#92400e}'+
     '.fk-foot{margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between}'+
-    '@media print{ body>*:not(.fk-ov){display:none!important} .fk-ov{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important} .fk-bar{display:none!important} .fk-sheet{box-shadow:none!important;width:auto!important} .fk-sec{page-break-inside:avoid} }';
+    '.fk-a3{width:1520px;max-width:none}'+
+    '.fk-page{height:0;margin:0}'+
+    '@media print{ body>*:not(.fk-ov){display:none!important} .fk-ov{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important} .fk-bar{display:none!important} .fk-sheet{box-shadow:none!important;width:auto!important} .fk-sec{page-break-inside:avoid} .fk-page{page-break-after:always} .fk-noBreak{page-break-inside:avoid;break-inside:avoid} }';
   document.head.appendChild(s);
 }
 
@@ -345,11 +347,12 @@ function fichaEle(){
 }
 
 // ── Planta de UNA hilada del L/U (todas las cajas de esa cota, pieza a pieza) ──
-function eleCroquisHilada(bs){
+function eleCroquisHilada(bs, wMax){
+  wMax=wMax||720;
   let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9;
   bs.forEach(function(b){ minX=Math.min(minX,b.x); maxX=Math.max(maxX,b.x+b.l); minZ=Math.min(minZ,b.z); maxZ=Math.max(maxZ,b.z+b.a); });
   const Wm=Math.max(0.5,maxX-minX), Hm=Math.max(0.5,maxZ-minZ);
-  const sc=Math.max(4, Math.min(24, Math.min(620/Wm, 460/Hm)));
+  const sc=Math.max(4, Math.min(24, Math.min((wMax-100)/Wm, 460/Hm)));
   const padL=34, padT=16, padR=16, padB=34;
   const vbW=padL+Wm*sc+padR, vbH=padT+Hm*sc+padB;
   const X=x=>padL+(x-minX)*sc, Y=z=>padT+(maxZ-z)*sc;
@@ -368,7 +371,7 @@ function eleCroquisHilada(bs){
   const lx=padL-12;
   out+='<line x1="'+lx+'" y1="'+padT+'" x2="'+lx+'" y2="'+(padT+Hm*sc).toFixed(1)+'" stroke="#94a3b8" stroke-width="1"/>';
   out+='<text x="'+(lx-5)+'" y="'+(padT+Hm*sc/2).toFixed(1)+'" font-size="10" fill="#334155" text-anchor="middle" font-family="system-ui" transform="rotate(-90 '+(lx-5)+' '+(padT+Hm*sc/2).toFixed(1)+')">'+fmtN(Hm)+' m</text>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),720)+'" style="max-width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta de la hilada">'+out+'</svg>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),wMax)+'" style="max-width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Planta de la hilada">'+out+'</svg>';
 }
 
 // ── PLANO POR HILADAS del muro en L/U: una lámina en planta por cota, de arriba abajo ──
@@ -394,6 +397,78 @@ function elePlanoHiladas(){
       secs+ fichaNota()+
     '</div>';
   fichaOpen(sheet, 'plano-hiladas-LU');
+}
+
+// ════════════ IMPRESIÓN A3 (montaje y obra) ════════════
+// Hoja A3 APAISADA imprimible: planta acotada + sección (perfil) + gaviones por tipo,
+// después los alzados por recta y al final las hiladas una a una (para montar).
+function eleA3Open(sheetHtml){
+  fichaInjectCSS();
+  if(!document.getElementById('fk-a3-page')){
+    const st=document.createElement('style'); st.id='fk-a3-page';
+    st.textContent='@media print{ @page{ size: A3 landscape; margin: 8mm } }';
+    document.head.appendChild(st);
+  }
+  const ov=document.createElement('div'); ov.className='fk-ov';
+  ov.innerHTML =
+    '<div class="fk-bar">'+
+      '<button class="p" data-a="print"><i class="ti ti-printer"></i> Imprimir A3 / Guardar PDF</button>'+
+      '<button data-a="close"><i class="ti ti-x"></i> Cerrar</button>'+
+    '</div><div class="fk-sheet fk-a3">'+sheetHtml+'</div>';
+  document.body.appendChild(ov);
+  const cerrar=function(){ ov.remove(); const st=document.getElementById('fk-a3-page'); if(st) st.remove(); };
+  ov.querySelector('[data-a="close"]').onclick=cerrar;
+  ov.querySelector('[data-a="print"]').onclick=function(){ window.print(); };
+  ov.addEventListener('click', function(e){ if(e.target===ov) cerrar(); });
+  document.addEventListener('keydown', function esc(ev){ if(ev.key==='Escape' && document.body.contains(ov)){ cerrar(); document.removeEventListener('keydown', esc); } });
+}
+function eleA3(){
+  const data=window.__muroEle; if(!data||!data.segs||!data.segs.length) return;
+  const boxes=(typeof eleBoxes==='function')?eleBoxes():[]; if(!boxes.length) return;
+  const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
+  const T=data.T, segs=data.segs, fix=data.ancho||null, cara=data.cara||'int';
+  const nEsq=Math.max(0,segs.length-1);
+  const largoTot=segs.reduce(function(s,x){return s+x.largo;},0);
+  const Hmax=Math.max.apply(null,T.map(function(t){return t.H;}));
+  // gaviones por tipo (todas las cajas)
+  const map={}; let vol=0;
+  boxes.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100;
+    const k=b.largo+'|'+an+'|'+b.h; if(!map[k])map[k]={largo:b.largo,ancho:an,alto:b.h,n:0}; map[k].n++; vol+=b.l*b.a*b.h; });
+  const tipos=Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){return (b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo);});
+  const chips=tipos.map(function(t){ const c=colorGavion(t.largo,t.ancho,t.alto);
+    return '<span style="display:inline-flex;align-items:center;gap:6px;margin:3px 16px 3px 0;font-size:13.5px"><span style="width:14px;height:14px;background:'+c.f+';border:1px solid '+c.s+';display:inline-block;border-radius:2px"></span>'+Math.round(t.largo*100)+'×'+Math.round(t.ancho*100)+'×'+Math.round(t.alto*100)+': <strong>'+fnum(t.n)+'</strong></span>'; }).join('');
+  // alzados por recta (anchos de A3)
+  const alzados=segs.map(function(s,i){
+    return '<div class="fk-sec fk-noBreak"><h2><i class="ti ti-chart-bar"></i> Perfil / alzado · recta '+(i+1)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos'):'')+'</h2>'+
+      '<div class="fk-draw" style="display:block;overflow-x:auto">'+croquisAlzadoPlano(i, 1430)+'</div></div>';
+  }).join('');
+  // hiladas de coronación a base
+  const lvls=[]; boxes.forEach(function(b){ if(!lvls.some(function(y){return Math.abs(y-b.y)<1e-6;})) lvls.push(b.y); });
+  lvls.sort(function(a,b){return a-b;});
+  const hiladas=lvls.slice().reverse().map(function(y){
+    const bs=boxes.filter(function(b){return Math.abs(b.y-y)<1e-6;});
+    const idx=lvls.indexOf(y)+1;
+    const cnt={}; bs.forEach(function(b){ const an=Math.round(((Math.abs(b.l-b.largo)<1e-6)?b.a:b.l)*100)/100; const k=b.largo+'|'+an+'|'+b.h; cnt[k]=(cnt[k]||0)+1; });
+    const lista=Object.keys(cnt).sort().map(function(k){ const pp=k.split('|'); return fmtm(+pp[0])+'×'+fmtm(+pp[1])+'×'+fmtm(+pp[2])+' m: <strong>'+cnt[k]+'</strong>'; }).join(' &nbsp;·&nbsp; ');
+    return '<div class="fk-noBreak" style="margin-top:18px"><div style="font-size:13px;font-weight:700;margin-bottom:4px;color:#0f172a"><i class="ti ti-layers-subtract"></i> Hilada '+idx+(idx===1?' (base)':'')+' · cota '+fmtm(y)+' m · '+bs.length+' gaviones &nbsp;&nbsp;<span style="font-weight:400;color:#475569;font-size:12px">'+lista+'</span></div>'+
+      eleCroquisHilada(bs, 1430)+'</div>';
+  }).join('');
+  const sheet=
+    fichaHead('Plano de montaje · muro en L/U (A3)', segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m ext. · '+fnum(vol,1)+' m³'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario')+((cara==='ext')?' · base hacia fuera':' · base hacia dentro'))+
+    '<div class="fk-body">'+
+      '<div class="fk-sec fk-noBreak"><h2><i class="ti ti-map-2"></i> Planta acotada (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(segs, fix||1, 1380)+'</div></div>'+
+      '<div class="fk-noBreak" style="display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap">'+
+        '<div class="fk-sec"><h2><i class="ti ti-layout-distribute-horizontal"></i> Sección (perfil)</h2>'+croquisSeccionPront(Hmax, cara)+
+          '<div style="font-size:11.5px;color:#475569;margin-top:6px">Ensanche de la base: <strong>'+((cara==='ext')?'hacia fuera (la base sobresale)':'hacia dentro (cara vista lisa)')+'</strong></div></div>'+
+        '<div class="fk-sec" style="flex:1;min-width:420px"><h2><i class="ti ti-palette"></i> Gaviones por tipo (cm)</h2><div>'+chips+'</div>'+fichaLeyendaNorma()+'</div>'+
+      '</div>'+
+      '<div class="fk-page"></div>'+
+      alzados+
+      '<div class="fk-page"></div>'+
+      '<div class="fk-sec"><h2><i class="ti ti-stack-2"></i> Hiladas (planta por nivel, de coronación a base) — para montaje</h2>'+hiladas+'</div>'+
+      fichaNota()+
+    '</div>';
+  eleA3Open(sheet);
 }
 
 // Leyenda de la norma de colores (tono = tipo ancho×alto · intensidad = largo)
@@ -434,11 +509,12 @@ function eleAlzadoFrontal(i){
       Math.min(q.x+q.largo, p.x+p.largo)-Math.max(q.x, p.x)>1e-6 && q.depth<p.depth-1e-6; });
   });
 }
-function croquisAlzadoPlano(i){
+function croquisAlzadoPlano(i, wMax){
+  wMax=wMax||750;
   const data=window.__muroEle, st=data.estados[i], T=data.T[i];
   const piezas=eleAlzadoFrontal(i), fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
   const Lm=T.largo, maxTop=Math.max.apply(null, st.crown);
-  const sc=Math.max(5.5, Math.min(16, 740/Lm));
+  const sc=Math.max(5.5, Math.min(16, (wMax-30)/Lm));
   const padL=14, padR=14, padT=(T.tr&&T.tr.length>1)?22:12, padB=30;
   const vbW=padL+Lm*sc+padR, vbH=padT+maxTop*sc+padB, groundY=padT+maxTop*sc;
   const X=x=>padL+x*sc, Y=y=>groundY-y*sc; let out='';
@@ -462,7 +538,7 @@ function croquisAlzadoPlano(i){
   const ly=groundY+16;
   out+='<line x1="'+padL+'" y1="'+ly+'" x2="'+(padL+Lm*sc).toFixed(1)+'" y2="'+ly+'" stroke="#94a3b8" stroke-width="1"/>';
   out+='<text x="'+(padL+Lm*sc/2).toFixed(1)+'" y="'+(ly+11)+'" font-size="10" fill="#334155" text-anchor="middle">'+fnum(Lm)+' m (exterior)</text>';
-  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),750)+'" style="max-width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado de la recta '+(i+1)+'">'+out+'</svg>';
+  return '<svg viewBox="0 0 '+Math.ceil(vbW)+' '+Math.ceil(vbH)+'" width="'+Math.min(Math.ceil(vbW),wMax)+'" style="max-width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:4px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alzado de la recta '+(i+1)+'">'+out+'</svg>';
 }
 function elePlano(){
   const data=window.__muroEle; if(!data||!data.segs||!data.segs.length) return;

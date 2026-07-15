@@ -868,6 +868,7 @@ function eleCalcular(){
         '<button class="btn btn-outline btn-sm" onclick="elePlano()"><i class="ti ti-ruler-measure"></i> Plano 2D (perfiles)</button>'+
         '<button class="btn btn-outline btn-sm" onclick="elePlanoHiladas()"><i class="ti ti-stack-2"></i> Plano por hiladas</button>'+
         '<button class="btn btn-outline btn-sm" onclick="fichaEle()"><i class="ti ti-file-description"></i> Ficha técnica</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="eleA3()"><i class="ti ti-printer"></i> Imprimir A3</button>'+
         '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button>'+
       '</div></div>'+
       '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs, fix||1)+
@@ -902,7 +903,7 @@ function eleFootprint(segs, w){
     else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=(nx<0)?s.p0.x-w:s.p0.x; rw=w; }
     return {rx:rx, ry:ry, rw:rw, rh:rh, nx:nx, ny:ny, s:s}; });
 }
-function croquisPlantaLU(segs, w){
+function croquisPlantaLU(segs, w, wMax){
   w=w||((window.__muroEle&&window.__muroEle.ancho)||1);
   const R=eleFootprint(segs, w);
   // envolvente EXTERIOR = polilínea del recorrido (bordes de fuera)
@@ -910,7 +911,7 @@ function croquisPlantaLU(segs, w){
   const exMinX=Math.min.apply(null,vx), exMaxX=Math.max.apply(null,vx), exMinY=Math.min.apply(null,vy), exMaxY=Math.max.apply(null,vy);
   const extW=exMaxX-exMinX, extH=exMaxY-exMinY;
   const minX=exMinX-3, maxX=exMaxX+3, minY=exMinY-3, maxY=exMaxY+3;
-  const Wm=maxX-minX, Hm=maxY-minY, sc=Math.max(3, Math.min(11, 520/Math.max(Wm,Hm)));
+  const Wm=maxX-minX, Hm=maxY-minY, sc=Math.max(3, Math.min(11, (wMax||520)/Math.max(Wm,Hm)));
   const pad=24, vbW=pad*2+Wm*sc, vbH=pad*2+Hm*sc;
   const X=xm=>pad+(xm-minX)*sc, Y=ym=>pad+(maxY-ym)*sc; let out='';
   R.forEach(function(r){ const s=r.s;
