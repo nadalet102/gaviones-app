@@ -136,52 +136,103 @@ function eleBoxes(){
       Object.keys(porY).forEach(function(yk){
         const list0=porY[yk].sort(function(a,b){ return a.x-b.x; });
         const y=list0[0].y, alto=list0[0].alto, yp=Math.floor(y+1e-6)%2;
-        // Piezas de cara que CRUZAN un cambio de sección (dep): se PARTEN en la junta con
-        // largos ENTEROS (un resto de 0,5 se funde con la vecina → 1,5 + …), de modo que la
-        // banda saliente del lado hondo arranca EXACTO en la junta (sin hueco, normalmente
-        // con un 1,5) y cada pieza lleva el fondo de SU zona. En las demás hiladas (fondo
-        // uniforme) las piezas siguen cruzando la junta → el trabado entre tramos se mantiene.
         const fronteraEn=function(p){   // 1ª frontera de dep estrictamente dentro de la pieza
           let x=p.x, d0=depOf(x+0.005, y);
           while(true){ const e=colEnd(x+0.005); if(e>=p.x+p.largo-1e-9) return null;
             const d1=depOf(e+0.005, y); if(Math.abs(d1-d0)>1e-9) return e; d0=d1; x=e; }
         };
-        const arr=list0.map(function(p){ return {x:p.x, y:p.y, largo:p.largo, alto:p.alto}; });
-        for(let idx=0; idx<arr.length; idx++){
-          const p=arr[idx]; if(!p) continue;
-          const B=fronteraEn(p); if(B==null) continue;
-          const lL=Math.round((B-p.x)*100)/100, lR=Math.round((p.x+p.largo-B)*100)/100;
-          let izq, der;
-          if(lL>=0.99) izq=[{x:p.x, largo:lL}];
-          else { const q=arr[idx-1];
-            if(q && Math.abs(q.x+q.largo-p.x)<1e-6 && fronteraEn(q)==null){
-              const s=q.largo+lL; arr[idx-1]=null;
-              izq=(s>2.25)? [{x:q.x, largo:1.5},{x:q.x+1.5, largo:s-1.5}] : [{x:q.x, largo:s}];
-            } else izq=[{x:p.x, largo:lL}];
+        let list;
+        if(cara==='ext'){
+          // Base hacia FUERA: el carril saliente cambia de plano en la junta, así que la pieza
+          // que cruza un cambio de sección se PARTE en la junta con largos ENTEROS (un resto de
+          // 0,5 se funde con la vecina → 1,5 + …). Solo pasa en esa hilada; el resto cruzan.
+          const arr=list0.map(function(p){ return {x:p.x, y:p.y, largo:p.largo, alto:p.alto}; });
+          for(let idx=0; idx<arr.length; idx++){
+            const p=arr[idx]; if(!p) continue;
+            const B=fronteraEn(p); if(B==null) continue;
+            const lL=Math.round((B-p.x)*100)/100, lR=Math.round((p.x+p.largo-B)*100)/100;
+            let izq, der;
+            if(lL>=0.99) izq=[{x:p.x, largo:lL}];
+            else { const q=arr[idx-1];
+              if(q && Math.abs(q.x+q.largo-p.x)<1e-6 && fronteraEn(q)==null){
+                const s=q.largo+lL; arr[idx-1]=null;
+                izq=(s>2.25)? [{x:q.x, largo:1.5},{x:q.x+1.5, largo:s-1.5}] : [{x:q.x, largo:s}];
+              } else izq=[{x:p.x, largo:lL}];
+            }
+            if(lR>=0.99) der=[{x:B, largo:lR}];
+            else { const q=arr[idx+1];
+              if(q && Math.abs(p.x+p.largo-q.x)<1e-6 && fronteraEn(q)==null){
+                const s=lR+q.largo; arr[idx+1]=null;
+                der=(s>2.25)? [{x:B, largo:1.5},{x:B+1.5, largo:s-1.5}] : [{x:B, largo:s}];
+              } else der=[{x:B, largo:lR}];
+            }
+            arr[idx]=null;
+            izq.concat(der).forEach(function(t){ arr.push({x:t.x, y:p.y, largo:t.largo, alto:p.alto}); });
           }
-          if(lR>=0.99) der=[{x:B, largo:lR}];
-          else { const q=arr[idx+1];
-            if(q && Math.abs(p.x+p.largo-q.x)<1e-6 && fronteraEn(q)==null){
-              const s=lR+q.largo; arr[idx+1]=null;
-              der=(s>2.25)? [{x:B, largo:1.5},{x:B+1.5, largo:s-1.5}] : [{x:B, largo:s}];
-            } else der=[{x:B, largo:lR}];
+          list=arr.filter(Boolean).sort(function(a,b){ return a.x-b.x; });
+        } else list=list0;
+        // INTERCAMBIO EN LAS TRANSICIONES (cara lisa): junto a cada frontera de sección, en la
+        // zona honda se invierte la banda (el 100 pasa DELANTE y el 50 se esconde detrás) desde
+        // la junta hasta el primer final de pieza a ≥1 m → la cara sigue en gaviones de 100,
+        // ESTÉTICA y trabada cruzando la junta también en esta hilada; el retranqueo del 50
+        // queda detrás, contra el terreno. Lejos de las juntas se mantiene el 50 delante.
+        const swaps=[];
+        if(cara!=='ext'){
+          let j0=0;
+          while(j0<list.length){
+            let j1=j0, fin=list[j0].x+list[j0].largo;
+            while(j1+1<list.length && Math.abs(list[j1+1].x-fin)<1e-6){ j1++; fin=list[j1].x+list[j1].largo; }
+            const X0=list[j0].x, X1=fin, tira=list.slice(j0, j1+1);
+            // zonas de fondo uniforme dentro de la tira, con su ancho de banda frontal clásico
+            const zonas=[]; let zx=X0;
+            while(zx<X1-1e-9){
+              const dz=depOf(zx+0.005,y); let ze=Math.min(X1, colEnd(zx+0.005));
+              while(ze<X1-1e-9 && Math.abs(depOf(ze+0.005,y)-dz)<1e-9) ze=Math.min(X1, colEnd(ze+0.005));
+              zonas.push({a:zx, b:ze, w:((typeof muroBandas==='function')?muroBandas(dz)[0]:dz)});
+              zx=ze;
+            }
+            zonas.forEach(function(z, zi){
+              if(z.w>=1-1e-9) return;   // solo zonas HONDAS (banda frontal estrecha)
+              const sw=[];
+              if(zi>0 && zonas[zi-1].w>=1-1e-9){          // junta con cambio de ancho a la IZQUIERDA
+                const e=z.a; let smin=e+1;
+                tira.forEach(function(p){ if(p.x<e-1e-9 && p.x+p.largo>e+1e-9) smin=Math.max(smin, p.x+p.largo); });
+                let S=z.b; tira.forEach(function(p){ const pe=p.x+p.largo; if(pe>=smin-1e-9 && pe<S) S=pe; });
+                sw.push({a:e, b:S});
+              }
+              if(zi<zonas.length-1 && zonas[zi+1].w>=1-1e-9){   // junta a la DERECHA
+                const e=z.b; let amax=e-1;
+                tira.forEach(function(p){ if(p.x<e-1e-9 && p.x+p.largo>e+1e-9) amax=Math.min(amax, p.x); });
+                let A=z.a; tira.forEach(function(p){ if(p.x<=amax+1e-9 && p.x>A) A=p.x; });
+                sw.push({a:A, b:e});
+              }
+              if(!sw.length) return;
+              sw.sort(function(u,v){ return u.a-v.a; });
+              // funde solapes y ABSORBE huecos clásicos de <1 m (no cabe tabicado detrás)
+              if(sw.length===2 && sw[1].a-sw[0].b<0.99){ sw[0].b=Math.max(sw[0].b, sw[1].b); sw.pop(); }
+              if(sw[0].a-z.a<0.99 && sw[0].a>z.a+1e-9) sw[0].a=z.a;
+              const ult=sw[sw.length-1];
+              if(z.b-ult.b<0.99 && ult.b<z.b-1e-9) ult.b=z.b;
+              sw.forEach(function(v){ swaps.push(v); });
+            });
+            j0=j1+1;
           }
-          arr[idx]=null;
-          izq.concat(der).forEach(function(t){ arr.push({x:t.x, y:p.y, largo:t.largo, alto:p.alto}); });
+          swaps.sort(function(u,v){ return u.a-v.a; });
         }
-        const list=arr.filter(Boolean).sort(function(a,b){ return a.x-b.x; });
+        const enSwap=function(p){ return swaps.some(function(sv){ return p.x<sv.b-1e-9 && p.x+p.largo>sv.a+1e-9; }); };
         // banda frontal: pieza a pieza (conserva remates y rincones de la cara)
         const frentes=[];
         list.forEach(function(p){
           const dep=depOf(p.x+p.largo/2, y);
-          const bw0=bandasDe(dep)[0];
-          const off0=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
+          let bw0, off0;
+          if(cara!=='ext' && enSwap(p)){ bw0=1; off0=0; }   // transición: el 100 delante
+          else { bw0=bandasDe(dep)[0]; off0=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0; }
           frentes.push({x0:p.x, x1:p.x+p.largo, d0:off0, d1:off0+bw0});
           boxes.push(elePlaceD(s, r, p.x, p.largo, p.y, p.alto, off0, bw0, i));
         });
-        // bandas traseras: por TIRAS contiguas del nivel, troceadas donde cambia la sección.
-        // Si una pieza frontal CRUZA la junta de zona con más fondo que el arranque de la banda
-        // trasera, la banda se recorta (la cruzante ya ocupa ese fondo en el vecino).
+        // bandas traseras: por TIRAS contiguas del nivel, troceadas donde cambia la sección y
+        // por los tramos de intercambio. Si una pieza frontal cruza con más fondo que el
+        // arranque de la banda, la banda se recorta (la cruzante ya ocupa ese fondo).
         let i0=0;
         while(i0<list.length){
           let i1=i0, end=list[i0].x+list[i0].largo;
@@ -191,20 +242,33 @@ function eleBoxes(){
             const dep=depOf(sx+0.01, y);
             let ex=Math.min(X1, colEnd(sx+0.01));
             while(ex<X1-1e-9 && Math.abs(depOf(ex+0.01, y)-dep)<1e-9) ex=Math.min(X1, colEnd(ex+0.01));
-            const bandas=bandasDe(dep);
-            let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
-            bandas.forEach(function(bw, bi){
-              if(bi>0){
-                let s2=sx, e2=ex;
-                frentes.forEach(function(c){
-                  if(c.d1>dOff+1e-9 && c.d0<dOff+bw-1e-9){   // solapa en profundidad con esta banda
-                    if(c.x0<s2+1e-9 && c.x1>s2+1e-9) s2=Math.min(ex, Math.max(s2, c.x1));
-                    if(c.x0<e2-1e-9 && c.x1>e2-1e-9) e2=Math.max(sx, Math.min(e2, c.x0));
-                  }
-                });
-                if(e2-s2>0.99) eleTileGrid(s2, e2, (yp+bi)%2).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, y, alto, dOff, bw, i)); });
-              }
-              dOff+=bw;
+            // partes intercambiadas / clásicas dentro de [sx,ex]
+            const partes=[];
+            if(cara!=='ext' && dep>1+1e-9 && swaps.length){
+              let cx=sx;
+              swaps.filter(function(sv){ return sv.b>sx+1e-9 && sv.a<ex-1e-9; }).forEach(function(sv){
+                const a=Math.max(sx,sv.a), b=Math.min(ex,sv.b);
+                if(a>cx+1e-9) partes.push({a:cx, b:a, swap:false});
+                partes.push({a:a, b:b, swap:true}); cx=b;
+              });
+              if(cx<ex-1e-9) partes.push({a:cx, b:ex, swap:false});
+            } else partes.push({a:sx, b:ex, swap:false});
+            partes.forEach(function(pt){
+              const seq = pt.swap ? ((typeof muroBandas==='function')?muroBandas(dep).slice().reverse():[w]) : bandasDe(dep);
+              let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
+              seq.forEach(function(bw, bi){
+                if(bi>0){
+                  let s2=pt.a, e2=pt.b;
+                  frentes.forEach(function(c){
+                    if(c.d1>dOff+1e-9 && c.d0<dOff+bw-1e-9){   // solapa en profundidad con esta banda
+                      if(c.x0<s2+1e-9 && c.x1>s2+1e-9) s2=Math.min(pt.b, Math.max(s2, c.x1));
+                      if(c.x0<e2-1e-9 && c.x1>e2-1e-9) e2=Math.max(pt.a, Math.min(e2, c.x0));
+                    }
+                  });
+                  if(e2-s2>0.99) eleTileGrid(s2, e2, (yp+bi)%2).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, y, alto, dOff, bw, i)); });
+                }
+                dOff+=bw;
+              });
             });
             sx=ex;
           }

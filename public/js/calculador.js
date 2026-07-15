@@ -44,27 +44,36 @@ function perfilProntuario(base, crown, cell, N){
     .sort(function(a,b){ return (b.alto-a.alto)||(b.ancho-a.ancho); });
   return { granular:granular, piezas:piezas, total:piezas.reduce(function(s,p){return s+p.n;},0) };
 }
-// Tabica una hilada de longitud L con piezas COMPLETAS de 2/1,5/1 m que suman EXACTO L.
-// Prioriza piezas de 2 m; el medio metro (L acabado en ,5) lo aporta una pieza de 1,5 m.
-// offset=true desfasa las juntas (trabado): la hilada se coloca "al revés" y, si es todo
-// de 2 m, se rematan los extremos con 1 m (empieza abajo en 1,5 y acaba en 1; arriba al revés).
+// Tabica una hilada de longitud L con piezas COMPLETAS que suman EXACTO L, MAXIMIZANDO los
+// 2 m: el sobrante se resuelve con UNO o DOS remates pequeños (1,5 y/o 1 m) SOLO en las
+// puntas (pequeños en las esquinas, centro grande y simétrico). Nunca piezas de 0,5 m.
+//   sobra 0   → [2×k]         · desfasada: [1, 2×(k−1), 1]
+//   sobra 1   → [2×k, 1]      · desfasada: [1, 2×k]
+//   sobra 1,5 → [2×k, 1.5]    · desfasada: [1.5, 2×k]
+//   sobra 0,5 → un 1 y un 1,5 repartidos en las puntas: [1, 2×(k−1), 1.5] · desfasada al revés
+// El desfase (offset=true) alterna el lado del remate → juntas a matajunta siempre.
 function muroTramo(L, offset){
   var u = Math.round(L*2);                 // longitud en medios metros
   if(u < 2) return [];                     // < 1 m no admite pieza válida
-  var med=0, uno=0, uu=u;
-  if(uu % 2 === 1){ med=1; uu-=3; }        // un 1,5 m (3 medios) para el medio metro
-  var dos=Math.floor(uu/4), rem=uu-dos*4;  // rem 0 o 2
-  if(rem===2) uno=1;                        // sobra 1 m
-  var p=[];
-  if(med) p.push(1.5);
-  for(var i=0;i<dos;i++) p.push(2);
-  if(uno){                                  // NO gaviones de 1 m: el 1 m sobrante + un 2 m → dos de 1,5 m
-    if(dos>0){ p[p.length-1]=1.5; p.push(1.5); }   // 2 m + 1 m = 1,5 + 1,5 (sin pieza de 1 m)
-    else p.push(1);                                 // sólo si no hay ningún 2 m (tramo muy corto)
+  var k = Math.floor(u/4), r = u - k*4;    // k piezas de 2 m; resto en medios (0/1/2/3)
+  var p=[], i;
+  if(r===0){
+    for(i=0;i<k;i++) p.push(2);
+    if(!offset) return p;
+    if(k===1) return [1,1];                // 2 m justos: el desfase son dos de 1 m
+    var q=[1]; for(i=0;i<k-1;i++) q.push(2); q.push(1); return q;
   }
-  if(!offset) return p;
-  if(med || uno) return p.slice().reverse();          // hilada impar: al revés (trabado)
-  var r=[1]; for(var j=0;j<dos-1;j++) r.push(2); r.push(1); return r; // todo 2 m: 1 m en extremos
+  if(r===2){                               // sobra 1 m → remate de 1 m en la punta
+    for(i=0;i<k;i++) p.push(2);
+    return offset? [1].concat(p) : p.concat([1]);
+  }
+  if(r===3){                               // sobra 1,5 m → remate de 1,5 m en la punta
+    for(i=0;i<k;i++) p.push(2);
+    return offset? [1.5].concat(p) : p.concat([1.5]);
+  }
+  // r===1: sobra 0,5 → un 1 m y un 1,5 m, uno en cada punta (k−1 de 2 m en medio)
+  var mid=[]; for(i=0;i<k-1;i++) mid.push(2);
+  return offset? [1.5].concat(mid).concat([1]) : [1].concat(mid).concat([1.5]);
 }
 function muroAddPieza(acc, p){ if(p===2) acc.p2++; else if(p===1.5) acc.p15++; else acc.p1++; }
 
