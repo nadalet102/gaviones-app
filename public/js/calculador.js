@@ -268,7 +268,7 @@ function renderCalculador(){
     '</div></div>';
   if(calcModo==='tramos') tramoTogglePerfil(); else if(calcModo==='ele') eleGridRedraw(); else muroToggleAncho();
   muroHistCount();
-  if(window.__histAbierto) renderHistorial();
+  if(window.__histAbierto) renderHistorialMuros();
 }
 
 // Selector de ancho: muros bajos (<2 m, ancho recto) y 2 m (prontuario o 0,50 recto)
@@ -1145,7 +1145,7 @@ function saveBarHTML(){
   return '<button class="btn btn-primary btn-sm" onclick="muroGuardar(false)"><i class="ti ti-device-floppy"></i> Guardar muro</button>';
 }
 function renderSaveBar(){ const e=document.getElementById('calc-save-bar'); if(e) e.innerHTML=saveBarHTML(); }
-function muroDejarEdicion(){ window.__muroGuardadoId=null; window.__muroGuardadoNombre=null; renderSaveBar(); if(window.__histAbierto) renderHistorial(); }
+function muroDejarEdicion(){ window.__muroGuardadoId=null; window.__muroGuardadoNombre=null; renderSaveBar(); if(window.__histAbierto) renderHistorialMuros(); }
 
 // Estado completo del modo activo (o null si no hay nada calculable que guardar)
 function calcEstadoActual(){
@@ -1220,7 +1220,7 @@ async function muroGuardar(actualizar){
     if(actualizar && window.__muroGuardadoId) r=await api('PUT','/muros/'+window.__muroGuardadoId, body);
     else r=await api('POST','/muros', body);
     window.__muroGuardadoId=r.id; window.__muroGuardadoNombre=r.nombre;
-    renderSaveBar(); muroHistCount(); if(window.__histAbierto) renderHistorial();
+    renderSaveBar(); muroHistCount(); if(window.__histAbierto) renderHistorialMuros();
     log('Muro «'+r.nombre+'» '+(actualizar?'actualizado':'guardado en el historial'));
   }catch(e){ log('No se pudo guardar: '+e.message,'warn'); }
 }
@@ -1233,7 +1233,7 @@ async function muroHistToggle(){
   window.__histAbierto=!window.__histAbierto;
   const c=document.getElementById('calc-hist');
   if(!window.__histAbierto){ if(c) c.innerHTML=''; return; }
-  await renderHistorial();
+  await renderHistorialMuros();
 }
 // Filtro del buscador (insensible a mayúsculas y tildes) sobre nombre/obra/cliente/nota/tipo
 function histNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
@@ -1277,7 +1277,7 @@ function histRowsHTML(list){
         '<button class="btn btn-outline btn-sm" onclick="muroNotaToggle('+m.id+')">Cerrar</button></div></td></tr>';
   }).join('');
 }
-async function renderHistorial(){
+async function renderHistorialMuros(){
   const c=document.getElementById('calc-hist'); if(!c) return;
   c.innerHTML='<div class="card" style="margin-bottom:14px"><div class="card-body dim" style="padding:12px 16px">Cargando historial…</div></div>';
   let list=[];
@@ -1306,7 +1306,7 @@ async function muroDuplicar(id){
     await api('POST','/muros',{nombre:nombre, obra:full.obra||'', cliente:full.cliente||'', modo:full.modo,
       resumen:full.resumen||{}, datos:full.datos, notas:full.notas||''});
   }catch(e){ log('No se pudo duplicar: '+e.message,'warn'); return; }
-  muroHistCount(); if(window.__histAbierto) renderHistorial();
+  muroHistCount(); if(window.__histAbierto) renderHistorialMuros();
   log('Copia «'+nombre+'» creada en el historial');
 }
 
@@ -1369,6 +1369,6 @@ async function muroBorrar(id){
   try{ await api('DELETE','/muros/'+id); }
   catch(e){ log('No se pudo borrar: '+e.message,'warn'); return; }
   if(window.__muroGuardadoId===id){ window.__muroGuardadoId=null; window.__muroGuardadoNombre=null; renderSaveBar(); }
-  muroHistCount(); if(window.__histAbierto) renderHistorial();
+  muroHistCount(); if(window.__histAbierto) renderHistorialMuros();
   log('Muro borrado del historial');
 }
