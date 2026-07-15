@@ -12,7 +12,9 @@ async function muro3dEnsure(){
   return _muro3d.lib;
 }
 
-// Genera las cajas (gaviones) de un muro con origen en (0,0,0): x=largo, y=alto, z=profundidad
+// Genera las cajas (gaviones) de un muro con origen en (0,0,0): x=largo, y=alto, z=profundidad.
+// La CARA VISTA queda en z=0 mirando a +z (la cámara por defecto); las bandas de profundidad
+// crecen hacia −z (el terreno queda detrás).
 function genWallBoxes(H, L, anchoOverride){
   const boxes=[];
   const courses = muroCourses(H, anchoOverride!=null ? anchoOverride : (H<2 ? 0.5 : null));
@@ -21,7 +23,7 @@ function genWallBoxes(H, L, anchoOverride){
     let z=0;
     muroBandas(c.w).forEach(function(bw, bi){
       let x=0; const off=(c.offset!==(bi%2===1));   // trabado también en profundidad
-      muroTramo(L, off).forEach(function(p){ boxes.push({x:x, y:yAcc, z:z, l:p, a:bw, h:c.h, largo:p}); x+=p; });
+      muroTramo(L, off).forEach(function(p){ boxes.push({x:x, y:yAcc, z:-(z+bw), l:p, a:bw, h:c.h, largo:p}); x+=p; });
       z+=bw;
     });
     yAcc+=c.h;
@@ -306,9 +308,11 @@ async function muro3dOpen(boxes, title){
   const camera = new THREE.PerspectiveCamera(50, wrap.clientWidth/wrap.clientHeight, 0.1, maxDim*40+200);
   function encuadrar(){
     const d = maxDim*1.5 + 6;
-    // la cámara arranca del lado de la CARA VISTA (la cara va en z=0 y el trasdós hacia +z;
-    // antes se abría desde el trasdós y el ensanche de la base parecía ir al revés)
-    camera.position.set(cx + d*0.75, cy + Math.max(sizeY, d*0.5), cz - d*1.15);
+    // Vista por defecto en +z: respeta el SENTIDO DEL DIBUJO (izquierda→derecha, como la
+    // cuadrícula y los alzados). La cara vista se orienta hacia esta cámara colocando el
+    // cuerpo del muro al otro lado de la línea (eleFootprint/genWallBoxes), no girando la
+    // vista (girarla deja el muro en espejo).
+    camera.position.set(cx + d*0.75, cy + Math.max(sizeY, d*0.5), cz + d*1.15);
     camera.lookAt(cx, cy, cz);
   }
   encuadrar();
