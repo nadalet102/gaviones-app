@@ -107,20 +107,63 @@ function eleBoxes(){
     const flat = st.base.every(b=>Math.abs(b-st.base[0])<1e-6) && st.crown.every(c=>Math.abs(c-st.crown[0])<1e-6);
     if(!flat){   // recta ESCALONADA (cotas/alturas variables): piezas del motor por cotas
       // (trabadas a través de las juntas de tramo) + profundidad del prontuario por columna.
-      st.piezas.forEach(function(p){
-        const xm=p.x+p.largo/2;
-        let j;
+      // La banda FRONTAL (los de 50/30 van FUERA, en la cara) usa las piezas de cara tal cual;
+      // las bandas TRASERAS se re-tabican con fase alternada → TRABADO DOBLE: cada banda traba
+      // con la de delante y con las hiladas de arriba/abajo (como en las rectas planas).
+      const colOf=function(xm){ let j;
         if(st.edges){ j=0; while(j<st.N-1 && xm>st.edges[j+1]) j++; }
         else j=Math.min(st.N-1, Math.max(0, Math.floor(xm/st.cell)));
-        const Hj=st.crown[j]-st.base[j];
+        return j; };
+      const depOf=function(xm, y){ const j=colOf(xm); const Hj=st.crown[j]-st.base[j];
         const anchos=fix?[w]:((typeof seccionAnchos==='function')?seccionAnchos(Hj):[w]);
-        const kIdx=Math.max(0, Math.floor(p.y - st.base[j] + 1e-6));
-        const dep=anchos[Math.min(kIdx, anchos.length-1)];
-        const bandas=(typeof muroBandas==='function')?muroBandas(dep):[w];
-        // 'ext': el ensanche SALE del muro (trasera enrasada con la hilada de 1 m; el extra
-        // sobresale de la línea dibujada). 'int' (defecto): cara lisa, el extra va hacia dentro.
-        let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
-        bandas.forEach(function(bw){ boxes.push(elePlaceD(s, r, p.x, p.largo, p.y, p.alto, dOff, bw, i)); dOff+=bw; });
+        const kIdx=Math.max(0, Math.floor(y - st.base[j] + 1e-6));
+        return anchos[Math.min(kIdx, anchos.length-1)]; };
+      const colEnd=function(xm){ const j=colOf(xm); return st.edges? st.edges[j+1] : Math.min(st.L,(j+1)*st.cell); };
+      const porY={};   // agrupado por (nivel, alto): las medias hiladas van aparte de las enteras
+      st.piezas.forEach(function(p){ const k=p.y+'|'+p.alto; (porY[k]=porY[k]||[]).push(p); });
+      Object.keys(porY).forEach(function(yk){
+        const list=porY[yk].sort(function(a,b){ return a.x-b.x; });
+        const y=list[0].y, alto=list[0].alto, yp=Math.floor(y+1e-6)%2;
+        // banda frontal: pieza a pieza (conserva remates y rincones de la cara)
+        const frentes=[];
+        list.forEach(function(p){
+          const dep=depOf(p.x+p.largo/2, y);
+          const bw0=(typeof muroBandas==='function')?muroBandas(dep)[0]:dep;
+          const off0=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
+          frentes.push({x0:p.x, x1:p.x+p.largo, d0:off0, d1:off0+bw0});
+          boxes.push(elePlaceD(s, r, p.x, p.largo, p.y, p.alto, off0, bw0, i));
+        });
+        // bandas traseras: por TIRAS contiguas del nivel, troceadas donde cambia la sección.
+        // Si una pieza frontal CRUZA la junta de zona con más fondo que el arranque de la banda
+        // trasera, la banda se recorta (la cruzante ya ocupa ese fondo en el vecino).
+        let i0=0;
+        while(i0<list.length){
+          let i1=i0, end=list[i0].x+list[i0].largo;
+          while(i1+1<list.length && Math.abs(list[i1+1].x-end)<1e-6){ i1++; end=list[i1].x+list[i1].largo; }
+          const X1=end; let sx=list[i0].x;
+          while(sx<X1-1e-9){
+            const dep=depOf(sx+0.01, y);
+            let ex=Math.min(X1, colEnd(sx+0.01));
+            while(ex<X1-1e-9 && Math.abs(depOf(ex+0.01, y)-dep)<1e-9) ex=Math.min(X1, colEnd(ex+0.01));
+            const bandas=(typeof muroBandas==='function')?muroBandas(dep):[w];
+            let dOff=(cara==='ext' && dep>1+1e-9) ? (1-dep) : 0;
+            bandas.forEach(function(bw, bi){
+              if(bi>0){
+                let s2=sx, e2=ex;
+                frentes.forEach(function(c){
+                  if(c.d1>dOff+1e-9 && c.d0<dOff+bw-1e-9){   // solapa en profundidad con esta banda
+                    if(c.x0<s2+1e-9 && c.x1>s2+1e-9) s2=Math.min(ex, Math.max(s2, c.x1));
+                    if(c.x0<e2-1e-9 && c.x1>e2-1e-9) e2=Math.max(sx, Math.min(e2, c.x0));
+                  }
+                });
+                if(e2-s2>0.99) eleTileGrid(s2, e2, (yp+bi)%2).forEach(function(pc){ boxes.push(elePlaceD(s, r, pc.x0, pc.l, y, alto, dOff, bw, i)); });
+              }
+              dOff+=bw;
+            });
+            sx=ex;
+          }
+          i0=i1+1;
+        }
       });
       continue;
     }
