@@ -134,8 +134,42 @@ function eleBoxes(){
       const porY={};   // agrupado por (nivel, alto): las medias hiladas van aparte de las enteras
       st.piezas.forEach(function(p){ const k=p.y+'|'+p.alto; (porY[k]=porY[k]||[]).push(p); });
       Object.keys(porY).forEach(function(yk){
-        const list=porY[yk].sort(function(a,b){ return a.x-b.x; });
-        const y=list[0].y, alto=list[0].alto, yp=Math.floor(y+1e-6)%2;
+        const list0=porY[yk].sort(function(a,b){ return a.x-b.x; });
+        const y=list0[0].y, alto=list0[0].alto, yp=Math.floor(y+1e-6)%2;
+        // Piezas de cara que CRUZAN un cambio de sección (dep): se PARTEN en la junta con
+        // largos ENTEROS (un resto de 0,5 se funde con la vecina → 1,5 + …), de modo que la
+        // banda saliente del lado hondo arranca EXACTO en la junta (sin hueco, normalmente
+        // con un 1,5) y cada pieza lleva el fondo de SU zona. En las demás hiladas (fondo
+        // uniforme) las piezas siguen cruzando la junta → el trabado entre tramos se mantiene.
+        const fronteraEn=function(p){   // 1ª frontera de dep estrictamente dentro de la pieza
+          let x=p.x, d0=depOf(x+0.005, y);
+          while(true){ const e=colEnd(x+0.005); if(e>=p.x+p.largo-1e-9) return null;
+            const d1=depOf(e+0.005, y); if(Math.abs(d1-d0)>1e-9) return e; d0=d1; x=e; }
+        };
+        const arr=list0.map(function(p){ return {x:p.x, y:p.y, largo:p.largo, alto:p.alto}; });
+        for(let idx=0; idx<arr.length; idx++){
+          const p=arr[idx]; if(!p) continue;
+          const B=fronteraEn(p); if(B==null) continue;
+          const lL=Math.round((B-p.x)*100)/100, lR=Math.round((p.x+p.largo-B)*100)/100;
+          let izq, der;
+          if(lL>=0.99) izq=[{x:p.x, largo:lL}];
+          else { const q=arr[idx-1];
+            if(q && Math.abs(q.x+q.largo-p.x)<1e-6 && fronteraEn(q)==null){
+              const s=q.largo+lL; arr[idx-1]=null;
+              izq=(s>2.25)? [{x:q.x, largo:1.5},{x:q.x+1.5, largo:s-1.5}] : [{x:q.x, largo:s}];
+            } else izq=[{x:p.x, largo:lL}];
+          }
+          if(lR>=0.99) der=[{x:B, largo:lR}];
+          else { const q=arr[idx+1];
+            if(q && Math.abs(p.x+p.largo-q.x)<1e-6 && fronteraEn(q)==null){
+              const s=lR+q.largo; arr[idx+1]=null;
+              der=(s>2.25)? [{x:B, largo:1.5},{x:B+1.5, largo:s-1.5}] : [{x:B, largo:s}];
+            } else der=[{x:B, largo:lR}];
+          }
+          arr[idx]=null;
+          izq.concat(der).forEach(function(t){ arr.push({x:t.x, y:p.y, largo:t.largo, alto:p.alto}); });
+        }
+        const list=arr.filter(Boolean).sort(function(a,b){ return a.x-b.x; });
         // banda frontal: pieza a pieza (conserva remates y rincones de la cara)
         const frentes=[];
         list.forEach(function(p){
