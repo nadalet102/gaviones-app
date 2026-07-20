@@ -97,9 +97,22 @@ function elePlaceD(s, r, x, pl, y, alto, dOff, bw, arm){
   return {x:x0, y:y, z:zz, l:bw, a:pl, h:alto, largo:pl, arm:arm, dx:s.dx, dy:s.dy};
 }
 function eleBoxes(){
-  const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return [];
-  const fix = data.ancho || null;                 // ancho fijo elegido (1 / 0,5 / 0,3) o null = prontuario
-  const cara = data.cara || 'int';                // ensanche de la base: 'int' hacia dentro (cara lisa) · 'ext' hacia fuera (sobresale)
+  const M = window.__muroEle; if(!M || !M.segs || !M.segs.length) return [];
+  // Varios muros en la hoja: cada muro genera sus cajas POR SEPARADO (footprint, esquinas y
+  // trabado propios — el centroide de uno no puede girar la cara del otro) y se concatenan.
+  // b.arm se reindexa al índice GLOBAL de recta para que los alzados encuentren sus piezas.
+  const walls = M.muros || [M]; let all=[], off=0;
+  walls.forEach(function(wd){
+    const bs = eleBoxesMuro(wd, M);
+    if(off) bs.forEach(function(b){ if(typeof b.arm==='number') b.arm+=off; });
+    all = all.concat(bs); off += (wd.segs||[]).length;
+  });
+  return all;
+}
+function eleBoxesMuro(data, top){
+  if(!data || !data.segs || !data.segs.length) return [];
+  const fix = (top||data).ancho || null;          // ancho fijo elegido (1 / 0,5 / 0,3) o null = prontuario
+  const cara = (top||data).cara || 'int';         // ensanche de la base: 'int' hacia dentro (cara lisa) · 'ext' hacia fuera (sobresale)
   const w = fix || 1, segs=data.segs, n=segs.length, boxes=[];
   // Orden de las bandas de una hilada ancha, del frente hacia el terreno:
   // · 'int' (cara lisa): el de 50/30 DELANTE y los de 100 detrás → la junta entre bandas cae a
@@ -344,7 +357,8 @@ function eleBoxes(){
 }
 function muro3dEle(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return;
-  muro3dOpen(eleBoxes(), 'Muro en L/U · '+data.T.length+' recta(s)'+(data.ancho?(' · ancho '+fmtN(data.ancho)+' m'):''));
+  const nm = data.muros ? data.muros.length : 1;
+  muro3dOpen(eleBoxes(), 'Muro en L/U · '+(nm>1?(nm+' muros · '):'')+data.T.length+' recta(s)'+(data.ancho?(' · ancho '+fmtN(data.ancho)+' m'):''));
 }
 
 function muro3dInjectCSS(){
