@@ -315,17 +315,21 @@ function fichaEle(){
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[]; if(!boxes.length) return;
   const d=eleDespieceBoxes(boxes), fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
   const T=data.T, segs=data.segs, fix=data.ancho||null;
-  const largoTot=segs.reduce(function(s,x){return s+x.largo;},0), nEsq=Math.max(0,segs.length-1);
+  // esquinas POR MURO: entre muros distintos de la hoja no hay esquina
+  const nM=(data.muros||[data]).length;
+  const nEsq=(data.muros||[data]).reduce(function(a,m){return a+Math.max(0,m.segs.length-1);},0);
+  const largoTot=segs.reduce(function(s,x){return s+x.largo;},0);
   const Hmax=Math.max.apply(null,T.map(function(t){return t.H;}));
   const peso=d.vol*FICHA_PARAM.densRelleno;
   const Ea=0.5*FICHA_PARAM.Ka*FICHA_PARAM.gamma*Hmax*Hmax;
   const kv=(k,v,hi)=>'<div class="fk-kv'+(hi?' fk-hi':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
-  const alzados=data.estados.map(function(st,i){ return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#334155">Recta '+(i+1)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos'):'')+'</div>'+croquisPorCotasInter(st,true)+'</div>'; }).join('');
+  const alzados=data.estados.map(function(st,i){ return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#334155">'+eleRectaLbl(i)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos'):'')+'</div>'+croquisPorCotasInter(st,true)+'</div>'; }).join('');
   const sheet=
-    fichaHead('Muro de gaviones en L/U', segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario'))+
+    fichaHead('Muro de gaviones en L/U', (nM>1?(nM+' muros · '):'')+segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario'))+
     '<div class="fk-body">'+
       '<div class="fk-sec"><h2><i class="ti ti-ruler-2"></i> Datos del muro</h2><div class="fk-grid">'+
         kv('Longitud total (ext.)', fnum(largoTot)+' <small>m</small>')+ kv('Altura máx.', fmtm(Hmax)+' <small>m</small>')+
+        (nM>1?kv('Muros en la hoja', fnum(nM)):'')+
         kv('Esquinas', fnum(nEsq))+ kv('Ancho', fix?(fmtm(fix)+' <small>m</small>'):'<span style="font-size:15px">Prontuario</span>')+
       '</div></div>'+
       '<div class="fk-sec"><h2><i class="ti ti-map-2"></i> Planta (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(segs, fix||1)+'</div>'+
@@ -391,7 +395,8 @@ function elePlanoHiladas(){
       '<div style="font-size:12px;margin-top:6px;color:#334155">'+lista+'</div></div>';
   }).join('');
   const chip=(c,s,t)=>'<span style="display:inline-block;width:12px;height:12px;background:'+c+';border:1px solid '+s+';vertical-align:middle"></span> '+t;
-  const sheet=fichaHead('Plano por hiladas · muro en L/U', data.T.length+' recta(s) · '+lvls.length+' hiladas · de arriba abajo'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):''))+
+  const nM=(data.muros||[data]).length;
+  const sheet=fichaHead('Plano por hiladas · muro en L/U', (nM>1?(nM+' muros · '):'')+data.T.length+' recta(s) · '+lvls.length+' hiladas · de arriba abajo'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):''))+
     '<div class="fk-body">'+
       '<div class="fk-sec"><h2><i class="ti ti-info-circle"></i> Cómo leerlo</h2><div style="font-size:12.5px;color:#334155">Una lámina por hilada, de la más alta a la base. Cada lámina es la <strong>vista en planta</strong> (desde arriba) de esa fila con TODOS los gaviones ya colocados: brazos, esquinas engranadas (headers que cruzan el rincón) y bandas de profundidad. '+fichaLeyendaNorma()+'</div></div>'+
       secs+ fichaNota()+
@@ -427,7 +432,8 @@ function eleA3(){
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[]; if(!boxes.length) return;
   const fmtm=x=>String(Math.round(x*100)/100).replace('.',',');
   const T=data.T, segs=data.segs, fix=data.ancho||null, cara=data.cara||'int';
-  const nEsq=Math.max(0,segs.length-1);
+  const nM=(data.muros||[data]).length;
+  const nEsq=(data.muros||[data]).reduce(function(a,m){return a+Math.max(0,m.segs.length-1);},0);
   const largoTot=segs.reduce(function(s,x){return s+x.largo;},0);
   const Hmax=Math.max.apply(null,T.map(function(t){return t.H;}));
   // gaviones por tipo (todas las cajas)
@@ -439,7 +445,7 @@ function eleA3(){
     return '<span style="display:inline-flex;align-items:center;gap:6px;margin:3px 16px 3px 0;font-size:13.5px"><span style="width:14px;height:14px;background:'+c.f+';border:1px solid '+c.s+';display:inline-block;border-radius:2px"></span>'+Math.round(t.largo*100)+'×'+Math.round(t.ancho*100)+'×'+Math.round(t.alto*100)+': <strong>'+fnum(t.n)+'</strong></span>'; }).join('');
   // alzados por recta (anchos de A3)
   const alzados=segs.map(function(s,i){
-    return '<div class="fk-sec fk-noBreak"><h2><i class="ti ti-chart-bar"></i> Perfil / alzado · recta '+(i+1)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos'):'')+'</h2>'+
+    return '<div class="fk-sec fk-noBreak"><h2><i class="ti ti-chart-bar"></i> Perfil / alzado · '+eleRectaLbl(i).toLowerCase()+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos'):'')+'</h2>'+
       '<div class="fk-draw" style="display:block;overflow-x:auto">'+croquisAlzadoPlano(i, 1430)+'</div></div>';
   }).join('');
   // hiladas de coronación a base
@@ -454,7 +460,7 @@ function eleA3(){
       eleCroquisHilada(bs, 1430)+'</div>';
   }).join('');
   const sheet=
-    fichaHead('Plano de montaje · muro en L/U (A3)', segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m ext. · '+fnum(vol,1)+' m³'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario')+((cara==='ext')?' · base hacia fuera':' · base hacia dentro'))+
+    fichaHead('Plano de montaje · muro en L/U (A3)', (nM>1?(nM+' muros · '):'')+segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m ext. · '+fnum(vol,1)+' m³'+(fix?(' · ancho '+fmtm(fix)+' m'):' · sección prontuario')+((cara==='ext')?' · base hacia fuera':' · base hacia dentro'))+
     '<div class="fk-body">'+
       '<div class="fk-sec fk-noBreak"><h2><i class="ti ti-map-2"></i> Planta acotada (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(segs, fix||1, 1380)+'</div></div>'+
       alzados+
@@ -487,7 +493,9 @@ function eleAlzadoFrontal(i){
   const data=window.__muroEle; if(!data) return [];
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
   const segs=data.segs, s=segs[i], w=data.ancho||1;
-  const R=(typeof eleFootprint==='function')?eleFootprint(segs, w):null; if(!R) return [];
+  // footprint por muro (eleFootprintAll): con varios muros en la hoja, el centroide de uno
+  // no debe decidir el lado interior del otro; el índice global i se conserva
+  const R=(typeof eleFootprintAll==='function')?eleFootprintAll(segs, w):((typeof eleFootprint==='function')?eleFootprint(segs, w):null); if(!R) return [];
   const r=R[i], arm=[];
   // profundidad respecto a la línea exterior dibujada (NEGATIVA si la base sobresale con
   // «ensanche hacia fuera») + coordenada local a lo largo del brazo
@@ -548,14 +556,15 @@ function elePlano(){
   const tipos=Object.keys(map).map(k=>map[k]).sort((a,b)=>(b.alto-a.alto)||(b.ancho-a.ancho)||(b.largo-a.largo));
   const chips=tipos.map(function(t){ const c=colorGavion(t.largo,t.ancho,t.alto);
     return '<span style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;font-size:12.5px"><span style="width:13px;height:13px;background:'+c.f+';border:1px solid '+c.s+';display:inline-block;border-radius:2px"></span>'+Math.round(t.largo*100)+'×'+Math.round(t.ancho*100)+'×'+Math.round(t.alto*100)+': <strong>'+fnum(t.n)+'</strong></span>'; }).join('');
-  const T=data.T, nEsq=Math.max(0,data.segs.length-1);
+  const T=data.T, nM=(data.muros||[data]).length;
+  const nEsq=(data.muros||[data]).reduce(function(a,m){return a+Math.max(0,m.segs.length-1);},0);
   const largoTot=data.segs.reduce(function(s,x){return s+x.largo;},0);
   const alzados=data.segs.map(function(s,i){
-    return '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Perfil · recta '+(i+1)+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos fundidos'):'')+'</h2>'+
+    return '<div class="fk-sec"><h2><i class="ti ti-chart-bar"></i> Perfil · '+eleRectaLbl(i).toLowerCase()+' · '+fnum(T[i].largo)+' m · alt máx '+fmtm(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos fundidos'):'')+'</h2>'+
       '<div class="fk-draw" style="display:block;overflow-x:auto">'+croquisAlzadoPlano(i)+'</div></div>';
   }).join('');
   const sheet=
-    fichaHead('Plano 2D · muro en L/U', data.segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):' · sección prontuario')+((data.cara==='ext')?' · base hacia fuera':''))+
+    fichaHead('Plano 2D · muro en L/U', (nM>1?(nM+' muros · '):'')+data.segs.length+' recta(s) · '+nEsq+' esquina(s) · '+fnum(largoTot)+' m exteriores'+(data.ancho?(' · ancho '+fmtm(data.ancho)+' m'):' · sección prontuario')+((data.cara==='ext')?' · base hacia fuera':''))+
     '<div class="fk-body">'+
       '<div class="fk-sec"><h2><i class="ti ti-map-2"></i> Planta (medidas exteriores)</h2><div class="fk-draw">'+croquisPlantaLU(data.segs, data.ancho||1)+'</div></div>'+
       alzados+
