@@ -109,11 +109,23 @@ function eleBoxes(){
   });
   return all;
 }
+// ESPEJO de la planta para el 3D (y → −y): el 3D usa (x, altura, z) a derechas, así que si
+// z copiara la y de la planta tal cual, la escena saldría en ESPEJO (un retorno dibujado
+// hacia arriba-derecha aparecería girado — «me lo pones todo al revés»). Con z = −y la
+// planta se construye tal como se dibuja: arriba del dibujo = detrás (terreno), y la cámara
+// por defecto (+z) queda DELANTE mirando la cara vista, leyendo izquierda→derecha.
+function eleMirrorY(segs, R){
+  const ms=segs.map(function(s){ return Object.assign({}, s, {p0:{x:s.p0.x, y:-s.p0.y}, p1:{x:s.p1.x, y:-s.p1.y}, dy:-s.dy}); });
+  const mr=R ? R.map(function(r,i){ return {rx:r.rx, ry:-(r.ry+r.rh), rw:r.rw, rh:r.rh, nx:r.nx, ny:-r.ny, s:ms[i]}; }) : null;
+  return {segs:ms, R:mr};
+}
 function eleBoxesMuro(data, top){
   if(!data || !data.segs || !data.segs.length) return [];
   const fix = (top||data).ancho || null;          // ancho fijo elegido (1 / 0,5 / 0,3) o null = prontuario
   const cara = (top||data).cara || 'int';         // ensanche de la base: 'int' hacia dentro (cara lisa) · 'ext' hacia fuera (sobresale)
-  const w = fix || 1, segs=data.segs, n=segs.length, boxes=[];
+  const w = fix || 1, n=data.segs.length, boxes=[];
+  const mir = eleMirrorY(data.segs, (typeof eleFootprint==='function') ? eleFootprint(data.segs, w) : null);
+  const segs = mir.segs;
   // Orden de las bandas de una hilada ancha, del frente hacia el terreno:
   // · 'int' (cara lisa): el de 50/30 DELANTE y los de 100 detrás → la junta entre bandas cae a
   //   media losa bajo la hilada superior (traba).
@@ -128,7 +140,7 @@ function eleBoxesMuro(data, top){
   // de largo recBig, cruza la esquina); el otro brazo recede recSmall. Para 0,3 m el recorte se
   // redondea a 0,5 (queda 0,2 de holgura en el rincón; se cierra al atar en obra).
   const recBig = Math.max(1, 2*w), recSmall = Math.ceil(w*2 - 1e-9)/2;
-  const R = (typeof eleFootprint==='function') ? eleFootprint(segs, w) : null;
+  const R = mir.R;   // huella en el marco espejado (misma configuración de lado que la planta)
   for(let i=0;i<n;i++){ const s=segs[i], st=data.estados[i]; if(!st) continue;
     const r = R ? R[i] : {rx:s.p0.x-w/2, ry:s.p0.y-w/2}, Lext=s.largo;
     const flat = st.base.every(b=>Math.abs(b-st.base[0])<1e-6) && st.crown.every(c=>Math.abs(c-st.crown[0])<1e-6);

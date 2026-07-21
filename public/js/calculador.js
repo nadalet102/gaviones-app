@@ -963,14 +963,24 @@ function eleFootprintAll(segs, w){
 function eleFootprint(segs, w){
   const pts=[]; segs.forEach((s,i)=>{ if(i===0)pts.push(s.p0); pts.push(s.p1); });
   const cx=pts.reduce((a,p)=>a+p.x,0)/pts.length, cy=pts.reduce((a,p)=>a+p.y,0)/pts.length;
-  return segs.map(s=>{ const midx=(s.p0.x+s.p1.x)/2, midy=(s.p0.y+s.p1.y)/2;
+  // normal interior por tramo según el centroide (recto puro → a la derecha del sentido)
+  const ns=segs.map(s=>{ const midx=(s.p0.x+s.p1.x)/2, midy=(s.p0.y+s.p1.y)/2;
     let nx=-s.dy, ny=s.dx;
     const dot=(cx-midx)*nx+(cy-midy)*ny;
-    // Muro RECTO puro (el centroide cae sobre la línea): el interior/terreno va a la DERECHA
-    // del sentido de dibujo → la CARA VISTA queda mirando a la cámara por defecto del 3D
-    // (que respeta el sentido izquierda→derecha del dibujo). Con giros manda el centroide.
     if(Math.abs(dot)<1e-9){ nx=s.dy; ny=-s.dx; }
-    else if(dot<0){ nx=-nx; ny=-ny; }   // normal hacia el interior
+    else if(dot<0){ nx=-nx; ny=-ny; }
+    return {nx:nx, ny:ny}; });
+  // LADO DEL TERRENO en muros de UNA sola recta: el usuario dibuja con «arriba = detrás/
+  // terreno», así que si el interior quedó hacia abajo se pasa arriba (con el espejo del 3D,
+  // este cambio deja el muro recto EXACTAMENTE como antes: cara a cámara, izquierda→derecha).
+  // Los muros CON esquinas conservan la configuración del centroide: es la única en la que
+  // los brazos se SOLAPAN en el rincón (esquina interior) y el encastre puede engranar —
+  // en la contraria los cuerpos quedan corner-con-corner y el muro saldría partido.
+  if(segs.length===1){
+    let S=0; segs.forEach((s,i)=>{ S+=s.largo*ns[i].ny; });
+    if(S<-1e-9) ns.forEach(n=>{ n.nx=-n.nx; n.ny=-n.ny; });
+  }
+  return segs.map((s,i)=>{ const nx=ns[i].nx, ny=ns[i].ny;
     let rx,ry,rw,rh;
     if(s.dx!==0){ rx=Math.min(s.p0.x,s.p1.x); rw=s.largo; ry=(ny<0)?s.p0.y-w:s.p0.y; rh=w; }
     else { ry=Math.min(s.p0.y,s.p1.y); rh=s.largo; rx=(nx<0)?s.p0.x-w:s.p0.x; rw=w; }
