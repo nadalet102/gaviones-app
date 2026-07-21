@@ -359,12 +359,14 @@ function eleCroquisHilada(bs, wMax){
   const sc=Math.max(4, Math.min(24, Math.min((wMax-100)/Wm, 460/Hm)));
   const padL=34, padT=16, padR=16, padB=34;
   const vbW=padL+Wm*sc+padR, vbH=padT+Hm*sc+padB;
-  const X=x=>padL+(x-minX)*sc, Y=z=>padT+(maxZ-z)*sc;
+  // Las cajas del 3D llevan z = −y de la planta (eleMirrorY) → aquí se dibuja con la z MENOR
+  // arriba para que la lámina quede orientada COMO LA PLANTA dibujada (arriba = detrás).
+  const X=x=>padL+(x-minX)*sc, Y=z=>padT+(z-minZ)*sc;
   let out='';
   bs.forEach(function(b){
     const col=colorGavion(b.largo, (Math.abs(b.l-b.largo)<1e-6)?b.a:b.l, b.h), rw=b.l*sc, rh=b.a*sc;
-    out+='<rect x="'+X(b.x).toFixed(1)+'" y="'+Y(b.z+b.a).toFixed(1)+'" width="'+Math.max(1,rw-1).toFixed(1)+'" height="'+Math.max(1,rh-1).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"><title>'+String(b.l).replace('.',',')+' × '+String(b.a).replace('.',',')+' × '+String(b.h).replace('.',',')+' m</title></rect>';
-    const cxp=X(b.x)+rw/2, cyp=Y(b.z+b.a)+rh/2, lbl=String(b.largo).replace('.',',');
+    out+='<rect x="'+X(b.x).toFixed(1)+'" y="'+Y(b.z).toFixed(1)+'" width="'+Math.max(1,rw-1).toFixed(1)+'" height="'+Math.max(1,rh-1).toFixed(1)+'" fill="'+col.f+'" stroke="'+col.s+'" stroke-width="0.7"><title>'+String(b.l).replace('.',',')+' × '+String(b.a).replace('.',',')+' × '+String(b.h).replace('.',',')+' m</title></rect>';
+    const cxp=X(b.x)+rw/2, cyp=Y(b.z)+rh/2, lbl=String(b.largo).replace('.',',');
     if(rw>=17 && rh>=9) out+='<text x="'+cxp.toFixed(1)+'" y="'+(cyp+3.2).toFixed(1)+'" font-size="9" fill="#0f172a" text-anchor="middle" font-family="system-ui">'+lbl+'</text>';
     else if(rh>=17 && rw>=9) out+='<text x="'+cxp.toFixed(1)+'" y="'+cyp.toFixed(1)+'" font-size="9" fill="#0f172a" text-anchor="middle" font-family="system-ui" transform="rotate(-90 '+cxp.toFixed(1)+' '+cyp.toFixed(1)+')" dominant-baseline="middle">'+lbl+'</text>';
   });
@@ -492,11 +494,13 @@ function fichaLeyendaNorma(){
 function eleAlzadoFrontal(i){
   const data=window.__muroEle; if(!data) return [];
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
-  const segs=data.segs, s=segs[i], w=data.ancho||1;
+  const w=data.ancho||1;
   // footprint por muro (eleFootprintAll): con varios muros en la hoja, el centroide de uno
-  // no debe decidir el lado interior del otro; el índice global i se conserva
-  const R=(typeof eleFootprintAll==='function')?eleFootprintAll(segs, w):((typeof eleFootprint==='function')?eleFootprint(segs, w):null); if(!R) return [];
-  const r=R[i], arm=[];
+  // no debe decidir el lado interior del otro; el índice global i se conserva.
+  // Se pasa al marco ESPEJADO (eleMirrorY, y→−y) porque las cajas del 3D viven ahí.
+  const R0=(typeof eleFootprintAll==='function')?eleFootprintAll(data.segs, w):((typeof eleFootprint==='function')?eleFootprint(data.segs, w):null); if(!R0) return [];
+  const mir=eleMirrorY(data.segs, R0), segs=mir.segs, R=mir.R;
+  const s=segs[i], r=R[i], arm=[];
   // profundidad respecto a la línea exterior dibujada (NEGATIVA si la base sobresale con
   // «ensanche hacia fuera») + coordenada local a lo largo del brazo
   boxes.forEach(function(b){ if(b.arm!==i) return;
