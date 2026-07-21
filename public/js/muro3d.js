@@ -121,7 +121,8 @@ function eleMirrorY(segs, R){
 }
 function eleBoxesMuro(data, top){
   if(!data || !data.segs || !data.segs.length) return [];
-  const fix = (top||data).ancho || null;          // ancho fijo elegido (1 / 0,5 / 0,3) o null = prontuario
+  // ancho fijo (1 / 0,5 / 0,3) o null = prontuario — POR MURO (cada muro de la hoja el suyo)
+  const fix = (data.ancho!==undefined) ? (data.ancho||null) : (((top||data).ancho)||null);
   const cara = (top||data).cara || 'int';         // ensanche de la base: 'int' hacia dentro (cara lisa) · 'ext' hacia fuera (sobresale)
   const w = fix || 1, n=data.segs.length, boxes=[];
   const mir = eleMirrorY(data.segs, (typeof eleFootprint==='function') ? eleFootprint(data.segs, w) : null);
@@ -370,7 +371,7 @@ function eleBoxesMuro(data, top){
 function muro3dEle(){
   const data = window.__muroEle; if(!data || !data.segs || !data.segs.length) return;
   const nm = data.muros ? data.muros.length : 1;
-  muro3dOpen(eleBoxes(), 'Muro en L/U · '+(nm>1?(nm+' muros · '):'')+data.T.length+' recta(s)'+(data.ancho?(' · ancho '+fmtN(data.ancho)+' m'):''));
+  muro3dOpen(eleBoxes(), 'Muro en L/U · '+(nm>1?(nm+' muros · '):'')+data.T.length+' recta(s)'+((typeof eleAnchoTxt==='function')?eleAnchoTxt(data):''));
 }
 
 function muro3dInjectCSS(){

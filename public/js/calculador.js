@@ -180,11 +180,12 @@ function renderCalculador(){
       '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Haz <strong>clic en la cuadrícula</strong> para ir extendiendo el muro (las esquinas salen a 90° solas). Con <strong>«Otro muro»</strong> puedes dibujar varios muros independientes en la misma hoja (el primer clic sitúa dónde empieza). Fija la altura por defecto y se aplica a todo lo que dibujes (luego puedes afinar cada tramo en la tabla).</div>'+
       '<div class="frow3" style="gap:12px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap">'+
         '<div class="field" style="margin:0"><label>Altura por defecto (m)</label><input type="number" id="el-alt-def" min="0.5" step="0.5" value="'+((window.__eleH)||3)+'" style="width:110px" oninput="eleSetH(this.value)"></div>'+
-        '<div class="field" style="margin:0"><label>Ancho del gavión</label><select id="el-ancho" style="width:210px" onchange="eleSetAncho(this.value)">'+
-          '<option value=""'+(!window.__eleAncho?' selected':'')+'>Prontuario (auto según altura)</option>'+
-          '<option value="1"'+(window.__eleAncho===1?' selected':'')+'>1 m (recto)</option>'+
-          '<option value="0.5"'+(window.__eleAncho===0.5?' selected':'')+'>0,50 m</option>'+
-          '<option value="0.3"'+(window.__eleAncho===0.3?' selected':'')+'>0,30 m</option>'+
+        '<div class="field" style="margin:0"><label>Ancho del gavión · muro activo</label><select id="el-ancho" style="width:210px" onchange="eleSetAncho(this.value)" title="Cada muro de la hoja puede llevar su ancho: elige el muro en los chips bajo la cuadrícula y ajusta aquí su ancho">'+
+          (function(){ const a=(typeof eleMuroCur==='function')?eleMuroCur().ancho:null;
+            return '<option value=""'+(!a?' selected':'')+'>Prontuario (auto según altura)</option>'+
+              '<option value="1"'+(a===1?' selected':'')+'>1 m (recto)</option>'+
+              '<option value="0.5"'+(a===0.5?' selected':'')+'>0,50 m</option>'+
+              '<option value="0.3"'+(a===0.3?' selected':'')+'>0,30 m</option>'; })()+
         '</select></div>'+
         '<div class="field" style="margin:0"><label>Ensanche de la base</label><select id="el-cara" style="width:250px" onchange="eleSetCara(this.value)" title="Solo afecta cuando la base es más ancha que 1 m (sección del prontuario)">'+
           '<option value="int"'+(window.__eleCara!=='ext'?' selected':'')+'>Hacia dentro (cara vista lisa)</option>'+
@@ -726,9 +727,11 @@ function perfilToggle(i){
 // con «Otro muro», el siguiente clic sitúa el inicio de un muro nuevo en la hoja.
 function eleDrawNorm(){
   let D=window.__eleDraw;
-  if(!D) D=window.__eleDraw={muros:[{ox:0,oy:0,seg:[]}],cur:0};
+  if(!D) D=window.__eleDraw={muros:[{ox:0,oy:0,seg:[],ancho:null}],cur:0};
   if(D.seg){ D.muros=[{ox:0,oy:0,seg:D.seg}]; delete D.seg; D.cur=0; }   // formato antiguo (un solo muro)
-  if(!D.muros||!D.muros.length){ D.muros=[{ox:0,oy:0,seg:[]}]; D.cur=0; }
+  if(!D.muros||!D.muros.length){ D.muros=[{ox:0,oy:0,seg:[],ancho:null}]; D.cur=0; }
+  // ancho del gavión POR MURO (null = prontuario); los estados antiguos heredan el global
+  D.muros.forEach(function(m){ if(m.ancho===undefined) m.ancho=window.__eleAncho||null; });
   if(D.cur==null||D.cur<0||D.cur>=D.muros.length) D.cur=D.muros.length-1;
   return D;
 }
@@ -756,8 +759,11 @@ function eleZoomReset(){ window.__eleZoom=1; eleGridRedraw(); }
 // Altura por defecto: se aplica a TODO lo dibujado (todos los muros) y a los tramos nuevos.
 function eleSetH(v){ const h=parseFloat(v); if(!(h>0)) return; window.__eleH=Math.max(0.5, Math.round(h*2)/2);
   eleDrawNorm().muros.forEach(function(m){ m.seg.forEach(function(s){ s.H=window.__eleH; }); }); eleGridRedraw(); }
-// Ancho del gavión en L/U: vacío = prontuario (auto); 1 / 0,5 / 0,3 = ancho fijo para todo el muro.
-function eleSetAncho(v){ window.__eleAncho = v ? parseFloat(v) : null; }
+// Ancho del gavión en L/U, POR MURO: vacío = prontuario (auto); 1 / 0,5 / 0,3 = ancho fijo.
+// El selector actúa sobre el MURO ACTIVO (cada muro de la hoja puede llevar el suyo).
+function eleSetAncho(v){ const M=eleMuroCur(); M.ancho = v ? parseFloat(v) : null;
+  window.__eleAncho=M.ancho;   // último usado: lo heredan los muros nuevos y los estados antiguos
+  eleGridRedraw(); }
 // Ensanche de la base (cuando la sección del prontuario supera 1 m):
 // 'int' hacia dentro (cara vista lisa, defecto) · 'ext' hacia fuera (la base sobresale de la línea).
 function eleSetCara(v){ window.__eleCara = (v==='ext') ? 'ext' : 'int'; }
@@ -798,7 +804,10 @@ function eleGridRedraw(){
     if(M.seg.length) wall+='<path d="'+path+'" fill="none" stroke="'+col+'" stroke-width="'+Math.max(3,Math.min(9,G.sc*0.9)).toFixed(1)+'" stroke-linejoin="round" stroke-linecap="round" opacity="'+(act?'0.8':'0.55')+'" pointer-events="none"/>';
   });
   const cur=D.muros[D.cur], nTr=D.muros.reduce(function(a,m){ return a+m.seg.length; },0);
-  const chips=D.muros.map(function(M,mi){ return '<button class="btn btn-sm '+(mi===D.cur?'btn-primary':'btn-outline')+'" onclick="eleMuroSel('+mi+')">Muro '+(mi+1)+(M.seg.length?(' · '+M.seg.length+' tr'):(M.ox==null?' · sitúalo':''))+'</button>'; }).join('')+
+  // el selector de ancho refleja SIEMPRE el muro activo
+  const selA=document.getElementById('el-ancho');
+  if(selA){ const va=(cur.ancho==null)?'':String(cur.ancho); if(selA.value!==va) selA.value=va; }
+  const chips=D.muros.map(function(M,mi){ return '<button class="btn btn-sm '+(mi===D.cur?'btn-primary':'btn-outline')+'" onclick="eleMuroSel('+mi+')">Muro '+(mi+1)+(M.seg.length?(' · '+M.seg.length+' tr'):(M.ox==null?' · sitúalo':''))+(M.ancho?(' · '+String(M.ancho).replace('.',',')+' m'):'')+'</button>'; }).join('')+
     '<button class="btn btn-outline btn-sm" onclick="eleMuroAdd()"><i class="ti ti-plus"></i> Otro muro</button>'+
     (multi?'<button class="btn btn-outline btn-sm" onclick="eleMuroDel()" title="Eliminar el muro activo"><i class="ti ti-trash"></i> Quitar muro '+(D.cur+1)+'</button>':'');
   const hint = (cur.ox==null) ? 'Haz clic en la cuadrícula para <strong>situar el inicio del muro '+(D.cur+1)+'</strong>.'
@@ -818,7 +827,7 @@ function eleGridRedraw(){
 // Varios muros en la hoja: añadir (el siguiente clic lo sitúa), elegir el activo y quitar.
 function eleMuroAdd(){ const D=eleDrawNorm();
   const idx=D.muros.findIndex(function(m){ return m.ox==null && !m.seg.length; });
-  if(idx>=0){ D.cur=idx; } else { D.muros.push({ox:null,oy:null,seg:[]}); D.cur=D.muros.length-1; }
+  if(idx>=0){ D.cur=idx; } else { D.muros.push({ox:null,oy:null,seg:[],ancho:(D.muros[D.cur]?D.muros[D.cur].ancho:null)||null}); D.cur=D.muros.length-1; }
   eleGridRedraw(); }
 function eleMuroSel(i){ const D=eleDrawNorm(); if(D.muros[i]){ D.cur=i; eleGridRedraw(); } }
 function eleMuroDel(){ const D=eleDrawNorm(); D.muros.splice(D.cur,1);
@@ -844,9 +853,9 @@ function eleSegDel(i){ const M=eleMuroCur(); M.seg.splice(i,1); eleGridRedraw();
 function eleUndo(){ const D=eleDrawNorm(), M=D.muros[D.cur];
   if(M.seg.length){ M.seg.pop(); } else if(D.muros.length>1){ D.muros.splice(D.cur,1); D.cur=D.muros.length-1; }
   eleGridRedraw(); }
-function eleClear(){ window.__eleDraw={muros:[{ox:0,oy:0,seg:[]}],cur:0}; eleGridRedraw(); }
-function eleEjemploL(){ window.__eleDraw={muros:[{ox:0,oy:0,seg:[{dx:1,dy:0,largo:20,ci:0,cf:2,H:3},{dx:0,dy:-1,largo:12,ci:2,cf:2,H:3}]}],cur:0}; eleGridRedraw(); }
-function eleEjemploU(){ window.__eleDraw={muros:[{ox:0,oy:0,seg:[{dx:1,dy:0,largo:16,ci:0,cf:1,H:3},{dx:0,dy:-1,largo:10,ci:1,cf:1,H:3},{dx:-1,dy:0,largo:16,ci:1,cf:0,H:3}]}],cur:0}; eleGridRedraw(); }
+function eleClear(){ window.__eleDraw={muros:[{ox:0,oy:0,seg:[],ancho:null}],cur:0}; eleGridRedraw(); }
+function eleEjemploL(){ window.__eleDraw={muros:[{ox:0,oy:0,ancho:null,seg:[{dx:1,dy:0,largo:20,ci:0,cf:2,H:3},{dx:0,dy:-1,largo:12,ci:2,cf:2,H:3}]}],cur:0}; eleGridRedraw(); }
+function eleEjemploU(){ window.__eleDraw={muros:[{ox:0,oy:0,ancho:null,seg:[{dx:1,dy:0,largo:16,ci:0,cf:1,H:3},{dx:0,dy:-1,largo:10,ci:1,cf:1,H:3},{dx:-1,dy:0,largo:16,ci:1,cf:0,H:3}]}],cur:0}; eleGridRedraw(); }
 function eleCalcular(){
   const res=document.getElementById('calc-result'); if(!res) return;
   const wallsIn=eleDrawNorm().muros.filter(function(m){ return m.seg.length && m.ox!=null; });
@@ -886,12 +895,16 @@ function eleCalcular(){
     let x=M.ox||0, y=M.oy||0; const gi0=segs.length;
     const segW=Tw.map(function(t,wi){ const p0={x:x,y:y}, p1={x:x+t.dx*t.largo,y:y+t.dy*t.largo}; x=p1.x; y=p1.y;
       return {p0:p0,p1:p1,dx:t.dx,dy:t.dy,largo:t.largo,H:t.H,i:gi0+wi,mi:mi,wi:wi}; });
-    muros.push({T:Tw, estados:estW, segs:segW});
+    muros.push({T:Tw, estados:estW, segs:segW, ancho:(M.ancho||null)});   // ancho del gavión POR MURO
     T.push.apply(T,Tw); estados.push.apply(estados,estW); segs.push.apply(segs,segW);
   });
-  const fix=window.__eleAncho||null;   // ancho fijo (1 / 0,5 / 0,3) o null = prontuario
+  // ancho "global": solo si TODOS los muros llevan el mismo (para los consumidores antiguos);
+  // con mezcla queda null y cada vista usa el ancho de su muro (muros[mi].ancho)
+  const anchosW=muros.map(function(m){ return m.ancho; });
+  const uniforme=anchosW.every(function(a){ return a===anchosW[0]; }) ? anchosW[0] : null;
+  const mixto=!anchosW.every(function(a){ return a===anchosW[0]; });
   const cara=window.__eleCara||'int';  // ensanche de la base: hacia dentro (cara lisa) o hacia fuera
-  window.__muroEle={T:T, estados:estados, segs:segs, muros:muros, ancho:fix, cara:cara};
+  window.__muroEle={T:T, estados:estados, segs:segs, muros:muros, ancho:uniforme, anchoMixto:mixto, cara:cara};
   // DESPIECE REAL pieza a pieza: las MISMAS cajas que la vista 3D (esquinas engranadas con
   // headers, bandas de profundidad y sección del prontuario incluidas) → las cuentas cuadran.
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
@@ -905,23 +918,29 @@ function eleCalcular(){
   const nEsq=muros.reduce(function(a,m){ return a+Math.max(0,m.T.length-1); },0);
   const nTr=wallsIn.reduce(function(a,m){ return a+m.seg.length; },0);
   const Hmax=Math.max.apply(null, T.map(t=>t.H));
-  // tarjeta de sección: prontuario (auto) o aviso si el ancho fijo se queda corto en altura
+  // tarjeta de sección POR MURO: prontuario (los muros en auto) + aviso por cada muro con
+  // ancho fijo que se queda corto en altura
   let secCard='';
-  if(!fix){
+  const wPront=muros.filter(function(m){ return !m.ancho; });
+  if(wPront.length){
     // Sección según la ALTURA DEL MURO (no la cota máxima del terreno): un muro de 4 m es
     // 1,5·1·1·1 aunque su coronación llegue a cota 8 por ir subiendo el terreno.
-    secCard='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)</div></div>'+
+    const Hp=Math.max.apply(null, wPront.map(function(m){ return Math.max.apply(null, m.T.map(function(t){return t.H;})); }));
+    secCard='<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-layout-distribute-horizontal"></i> Sección (prontuario ARISAC)'+(mixto?' · muros en auto':'')+'</div></div>'+
       '<div class="card-body" style="padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'+
-        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección del muro a la altura máx. ('+fmtm(Hmax)+' m)</div>'+croquisSeccionPront(Hmax, cara)+'</div>'+
+        '<div><div class="dim" style="font-size:11px;margin-bottom:4px">Sección del muro a la altura máx. ('+fmtm(Hp)+' m)</div>'+croquisSeccionPront(Hp, cara)+'</div>'+
         '<div class="dim" style="flex:1;min-width:220px;font-size:12px">A más altura, la base ensancha según el prontuario y añade bandas de profundidad. El despiece de arriba <strong>ya lo incluye</strong> (sale del modelo 3D pieza a pieza).'+
         (cara==='ext'?' <strong>Base hacia FUERA</strong>: el ensanche sobresale de la línea dibujada (escalones por delante); la trasera queda enrasada.':' <strong>Base hacia DENTRO</strong>: cara vista lisa; el ensanche se entierra hacia el terreno.')+'</div>'+
       '</div></div>';
-  } else if(Hmax>=2){
-    secCard='<div class="card" style="margin-top:14px"><div class="card-body" style="padding:10px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Ancho fijo de '+fmtm(fix)+' m con altura de '+fmtm(Hmax)+' m: no se aplica el ensanche de base del prontuario (recomendado a partir de 2 m). Revisa la estabilidad.</div></div>';
   }
-  const holgura03=(fix===0.3&&nEsq>0)?'<div class="dim" style="font-size:11px;margin-top:6px">Ancho 0,30 m: el recorte de esquina va a la rejilla de 0,5 → queda una holgura de 20 cm en el rincón, que se cierra al atar en obra.</div>':'';
+  muros.forEach(function(m,mi){ if(!m.ancho) return;
+    const Hw=Math.max.apply(null, m.T.map(function(t){return t.H;}));
+    if(Hw>=2) secCard+='<div class="card" style="margin-top:14px"><div class="card-body" style="padding:10px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> '+(muros.length>1?('Muro '+(mi+1)+': a'):'A')+'ncho fijo de '+fmtm(m.ancho)+' m con altura de '+fmtm(Hw)+' m: no se aplica el ensanche de base del prontuario (recomendado a partir de 2 m). Revisa la estabilidad.</div></div>';
+  });
+  const alg03=muros.some(function(m){ return m.ancho===0.3 && m.T.length>1; });
+  const holgura03=alg03?'<div class="dim" style="font-size:11px;margin-top:6px">Ancho 0,30 m: el recorte de esquina va a la rejilla de 0,5 → queda una holgura de 20 cm en el rincón, que se cierra al atar en obra.</div>':'';
   res.innerHTML=
-    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+(muros.length>1?(muros.length+' muros · '):'')+nTr+' tramo(s) · '+T.length+' recta(s) · '+nEsq+' esquina(s)'+(fix?(' · ancho '+fmtm(fix)+' m'):'')+'</div>'+
+    '<div class="card"><div class="card-hdr"><div class="card-title"><i class="ti ti-map-2"></i> Planta · muro en L/U · '+(muros.length>1?(muros.length+' muros · '):'')+nTr+' tramo(s) · '+T.length+' recta(s) · '+nEsq+' esquina(s)'+eleAnchoTxt(window.__muroEle)+'</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         '<button class="btn btn-outline btn-sm" onclick="elePlano()"><i class="ti ti-ruler-measure"></i> Plano 2D (perfiles)</button>'+
         '<button class="btn btn-outline btn-sm" onclick="elePlanoHiladas()"><i class="ti ti-stack-2"></i> Plano por hiladas</button>'+
@@ -929,18 +948,31 @@ function eleCalcular(){
         '<button class="btn btn-outline btn-sm" onclick="eleA3()"><i class="ti ti-printer"></i> Imprimir A3</button>'+
         '<button class="btn btn-primary btn-sm" onclick="muro3dEle()"><i class="ti ti-3d-cube-sphere"></i> Ver en 3D</button>'+
       '</div></div>'+
-      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs, fix||1)+
+      '<div class="card-body" style="padding:14px 16px;overflow-x:auto">'+croquisPlantaLU(segs, uniforme||1)+
       '<div class="dim" style="font-size:11px;margin-top:6px"><span style="display:inline-block;width:12px;height:12px;border:1.5px dashed #dc2626;vertical-align:middle"></span> esquina trabada — los gaviones alternan de brazo en cada hilada (matajunta también en el giro). Los tramos seguidos <strong>en la misma dirección</strong> se funden en una recta continua, trabada a través de la junta.</div>'+holgura03+'</div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-list-details"></i> Despiece total (según 3D)</div>'+
       '<span class="dim">'+fmtN(vol)+' m³ · '+fmtN(total)+' gaviones</span></div>'+
       '<div class="card-body" style="padding:8px 16px 12px"><table class="tbl"><thead><tr><th>Pieza</th><th>Medidas (l × a × h)</th><th class="r">Uds</th></tr></thead><tbody>'+filas+
       '<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:600">Total</td><td class="r mono" style="font-weight:700">'+fmtN(total)+'</td></tr></tbody></table>'+
-      '<div class="dim" style="font-size:11px;margin-top:6px">Cuenta pieza a pieza del modelo 3D: esquinas engranadas (headers que cruzan alternando de brazo)'+(fix?'':' y bandas de profundidad del prontuario')+' incluidas.</div></div></div>'+
+      '<div class="dim" style="font-size:11px;margin-top:6px">Cuenta pieza a pieza del modelo 3D: esquinas engranadas (headers que cruzan alternando de brazo)'+(wPront.length?' y bandas de profundidad del prontuario':'')+' incluidas.</div></div></div>'+
     secCard+
     '<div class="card" style="margin-top:14px"><div class="card-hdr"><div class="card-title"><i class="ti ti-chart-bar"></i> Alzados por recta</div></div>'+
       '<div class="card-body" style="padding:14px 16px">'+
-        estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">'+eleRectaLbl(i)+' · '+fmtN(T[i].largo)+' m · cotas '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt máx '+fmtN(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos fundidos'):'')+'</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
+        estados.map((st,i)=>'<div style="margin-bottom:14px"><div style="font-weight:600;font-size:12px;margin-bottom:4px">'+eleRectaLbl(i)+' · '+fmtN(T[i].largo)+' m · cotas '+fmtN(T[i].ci)+'→'+fmtN(T[i].cf)+' m · alt máx '+fmtN(T[i].H)+' m'+(T[i].tr&&T[i].tr.length>1?(' · '+T[i].tr.length+' tramos fundidos'):'')+(mixto?(' · ancho '+(muros[T[i].mi].ancho?fmtm(muros[T[i].mi].ancho)+' m':'prontuario')):'')+'</div><div style="overflow-x:auto">'+croquisPorCotasInter(st,true)+'</div></div>').join('')+
       '</div></div>';
+}
+// Texto del ancho para cabeceras: '' (todo prontuario) · ' · ancho X m' (uniforme) ·
+// ' · anchos por muro' (cada muro con el suyo).
+function eleAnchoTxt(data){
+  const d=data||window.__muroEle; if(!d) return '';
+  if(d.anchoMixto) return ' · anchos por muro';
+  return d.ancho?(' · ancho '+String(d.ancho).replace('.',',')+' m'):'';
+}
+// Ancho del gavión del muro mi (para huellas y vistas); w = valor por defecto.
+function eleAnchoDe(mi, w){
+  const d=window.__muroEle;
+  if(d&&d.muros&&d.muros[mi]&&d.muros[mi].ancho) return d.muros[mi].ancho;
+  return w||1;
 }
 // Etiqueta de una recta por su índice GLOBAL: con varios muros en la hoja se antepone el muro.
 function eleRectaLbl(i){
@@ -954,7 +986,7 @@ function eleRectaLbl(i){
 // Los muros van contiguos y en orden en la lista global → concatenar conserva el índice global.
 function eleFootprintAll(segs, w){
   const grupos=[]; segs.forEach(function(s){ const mi=s.mi||0; (grupos[mi]=grupos[mi]||[]).push(s); });
-  let R=[]; grupos.forEach(function(g){ if(g&&g.length) R=R.concat(eleFootprint(g, w)); });
+  let R=[]; grupos.forEach(function(g,mi){ if(g&&g.length) R=R.concat(eleFootprint(g, eleAnchoDe(mi, w))); });
   return R;
 }
 // Huella del muro en planta con MEDIDAS EXTERIORES: la polilínea que dibuja el usuario es la
@@ -999,7 +1031,7 @@ function croquisPlantaLU(segs, w, wMax){
   const pad=24, vbW=pad*2+Wm*sc, vbH=pad*2+Hm*sc;
   const X=xm=>pad+(xm-minX)*sc, Y=ym=>pad+(maxY-ym)*sc; let out='';
   gl.forEach(function(gseg){
-    const mi=gseg[0].mi||0, R=eleFootprint(gseg, w);
+    const mi=gseg[0].mi||0, R=eleFootprint(gseg, eleAnchoDe(mi, w));   // ancho del gavión de ESE muro
     R.forEach(function(r){ const s=r.s;
       out+='<rect x="'+X(r.rx).toFixed(1)+'" y="'+Y(r.ry+r.rh).toFixed(1)+'" width="'+(r.rw*sc).toFixed(1)+'" height="'+(r.rh*sc).toFixed(1)+'" fill="#3b82f6" fill-opacity="0.45" stroke="#1d4ed8" stroke-width="1.2"/>';
       const mx=r.rx+r.rw/2, my=r.ry+r.rh/2, ti=(s.wi!=null?s.wi:s.i);
@@ -1302,7 +1334,7 @@ function calcEstadoActual(){
   // 'ele' — requiere haber calculado (muroGuardar lo lanza antes)
   const data=window.__muroEle;
   const murosD=eleDrawNorm().muros.filter(function(m){ return m.seg.length && m.ox!=null; })
-    .map(function(m){ return {ox:m.ox||0, oy:m.oy||0, seg:m.seg}; });
+    .map(function(m){ return {ox:m.ox||0, oy:m.oy||0, ancho:m.ancho||null, seg:m.seg}; });
   if(!murosD.length||!data||!data.segs||!data.segs.length) return null;
   const boxes=(typeof eleBoxes==='function')?eleBoxes():[];
   const vol=boxes.reduce(function(s,b){ return s+b.l*b.a*b.h; },0);
@@ -1454,9 +1486,9 @@ async function muroCargar(id){
   window.__fichaMeta={obra:m.obra||'', cliente:m.cliente||''};
   window.__muroGuardadoId=m.id; window.__muroGuardadoNombre=m.nombre;
   if(m.modo==='ele' && d.ele){   // globales ANTES de renderizar: el formulario los lee
-    if(d.ele.muros)   // formato nuevo: varios muros en la hoja, cada uno con su origen
-      window.__eleDraw={muros:d.ele.muros.map(function(m2){ return {ox:m2.ox||0, oy:m2.oy||0, seg:(m2.seg||[]).map(function(s){ return Object.assign({},s); })}; }), cur:0};
-    else window.__eleDraw={muros:[{ox:0, oy:0, seg:(d.ele.seg||[]).map(function(s){ return Object.assign({},s); })}], cur:0};
+    if(d.ele.muros)   // formato nuevo: varios muros en la hoja, cada uno con su origen y su ancho
+      window.__eleDraw={muros:d.ele.muros.map(function(m2){ return {ox:m2.ox||0, oy:m2.oy||0, ancho:(m2.ancho!==undefined?m2.ancho:(d.ele.ancho||null)), seg:(m2.seg||[]).map(function(s){ return Object.assign({},s); })}; }), cur:0};
+    else window.__eleDraw={muros:[{ox:0, oy:0, ancho:(d.ele.ancho||null), seg:(d.ele.seg||[]).map(function(s){ return Object.assign({},s); })}], cur:0};
     if(d.ele.H) window.__eleH=d.ele.H;
     window.__eleAncho=d.ele.ancho||null;
     window.__eleCara=d.ele.cara||'int';
