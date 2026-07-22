@@ -144,7 +144,10 @@ function eleBoxesMuro(data, top){
   const R = mir.R;   // huella en el marco espejado (misma configuración de lado que la planta)
   for(let i=0;i<n;i++){ const s=segs[i], st=data.estados[i]; if(!st) continue;
     const r = R ? R[i] : {rx:s.p0.x-w/2, ry:s.p0.y-w/2}, Lext=s.largo;
-    const flat = st.base.every(b=>Math.abs(b-st.base[0])<1e-6) && st.crown.every(c=>Math.abs(c-st.crown[0])<1e-6);
+    // una recta EDITADA a mano (piezas quitadas/cambiadas) va SIEMPRE por el camino por cotas,
+    // que construye desde st.piezas y respeta los cambios (el camino plano re-tabica y los perdería)
+    const editada = (st.removed && st.removed.size>0) || st.editada;
+    const flat = !editada && st.base.every(b=>Math.abs(b-st.base[0])<1e-6) && st.crown.every(c=>Math.abs(c-st.crown[0])<1e-6);
     if(!flat){   // recta ESCALONADA (cotas/alturas variables): piezas del motor por cotas
       // (trabadas a través de las juntas de tramo) + profundidad del prontuario por columna.
       // La banda FRONTAL (la primera de bandasDe: 50/30 en 'int', 100 en 'ext') usa las piezas
@@ -160,7 +163,8 @@ function eleBoxesMuro(data, top){
         return anchos[Math.min(kIdx, anchos.length-1)]; };
       const colEnd=function(xm){ const j=colOf(xm); return st.edges? st.edges[j+1] : Math.min(st.L,(j+1)*st.cell); };
       const porY={};   // agrupado por (nivel, alto): las medias hiladas van aparte de las enteras
-      st.piezas.forEach(function(p){ const k=p.y+'|'+p.alto; (porY[k]=porY[k]||[]).push(p); });
+      st.piezas.forEach(function(p,pi){ if(st.removed && st.removed.has(pi)) return;   // quitados a mano: fuera
+        const k=p.y+'|'+p.alto; (porY[k]=porY[k]||[]).push(p); });
       Object.keys(porY).forEach(function(yk){
         const list0=porY[yk].sort(function(a,b){ return a.x-b.x; });
         const y=list0[0].y, alto=list0[0].alto, yp=Math.floor(y+1e-6)%2;
