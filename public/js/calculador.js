@@ -180,13 +180,20 @@ function renderCalculador(){
       '<div class="dim" style="font-size:11.5px;margin-bottom:10px">Haz <strong>clic en la cuadrícula</strong> para ir extendiendo el muro (las esquinas salen a 90° solas). Con <strong>«Otro muro»</strong> puedes dibujar varios muros independientes en la misma hoja (el primer clic sitúa dónde empieza). Fija la altura por defecto y se aplica a todo lo que dibujes (luego puedes afinar cada tramo en la tabla).</div>'+
       '<div class="frow3" style="gap:12px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap">'+
         '<div class="field" style="margin:0"><label>Altura por defecto (m)</label><input type="number" id="el-alt-def" min="0.5" step="0.5" value="'+((window.__eleH)||3)+'" style="width:110px" oninput="eleSetH(this.value)"></div>'+
-        '<div class="field" style="margin:0"><label>Ancho del gavión · muro activo</label><select id="el-ancho" style="width:210px" onchange="eleSetAncho(this.value)" title="Cada muro de la hoja puede llevar su ancho: elige el muro en los chips bajo la cuadrícula y ajusta aquí su ancho">'+
+        '<div class="field" style="margin:0"><label>Ancho del gavión · muro activo</label><div style="display:flex;gap:6px;align-items:center">'+
+          '<select id="el-ancho" style="width:210px" onchange="eleSetAncho(this.value)" title="Cada muro de la hoja puede llevar su ancho: elige el muro en los chips bajo la cuadrícula y ajusta aquí su ancho">'+
           (function(){ const a=(typeof eleMuroCur==='function')?eleMuroCur().ancho:null;
+            const std=(a===1||a===0.5||a===0.3), pers=(a&&!std);
             return '<option value=""'+(!a?' selected':'')+'>Prontuario (auto según altura)</option>'+
               '<option value="1"'+(a===1?' selected':'')+'>1 m (recto)</option>'+
               '<option value="0.5"'+(a===0.5?' selected':'')+'>0,50 m</option>'+
-              '<option value="0.3"'+(a===0.3?' selected':'')+'>0,30 m</option>'; })()+
-        '</select></div>'+
+              '<option value="0.3"'+(a===0.3?' selected':'')+'>0,30 m</option>'+
+              '<option value="custom"'+(pers?' selected':'')+'>Personalizado…</option>'; })()+
+          '</select>'+
+          (function(){ const a=(typeof eleMuroCur==='function')?eleMuroCur().ancho:null;
+            const pers=(a&&a!==1&&a!==0.5&&a!==0.3);
+            return '<input type="number" id="el-ancho-custom" min="0.5" step="0.5" value="'+(pers?a:1.5)+'" style="width:86px;display:'+(pers?'block':'none')+'" onchange="eleSetAnchoCustom(this.value)" title="Ancho a medida, de 0,5 en 0,5 m (se tabica en bandas de gaviones de 1 m y 0,5 m)">'; })()+
+        '</div></div>'+
         '<div class="field" style="margin:0"><label>Ensanche de la base</label><select id="el-cara" style="width:250px" onchange="eleSetCara(this.value)" title="Solo afecta cuando la base es más ancha que 1 m (sección del prontuario)">'+
           '<option value="int"'+(window.__eleCara!=='ext'?' selected':'')+'>Hacia dentro (cara vista lisa)</option>'+
           '<option value="ext"'+(window.__eleCara==='ext'?' selected':'')+'>Hacia fuera (la base sobresale)</option>'+
@@ -759,10 +766,26 @@ function eleZoomReset(){ window.__eleZoom=1; eleGridRedraw(); }
 // Altura por defecto: se aplica a TODO lo dibujado (todos los muros) y a los tramos nuevos.
 function eleSetH(v){ const h=parseFloat(v); if(!(h>0)) return; window.__eleH=Math.max(0.5, Math.round(h*2)/2);
   eleDrawNorm().muros.forEach(function(m){ m.seg.forEach(function(s){ s.H=window.__eleH; }); }); eleGridRedraw(); }
-// Ancho del gavión en L/U, POR MURO: vacío = prontuario (auto); 1 / 0,5 / 0,3 = ancho fijo.
-// El selector actúa sobre el MURO ACTIVO (cada muro de la hoja puede llevar el suyo).
-function eleSetAncho(v){ const M=eleMuroCur(); M.ancho = v ? parseFloat(v) : null;
+// Ancho del gavión en L/U, POR MURO: vacío = prontuario (auto); 1 / 0,5 / 0,3 = fijo;
+// 'custom' = PERSONALIZADO a mano (de 0,5 en 0,5 m; anchos >1 m se tabican en bandas de
+// gaviones reales de 1 y 0,5). El selector actúa sobre el MURO ACTIVO.
+function eleSetAncho(v){ const M=eleMuroCur();
+  if(v==='custom'){
+    const inp=document.getElementById('el-ancho-custom');
+    let n=inp?parseFloat(inp.value):NaN; if(!(n>0)) n=1.5;
+    M.ancho=Math.max(0.5, Math.round(n*2)/2);
+    if(inp){ inp.style.display='block'; inp.value=M.ancho; inp.focus(); }
+  } else {
+    M.ancho = v ? parseFloat(v) : null;
+    const inp=document.getElementById('el-ancho-custom'); if(inp) inp.style.display='none';
+  }
   window.__eleAncho=M.ancho;   // último usado: lo heredan los muros nuevos y los estados antiguos
+  eleGridRedraw(); }
+// Campo del ancho personalizado: redondea a pasos de 0,5 (mínimo 0,5) y aplica al muro activo.
+function eleSetAnchoCustom(v){ const n=parseFloat(v); if(!(n>0)) return;
+  const M=eleMuroCur(); M.ancho=Math.max(0.5, Math.round(n*2)/2);
+  window.__eleAncho=M.ancho;
+  const inp=document.getElementById('el-ancho-custom'); if(inp && String(M.ancho)!==inp.value) inp.value=M.ancho;
   eleGridRedraw(); }
 // Ensanche de la base (cuando la sección del prontuario supera 1 m):
 // 'int' hacia dentro (cara vista lisa, defecto) · 'ext' hacia fuera (la base sobresale de la línea).
@@ -804,9 +827,14 @@ function eleGridRedraw(){
     if(M.seg.length) wall+='<path d="'+path+'" fill="none" stroke="'+col+'" stroke-width="'+Math.max(3,Math.min(9,G.sc*0.9)).toFixed(1)+'" stroke-linejoin="round" stroke-linecap="round" opacity="'+(act?'0.8':'0.55')+'" pointer-events="none"/>';
   });
   const cur=D.muros[D.cur], nTr=D.muros.reduce(function(a,m){ return a+m.seg.length; },0);
-  // el selector de ancho refleja SIEMPRE el muro activo
-  const selA=document.getElementById('el-ancho');
-  if(selA){ const va=(cur.ancho==null)?'':String(cur.ancho); if(selA.value!==va) selA.value=va; }
+  // el selector de ancho (y el campo personalizado) reflejan SIEMPRE el muro activo
+  const selA=document.getElementById('el-ancho'), inpA=document.getElementById('el-ancho-custom');
+  if(selA){
+    const a=cur.ancho, pers=(a&&a!==1&&a!==0.5&&a!==0.3);
+    const va=pers?'custom':((a==null)?'':String(a));
+    if(selA.value!==va) selA.value=va;
+    if(inpA){ inpA.style.display=pers?'block':'none'; if(pers && inpA.value!==String(a)) inpA.value=a; }
+  }
   const chips=D.muros.map(function(M,mi){ return '<button class="btn btn-sm '+(mi===D.cur?'btn-primary':'btn-outline')+'" onclick="eleMuroSel('+mi+')">Muro '+(mi+1)+(M.seg.length?(' · '+M.seg.length+' tr'):(M.ox==null?' · sitúalo':''))+(M.ancho?(' · '+String(M.ancho).replace('.',',')+' m'):'')+'</button>'; }).join('')+
     '<button class="btn btn-outline btn-sm" onclick="eleMuroAdd()"><i class="ti ti-plus"></i> Otro muro</button>'+
     (multi?'<button class="btn btn-outline btn-sm" onclick="eleMuroDel()" title="Eliminar el muro activo"><i class="ti ti-trash"></i> Quitar muro '+(D.cur+1)+'</button>':'');
@@ -935,7 +963,10 @@ function eleCalcular(){
   }
   muros.forEach(function(m,mi){ if(!m.ancho) return;
     const Hw=Math.max.apply(null, m.T.map(function(t){return t.H;}));
-    if(Hw>=2) secCard+='<div class="card" style="margin-top:14px"><div class="card-body" style="padding:10px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> '+(muros.length>1?('Muro '+(mi+1)+': a'):'A')+'ncho fijo de '+fmtm(m.ancho)+' m con altura de '+fmtm(Hw)+' m: no se aplica el ensanche de base del prontuario (recomendado a partir de 2 m). Revisa la estabilidad.</div></div>';
+    // aviso SOLO si el ancho fijo se queda por debajo de la base que pide el prontuario a esa
+    // altura (un personalizado de 1,5 m a 4 m ya cumple; 1 m a 2,5 m también: base [1,1,1])
+    const need=(typeof seccionAnchos==='function' && Hw>=2)? seccionAnchos(Hw)[0] : 1;
+    if(Hw>=2 && m.ancho<need-1e-9) secCard+='<div class="card" style="margin-top:14px"><div class="card-body" style="padding:10px 16px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> '+(muros.length>1?('Muro '+(mi+1)+': a'):'A')+'ncho fijo de '+fmtm(m.ancho)+' m con altura de '+fmtm(Hw)+' m: el prontuario pide una base de '+fmtm(need)+' m a esa altura (con ancho fijo no se aplica el ensanche). Revisa la estabilidad.</div></div>';
   });
   const alg03=muros.some(function(m){ return m.ancho===0.3 && m.T.length>1; });
   const holgura03=alg03?'<div class="dim" style="font-size:11px;margin-top:6px">Ancho 0,30 m: el recorte de esquina va a la rejilla de 0,5 → queda una holgura de 20 cm en el rincón, que se cierra al atar en obra.</div>':'';
