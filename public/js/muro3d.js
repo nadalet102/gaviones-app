@@ -355,7 +355,19 @@ function eleBoxesMuro(data, top){
         if(hr.ry+hr.rh>Sz1+1e-6){ hz0=Sz0; hz1=Sz1+(recBig-w); } else { hz0=Sz0-(recBig-w); hz1=Sz1; }
       }
       const lx=hx1-hx0, lz=hz1-hz0;
-      boxes.push({x:hx0, y:c.y, z:hz0, l:lx, a:lz, h:c.alto, largo:Math.max(lx,lz), arm:hi, dx:hs.dx, dy:hs.dy});
+      // Con ancho ≤1 el header es UNA pieza (como siempre). Con ancho PERSONALIZADO >1 m
+      // (o largo >2 m) no existe ese gavión: se despieza en bandas de ≤1 m de ancho
+      // (muroBandas) y trozos de largo válido (muroTramo) — mismas piezas reales de obra.
+      const alongX=(hs.dx!==0), L=alongX?lx:lz, Wd=alongX?lz:lx;
+      const cortes=(L>2.01 && typeof muroTramo==='function')? muroTramo(L,0) : [L];
+      const bandas=(Wd>1.01 && typeof muroBandas==='function')? muroBandas(Wd) : [Wd];
+      let off=0;
+      cortes.forEach(function(pl){ let doff=0;
+        bandas.forEach(function(bw){
+          if(alongX) boxes.push({x:hx0+off, y:c.y, z:hz0+doff, l:pl, a:bw, h:c.alto, largo:pl, arm:hi, dx:hs.dx, dy:hs.dy});
+          else       boxes.push({x:hx0+doff, y:c.y, z:hz0+off, l:bw, a:pl, h:c.alto, largo:pl, arm:hi, dx:hs.dx, dy:hs.dy});
+          doff+=bw; });
+        off+=pl; });
     });
   }
   // dedup: en las esquinas, las bandas profundas de dos brazos se solapan al ir hacia el interior;
